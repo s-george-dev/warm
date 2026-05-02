@@ -1,0 +1,69 @@
+[
+  {
+    "make": "Ariston",
+    "model": "Clas HE Evo 30",
+    "gcNumber": "47-116-36",
+    "links": {
+      "FreeBoilerManuals": "https://www.freeboilermanuals.com/ariston/clas-he-evo-30",
+      "AristonDownloads": "https://www.ariston.com/en-uk/downloads/"
+    }
+  },
+  {
+    "make": "Ariston",
+    "model": "Genus HE 38",
+    "gcNumber": "47-116-34",
+    "links": {
+      "FreeBoilerManuals": "https://www.freeboilermanuals.com/ariston/genus-he-38",
+      "AristonDownloads": "https://www.ariston.com/en-uk/downloads/"
+    }
+  },
+  {
+    "make": "Ariston",
+    "model": "E-Combi Evo 24",
+    "gcNumber": "47-116-37",
+    "links": {
+      "FreeBoilerManuals": "https://www.freeboilermanuals.com/ariston/e-combi-evo-24",
+      "AristonDownloads": "https://www.ariston.com/en-uk/downloads/"
+    }
+  },
+  {
+    "make": "Ariston",
+    "model": "Microgenus HE 28 MFFI",
+    "gcNumber": "47-116-20",
+    "links": {
+      "FreeBoilerManuals": "https://www.freeboilermanuals.com/ariston/microgenus-he-28-mffi",
+      "AristonDownloads": "https://www.ariston.com/en-uk/downloads/"
+    }
+  },
+  {
+    "make": "Ariston",
+    "model": "Genus One Net 30",
+    "gcNumber": "47-116-45",
+    "links": {
+      "FreeBoilerManuals": "https://www.freeboilermanuals.com/ariston/genus-one-net-30",
+      "AristonDownloads": "https://www.ariston.com/en-uk/downloads/"
+    }
+  },
+
+
+  {
+    "make": "Vaillant",
+    "model": "ecoTEC Plus 824",
+    "gcNumber": "47-044-40",
+    "links": {
+      "FreeBoilerManuals": "https://www.freeboilermanuals.com/vaillant/",
+      "DHSSpares": "https://www.dhsspares.co.uk/userfiles/boiler_manuals/VAI037.pdf",
+      "BoilerManuals": "https://boilermanuals.co.uk/vaillant_manuals/vaillant-ecotec-plus-824-4704440/"
+    }
+  },
+  {
+    "make": "Worcester Bosch",
+    "model": "28CDi",
+    "gcNumber": "47-071-60",
+    "links": {
+      "FreeBoilerManuals": "https://www.freeboilermanuals.com/worcester/",
+      "DHSSpares": "https://www.dhsspares.co.uk/userfiles/boiler_manuals/WOR028.pdf",
+      "BoilerManuals": "https://boilermanuals.co.uk/worcester_manuals/worcester-28cdi-4707160/"
+    }
+  }
+]

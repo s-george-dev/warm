@@ -1,0 +1,113 @@
+
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-primary);
+  padding-top: 80px;
+  padding: 100px 0;
+  background-size: cover;
+  background-position: center;
+  top:0px;
+   z-index: 1;
+   height:500px;
+   overflow: hidden;
+}
+.hero .overlay {
+  position: absolute;
+  inset: 0;
+   z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 44, 102, 0.55),
+    rgba(4, 14, 30, 0.45)
+  );
+}
+.hero .inner {
+  position: relative;
+  z-index: 2;
+  max-width: 800px;
+   z-index: 1;
+}
+
+.hero h1 {
+  font-size: 2.4rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+   z-index: 1;
+}
+.hero p {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+   z-index: 1;
+}
+
+/*SLIDES */
+
+ /* Background slides */
+    .slide {
+      position: absolute;
+      top: -10px; left: 0;
+      width: 100%; height: 100%;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+	  border-radius: 20px;
+	  overflow:hidden;
+	  transform: scale(0.95);
+      transition: opacity 1.5s ease-in-out, transform 8s ease;
+    }
+    .slide.active {
+      opacity: 1;
+      transform: scale(1.05); /* subtle zoom */
+    }
+
+    /* Text overlay container */
+    .slide-content {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: rgba(0,0,0,0.35); /* overlay for readability */
+      transform: translateY(30px);
+      transition: opacity 1s ease, transform 1s ease;
+	  text-decoration:none;
+	  padding: 10px;
+	  padding-top: 110px;
+    }
+
+     .slide-content h1,
+     .slide-content p {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+
+    .slide.active .slide-content h1{
+      opacity: 1;
+      transform: translateY(0);
+      transition-delay: 0.5s; /* text comes in after image */
+    }
+	.slide.active .slide-content p{
+      opacity: 1;
+      transform: translateY(0);
+      transition-delay: 1.5s; /* text comes in after heading */
+    }
+
+    .slide-content h1 {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+	  color: var(--text-banner-primary);
+    }
+    .slide-content p {
+      font-size: 1.25rem;
+      max-width: 600px;
+	  color: var(--text-banner-secondary);
+    }

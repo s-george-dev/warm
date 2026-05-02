@@ -1,0 +1,192 @@
+.footer {
+  background: #062940;
+  color: #fff;
+  padding: 10px 10px; /*size of footer adjustment */
+  border-top: 4px solid #ffd166;
+  margin-top: 32px;
+  font-size: 0.95rem;
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between; /* spreads columns evenly */
+  align-items: flex-start;
+  gap: 40px;
+  text-align: center; /* centers text inside each column */
+}
+
+.footer-section {
+  flex: 1;              /* each takes equal width */
+  min-width: 200px;     /* prevents squashing on small screens */
+}
+
+.footer-bottom {
+  text-align: center;
+  margin-top: -40px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.footer-logo {
+  max-height: 100px;
+  margin-bottom: 12px;
+  height:100px;
+}
+
+.footer-section h4 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+  color: #ffd166;
+}
+
+.footer-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.footer-section ul li {
+  margin-bottom: 6px;
+}
+
+.footer-section a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.footer-section a:hover {
+  text-decoration: underline;
+}
+
+
+
+
+.footer-a{
+	text-decoration:none;
+}
+
+.gas-safe {
+  text-align: center;   /* centers both logo and text */
+}
+
+.gas-safe-logo {
+  display: block;
+  margin: 0 auto 8px;   /* centers logo and adds space below */
+  	height: 50px;
+  object-fit: cover;
+}
+
+
+/* Default (desktop/tablet) already uses flex row */
+
+@media (max-width: 768px) {
+  .footer-content {
+    flex-direction: column;     /* stack columns vertically */
+    align-items: center;        /* center them horizontally */
+    text-align: center;         /* center text inside */
+    gap: 20px;                  /* space between stacked sections */
+  }
+
+  .footer-section {
+    flex: none;                 /* remove equal width constraint */
+    width: 100%;                /* each takes full width */
+    max-width: 300px;           /* optional: keeps them from stretching too wide */
+  }
+
+  .footer-section ul {
+    padding: 0;
+  }
+
+  .footer-section ul li {
+    margin-bottom: 8px;
+  }
+
+  .footer-bottom {
+    margin-top: 20px;
+    font-size: 0.8rem;
+  }
+
+  .footer-logo {
+    max-height: 50px;           /* slightly smaller on mobile */
+    margin-bottom: 10px;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* BUTTONS ON SIDE */
+
+
+.book-us-btn {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  background: #ff9900;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 50px;
+  text-decoration: none;
+  font-weight: bold;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  transition: all 0.4s ease;
+  text-align:center;
+}
+
+.book-us-btn:hover {
+  background: #e68a00;
+}
+
+    .back-to-top {
+      position: fixed;
+      bottom: 100px;
+      right: 25px;
+      background: #ff9900;
+      color: #fff;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      text-decoration: none;
+      font-size: 20px;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      opacity: 0;              /* hidden by default */
+      pointer-events: none;    /* not clickable when hidden */
+      transition: opacity 0.3s ease;
+    }
+
+    .back-to-top.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .back-to-top:hover {
+      background: #e68a00;
+    }
+

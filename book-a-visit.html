@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Warm Right Ltd — Book a Visit</title>
+  <link rel="icon" href="assets/images/favicon.png">
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/mobile-nav.css">
+  <link rel="stylesheet" href="/assets/css/tiles.css">
+  <link rel="stylesheet" href="/assets/css/forms.css">
+  <link rel="stylesheet" href="/assets/css/footer.css">
+  <link rel="stylesheet" href="/assets/css/header.css">
+  <link rel="stylesheet" href="/assets/css/hero.css">
+  <link rel="stylesheet" href="/assets/css/responsive.css">
+</head>
+<body>
+  <header id="header"></header>
+  
+  <section class="hero">
+  <!-- Slide 1 -->
+  <div class="slide active" style="background-image:url('assets/images/book-2.png');">
+    <a class="slide-content">
+      <h1>Book Your Visit Today</h1>
+      <p>Fast, simple, and reliable — schedule your appointment in just a few clicks.</p>
+    </a>
+  </div>
+
+  <!-- Slide 2 -->
+  <div class="slide" style="background-image:url('assets/images/engineers.jpg');">
+    <a class="slide-content">
+      <h1>Expert Engineers</h1>
+      <p>Gas Safe and OFTEC registered professionals ready to help with heating and plumbing.</p>
+    </a>
+  </div>
+
+  <!-- Slide 3 -->
+  <div class="slide" style="background-image:url('assets/images/support.jpg');">
+    <a class="slide-content">
+      <h1>Here When You Need Us</h1>
+      <p>Emergency support available 24/7 — dependable service, day or night.</p>
+    </a>
+  </div>
+
+  <!-- Slide 4 -->
+<div class="slide" style="background-image:url('assets/images/online-booking.png');">
+  <a class="slide-content" href="#callback-form"> <!-- Changed link to callback -->
+    <h1>Request a Callback</h1>
+    <p>Leave your details and we’ll call you back at a time that suits you.</p>
+  </a>
+</div>
+</section>
+
+  <main class="container section">
+
+    <h2 class="section-heading">How would you like to book?</h2>
+    <p class="article-gap">Choose the option that suits you best — whether you’d like to call us, book online, or request a callback.</p>
+
+    <!-- Booking Options -->
+    <section class="tile-grid">
+      <a class="info-tile" id="call-to-book" href="tel:08007566748">
+  <img src="assets/images/annual-servicing.jpg" alt="Call to book" />
+  <h3 id="call-to-book-title">Call to Book</h3>
+  <p id="call-to-book-text">Contact us Monday – Sunday, 9am – 6pm</p>
+</a>
+
+      <a class="info-tile" href="tel:08007566736">
+        <img src="assets/images/water-damage.jpg" alt="Emergency" />
+        <h3>Emergencies (24/7)</h3>
+        <p>Call us anytime for urgent assistance</p>
+      </a>
+	  
+	  <a class="info-tile" href="mailto:info@warmright.uk?subject=Online%20Booking&body=Hello,%0A%0APlease%20could%20you%20email%20me%20with%20your%20availability.%0A%0AI%20would%20like%20to%20book%20in%20a%20(INSERT%20SERVICE).%0A%0AThank%20you,">
+        <img src="assets/images/water-damage.jpg" alt="Email Us" />
+        <h3>Book via email</h3>
+        <p>Email us anytime</p>
+      </a>
+
+      <a class="info-tile" id="callback-toggle">
+        <img src="assets/images/contact.jpg" alt="Request a callback" />
+        <h3>Request a Callback</h3>
+        <p>Leave your details and we’ll call you back at a convenient time</p>
+      </a>
+    </section>
+
+    <!-- Callback Form -->
+    <div id="callback-form" class="form-panel" style="display:none; margin-top:20px;">
+    <h2>Request a Call Back</h2>
+<p class="article-gap card">
+Fill in the form below and one of our team will give you a call.  
+<br><br>
+We aim to respond by the next working day — sooner if we can.
+</p>
+	  <form action="https://formspree.io/f/xjkalnqv" method="POST">
+        <fieldset>
+          <legend>Your details</legend>
+          <label>Name<input name="name" required></label>
+          <label>Email<input type="email" name="_replyto" required></label>
+          <label>Phone<input name="phone" required></label>
+          <label>Preferred callback time<input name="callback_time"></label>
+        </fieldset>
+        <div class="center">
+          <button type="submit" class="btn">Request Callback</button>
+        </div>
+      </form>
+    </div>
+
+
+  </main>
+
+  <footer id="footer"></footer>
+
+  <script src="assets/js/nav.js"></script>
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/include.js"></script>
+  <script>
+    // Toggle Callback form
+    document.getElementById("callback-toggle").addEventListener("click", () => {
+      document.getElementById("callback-form").style.display = "block";
+      document.getElementById("google-calendar").style.display = "none";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,486 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap');
+/* Global resets, typography, containers, and utility classes. */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Poppins", Inter, Arial, Helvetica, sans-serif;
+}
+html, body {
+  height: 100%;
+  background-color: var(--background-main);
+  color: #0f1724;
+  line-height: 1.5;
+  font-size: 14px; /*main font size */
+}
+.container {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 0 18px;
+}
+
+
+/* HEADINGS */
+
+h1{
+	
+}
+
+
+h2{
+	margin: 10px 0 10px 0;
+	font-size:2em;
+	position:relative;
+}
+
+h2::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;                   /* align to left edge */
+  width: 50%;                /* half the width of the h2 */
+  border-bottom: 4px solid var(--accent-teal);
+}
+
+/* ARTICLES */
+
+.article-gap{
+	font-size:14pt;
+	margin-bottom:60px;
+}
+.article-nogap{
+	font-size:14pt;
+	
+}
+.list-gap{
+	margin-bottom:100px;
+}
+
+
+/* EMBEDDED MAP IN ABOUT US */
+
+    /* === Map Section === */
+.map-section {
+  margin-top: 60px;
+  text-align: center;
+}
+
+.map-note {
+  margin-top: 10px;
+  color: #5b6470;
+  font-size: 0.95rem;
+}
+
+/* === Map Container === */
+.map-container {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.map-container iframe {
+  width: 100%;
+  height: 500px;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(10, 44, 102, 0.15);
+  pointer-events: none;
+  transition: filter 0.3s ease;
+}
+
+.map-container.active iframe {
+  pointer-events: auto;
+}
+
+.map-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 20px;
+  z-index: 2;
+  transition: opacity 0.4s ease;
+}
+
+.map-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.map-message {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 500;
+  text-align: center;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+}
+
+/* BOOKING PAGE */
+
+/* Modal overlay */
+.modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+
+/* Modal box */
+.modal-content {
+ background: var(--background-main);
+  padding: 30px;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  margin: auto;
+
+}
+
+/* Modal buttons */
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.close-modal{
+	cursor:pointer;
+}
+/* Tile state polish */
+.call-closed h3, .call-closed p {
+  color: #ff6666;
+}
+.call-open h3, .call-open p {
+  color: #2ecc71;
+}
+/* Smooth fade + scale for call-to-book tile text */
+#call-to-book h3,
+#call-to-book p {
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+#call-to-book.fading h3,
+#call-to-book.fading p {
+  opacity: 0;
+  transform: scale(0.95); /* shrink slightly while fading out */
+}
+
+
+/* ===========================
+   MODAL FOR CONTACT BUTTON
+   =========================== */
+
+
+
+
+/* Overlay */
+.call-modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(15, 23, 36, 0.7); /* darker overlay */
+  display: none; /* hidden by default */
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+  animation: fadeIn 0.4s ease forwards;
+}
+
+/* Modal box */
+.call-modal-content {
+  background: var(--background-main, #fff);
+  border-radius: 16px;
+  max-width: 500px;
+  width: 90%;
+  padding: 30px 24px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  transform: translateY(-40px);
+  opacity: 0;
+  animation: slideIn 0.5s ease forwards;
+  text-align: center;
+}
+
+/* Header with logo + close */
+.call-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.call-modal-logo {
+  height: 40px;
+}
+
+.call-modal-close {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.call-modal-close:hover {
+  color: var(--accent-teal, #2ecc71);
+}
+
+/* Heading + subtext */
+.call-modal-content h2 {
+  color: var(--accent-teal, #2ecc71);
+  margin-bottom: 8px;
+}
+.call-modal-content p {
+  color: #5b6470;
+  margin-bottom: 20px;
+}
+
+/* Buttons */
+.call-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.call-modal-actions .btn {
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  display: block;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.btn.primary {
+  background: var(--accent-teal, #2ecc71);
+  color: #fff;
+}
+.btn.primary:hover {
+  background: #27ae60;
+}
+
+.btn.danger {
+  background: #d63c2c;
+  color: #fff;
+}
+.btn.danger:hover {
+  background: #b83224;
+}
+
+.btn.secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+.btn.secondary:hover {
+  background: #e0e0e0;
+}
+
+.btn.close {
+  background: transparent;
+  color: #666;
+}
+.btn.close:hover {
+  color: #000;
+}
+
+/* Animations */
+@keyframes slideIn {
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes fadeIn {
+  from { background: rgba(15,23,36,0); }
+  to   { background: rgba(15,23,36,0.7); }
+}
+
+/* ===========================
+   FAQ SECTION STYLES
+   =========================== */
+
+.faq {
+  background: var(--card-bg, #fff);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+  padding: 1.5rem 2rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.faq:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.faq h3 {
+  font-size: 1.2rem;
+  color: var(--heading-color, #0a2c66);
+  margin-bottom: 0.75rem;
+  position: relative;
+  padding-right: 1.5rem;
+}
+
+.faq h3::after {
+  content: "+";
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: 1.4rem;
+  color: var(--accent-color, #d63c2c);
+  transition: transform 0.3s ease;
+}
+
+.faq.open h3::after {
+  content: "–";
+  transform: rotate(90deg);
+}
+
+.faq p {
+  font-size: 1rem;
+  color: var(--text-color, #333);
+  line-height: 1.6;
+  margin: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.4s ease;
+  opacity: 0;
+}
+
+.faq.open p {
+  max-height: 500px; /* ensures smooth expansion */
+  opacity: 1;
+}
+
+/* Container spacing for FAQ sections */
+section.article-gap .faq + .faq {
+  margin-top: 1rem;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .faq {
+    padding: 1rem 1.25rem;
+  }
+
+  .faq h3 {
+    font-size: 1.1rem;
+  }
+
+  .faq p {
+    font-size: 0.95rem;
+  }
+}
+
+/* Modal backdrop */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4);
+  justify-content: center;
+  align-items: center;
+}
+
+/* Modal content box */
+.modal-content {
+  background-color: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+/* Header layout */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+/* Brand group (logo + title) */
+.modal-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-logo {
+  height: 40px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* Close button */
+.close-modal {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #666;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.close-modal:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  transition: background 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #f9f9f9;
+}
+
+.no-match-tile {
+  display: block;
+  padding: 20px;
+  text-align: center;
+  background: #f9f9f9;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s ease;
+}
+
+.no-match-tile:hover {
+  background: #f0f0f0;
+}
+
+.indent{
+	padding-left:40px;
+}

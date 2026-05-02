@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Warm Right Ltd — Home</title>
+  <link rel="icon" href="assets/images/favicon.png">
+    <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+<link rel="stylesheet" href="/assets/css/header.css">
+<link rel="stylesheet" href="/assets/css/mobile-nav.css">
+<link rel="stylesheet" href="/assets/css/hero.css">
+<link rel="stylesheet" href="/assets/css/tiles.css">
+<link rel="stylesheet" href="/assets/css/forms.css">
+<link rel="stylesheet" href="/assets/css/footer.css">
+<link rel="stylesheet" href="/assets/css/responsive.css">
+</head>
+
+
+<header id="header"></header>
+
+<body>
+  <section class="hero" style="background-image:url('assets/images/home-hero.jpg')">
+    <div class="inner container">
+      <h1>Welcome to Warm Right</h1>
+      <p>Reliable heating & plumbing across Kent, South East London & East Sussex.</p>
+    </div>
+  </section>
+
+  <main class="container section">
+   
+     <section class="section-heading">
+  <h2>Welcome</h2>
+
+
+<!-- CAROUSEL -->
+  <div class="carousel-container">
+    <button class="carousel-btn left">‹</button>
+
+    <div class="carousel-track">
+	
+      <!-- Your tiles go here -->
+	  
+      <a class="info-tile" href="services.html">
+        <img src="assets/images/annual-servicing.jpg" alt="Our Services" />
+        <h3>Our Services</h3>
+        <p>Fast response, expert engineers, professional service. View our wide range of services available.</p>
+      </a>
+
+      <a class="info-tile">
+        <img src="assets/images/landlord-cp12.jpg" alt="Landlord-cp12" />
+        <h3>Are you a landlord?</h3>
+        <p>Professional safety checks with exceptional landlord and tenant support</p>
+      </a>
+
+      <a class="info-tile" href="second-opinion.html">
+        <img src="assets/images/breakdowns.jpg" alt="Second Opinions" />
+        <h3>Having issues with another company?</h3>
+        <p>A second opionion followed by a report may be the way forward</p>
+      </a>
+
+      <a class="info-tile" href="contact.html">
+        <img src="assets/images/contact.jpg" alt="Contact Us" />
+        <h3>Contacting us is easy</h3>
+        <p>Click here for our contact details </p>
+      </a>
+	  
+	
+    </div>
+
+    <button class="carousel-btn right">›</button>
+  </div>
+</section>
+       
+  </main>
+
+  <footer id="footer"></footer>
+  <script src="assets/js/include.js"></script>
+  <script src="assets/js/nav.js"></script>
+   <script src="assets/js/main.js"></script>
+</body>
+</html>

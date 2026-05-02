@@ -1,0 +1,133 @@
+
+.header {
+  position: relative;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1200;
+  background: rgba(10, 44, 102, 0.95); /* Slightly lighter than footer */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  color: #fff;
+  box-shadow: none;
+  transition: background 0.3s ease;
+  opacity: 0;
+  transform: translateY(-12px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  border-radius: 0 0 16px 16px;
+  /*overflow: hidden;*/
+}
+.header.loaded {
+  opacity: 1;
+  transform: none;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  gap: 12px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand img {
+  height: 46px;
+  width: auto;
+}
+.brand .title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.brand .sub {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+.nav {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+    flex-wrap: wrap;
+  row-gap: 8px;
+
+}
+.nav a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  display: inline-block;
+}
+.nav a:hover {
+  color: #ffd166;
+  border-bottom: 2px solid #ffd166;
+}
+
+.dropdown {
+  position: relative;
+  z-index: 1300;
+}
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #083155;
+  color: #fff;
+  min-width: 220px;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 10px 30px rgba(2, 12, 34, 0.18);
+  z-index: 1300;
+
+}
+.dropdown-menu a {
+  display: block;
+  padding: 8px 12px;
+  color: #fff;
+  border-radius: 6px;
+}
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+.call-btn {
+  background: #ffd166;
+  color: #07243b;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+
+@media (max-width: 1024px) {
+  .header-inner {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .nav {
+    display: none;
+	  flex-wrap: wrap;
+  row-gap: 8px;
+  }
+  .nav a.active {
+  color: #ffd166;
+  font-weight: 700;
+}
+
+  .menu-toggle {
+    display: block;
+    margin-left: auto;
+  }
+}
+container {
+  position: static; /* or relative if needed for layout */
+  z-index: auto;
+  overflow: visible;
+}
+
+

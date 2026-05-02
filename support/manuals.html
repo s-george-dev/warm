@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Boiler Manuals — Warm Right Ltd</title>
+  <link rel="icon" href="/assets/images/favicon.png">
+  <link rel="stylesheet" href="/assets/css/variables.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/mobile-nav.css">
+  <link rel="stylesheet" href="/assets/css/tiles.css">
+  <link rel="stylesheet" href="/assets/css/forms.css">
+  <link rel="stylesheet" href="/assets/css/footer.css">
+  <link rel="stylesheet" href="/assets/css/header.css">
+  <link rel="stylesheet" href="/assets/css/hero.css">
+  <link rel="stylesheet" href="/assets/css/responsive.css">
+</head>
+<body>
+  <header id="header"></header>
+
+  <!-- SLIDE SHOW -->
+  <section class="hero">
+    <!-- Slide 1: Manuals Overview -->
+    <div class="slide active" style="background-image:url('/assets/images/manuals-hero.png');">
+      <a class="slide-content">
+        <h1>Boiler Manuals Made Simple</h1>
+        <p>Find manuals for the UK’s most common boiler brands — or request one directly from us.</p>
+      </a>
+    </div>
+
+    <!-- Slide 2: FreeBoilerManuals -->
+    <div class="slide" style="background-image:url('/assets/images/freeboilermanuals.jpg');">
+      <a class="slide-content" href="https://www.freeboilermanuals.com" target="_blank" rel="noopener">
+        <h1>Browse Manuals Online</h1>
+        <p>Visit FreeBoilerManuals.com for instant access to hundreds of boiler manuals.</p>
+      </a>
+    </div>
+
+    <!-- Slide 3: Request a Manual -->
+    <div class="slide" style="background-image:url('/assets/images/request-manual.jpg');">
+      <a class="slide-content" href="#manual-request">
+        <h1>Can’t Find Your Manual?</h1>
+        <p>Send us a request and we’ll do our best to locate it for you.</p>
+      </a>
+    </div>
+  </section>
+
+  <main class="container section">
+
+    <!-- Intro -->
+    <section class="section-heading card">
+  <h2 class="card">Need a boiler manual?</h2>
+  <p class="article-gap">
+    Whether you're troubleshooting a fault code or just want to understand your boiler better, we’ve made it easy to access manuals for the most popular brands — all in one place.  
+   </p>
+</section>
+<section class="section-heading card">
+  <h2 class="card">Search by GC number or Manufacturer</h2>
+  <p class="article-gap">
+    Every gas appliance has a Gas Council (GC) number in order to identify that specific make and model. Your appliances GC number is found on the databadge, which is located on your appliance (Please note, not all appliances have their databadges visible). <br><br>If you can't find your GC number, don't worry! Our easy to find guide helps you locate your appliance's manual with ease. Just select your appliances make below and start typing the model number.
+  </p>
+	</section>
+	<!-- Brand tiles -->
+    <section class="tile-grid manufacturer-grid card">
+  <section class="tile-grid manufacturer-grid card">
+  
+  <a class="boiler-tile card" href="#" onclick="openModal(''); document.getElementById('gcInput').focus();">
+  <img src="/assets/images/manuals.jpg" alt="Search by GC">
+  <h3>Search by GC (Gas Council)</h3>
+  <p>Find your boiler by GC number</p>
+</a>
+  
+  <a class="boiler-tile card"  data-make="Ariston">
+    <img src="/assets/images/ariston.png" alt="Ariston">
+    <h3>Ariston</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Baxi">
+    <img src="/assets/images/baxi.png" alt="Baxi">
+    <h3>Baxi</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Ideal">
+    <img src="/assets/images/partners-ideal.png" alt="Ideal">
+    <h3>Ideal</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Potterton">
+    <img src="/assets/images/potterton.png" alt="Potterton">
+    <h3>Potterton</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Vaillant">
+    <img src="/assets/images/vaillant.png" alt="Vaillant">
+    <h3>Vaillant</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Viessmann">
+    <img src="/assets/images/viessmann.png" alt="Viessmann">
+    <h3>Viessmann</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Worcester Bosch">
+    <img src="/assets/images/worcester.png" alt="Worcester Bosch">
+    <h3>Worcester Bosch</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Glow-worm">
+    <img src="/assets/images/glowworm.png" alt="Glow-worm">
+    <h3>Glow-worm</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Ferroli">
+    <img src="/assets/images/ferroli.jpg" alt="Ferroli">
+    <h3>Ferroli</h3>
+    <p>View</p>
+  </a>
+
+  <a class="boiler-tile card"  data-make="Intergas">
+    <img src="/assets/images/intergas.png" alt="Intergas">
+    <h3>Intergas</h3>
+    <p>View</p>
+  </a>
+</section>
+</section>
+
+<section id="manual-lookup" class="section-heading card" style="display:none;">
+  
+  <h2 class="card">Search by Model</h2>
+  <p class="article-gap">Enter your boiler’s model or GC number to find direct links to trusted manual sources.</p>
+  <input type="text" id="manualSearch" placeholder="e.g. ecoTEC Plus 824 or 4704440" class="card">
+  <div id="manualResults" class="card"></div>
+  <div id="manualFallback" class="card" style="display:none;">
+    <p>Manual not here? <a href="#manual-request">Fill out a request form</a> and we’ll try to find it for you.</p>
+  </div>
+</section>
+
+
+    <!-- Request form -->
+    <section class="section-heading" id="manual-request">
+      <h2 class="card">Request a manual</h2>
+      <p class="article-gap card">If you can’t find what you’re looking for, send us a request and we’ll do our best to locate the right manual for your boiler.</p>
+
+      <div class="form-panel card">
+        <form action="https://formspree.io/f/xjkalnqv" method="POST" class="manual-request-form">
+          <label for="name">Name <span style="color:red;">*</span></label>
+          <input type="text" id="name" name="name" required>
+
+          <label for="email">Email <span style="color:red;">*</span></label>
+          <input type="email" id="email" name="_replyto" required>
+
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" name="phone">
+
+          <label for="make">Appliance Make</label>
+          <input type="text" id="make" name="make" placeholder="e.g. Vaillant, Worcester Bosch">
+
+          <label for="model">Appliance Model</label>
+          <input type="text" id="model" name="model" placeholder="e.g. EcoTec Plus 824">
+		  
+		   <label for="model">Appliance GC</label>
+          <input type="text" id="gc-number" name="gc-number" placeholder="e.g. 47-044-31">
+
+          <label for="details">Additional Details</label>
+          <textarea id="details" name="details" rows="4" placeholder="Any extra information..."></textarea>
+
+          <button class="card" type="submit">Submit Request</button>
+        </form>
+      </div>
+    </section>
+
+
+ <section class="section-heading card">
+  <h2 class="card">Our sources</h2>
+  <p class="article-gap">
+    We gratefully acknowledge the work of <a href="https://www.freeboilermanuals.com" target="_blank" rel="noopener">Free Boiler Manuals</a>, <a href="https://www.dhsspares.co.uk" target="_blank" rel="noopener">DHS Spares</a>, and <a href="https://www.boilermanuals.org.uk" target="_blank" rel="noopener"> the Boiler Manuals website</a> for making these resources freely available.  
+    Their dedication to open access helps engineers, homeowners, and curious minds alike — and we’re proud to help share it.
+  </p>
+</section>
+
+
+
+
+
+<div id="manualModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-brand">
+        <img src="/assets/images/logo.png" alt="Warm Right Logo" class="modal-logo">
+        <h2 class="modal-title">Warm Right Manual Locator</h2>
+      </div>
+      <span class="close-modal" onclick="closeModal()">×</span>
+    </div>
+  
+    <label for="makeInput">Make</label>
+    <input type="text" id="makeInput" readonly>
+
+    <label for="modelInput">Model</label>
+    <input type="text" id="modelInput" placeholder="Start typing model...">
+
+    <label for="gcInput">GC Number</label>
+    <input type="text" id="gcInput" placeholder="Or search by GC number...">
+
+
+    <div id="autocompleteList" class="card"></div>
+    <div id="manualLinks" class=""></div>
+	
+  </div>
+    
+</div>
+
+  </main>
+
+  <footer id="footer"></footer>
+
+  <script src="/assets/js/include.js"></script>
+  <script src="/assets/js/nav.js"></script>
+  <script src="/assets/js/main.js"></script>
+  <script src="/assets/js/manual-lookup.js"></script>
+</body>
+</html>
