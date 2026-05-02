@@ -8,7 +8,7 @@
 let boilerData = [];
 
 // --- Load boiler data JSON ---
-fetch('/assets/data/boiler-manuals.json')
+fetch('../assets/data/boiler-manuals.json')
   .then(res => res.json())
   .then(data => boilerData = data);
 
