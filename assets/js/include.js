@@ -31,15 +31,17 @@ function loadHTML(id, file) {
   }
 }
 
+
+//adjusts for file path
 document.addEventListener("DOMContentLoaded", () => {
   const isGitHub = window.location.hostname.includes("github.io");
   const repoName = "warm"; 
   
-  // Detect if we are on GitHub or a custom domain/localhost
+  // Sets root to /warm/ for GitHub, or / for everything else
   const siteRoot = isGitHub ? `/${repoName}/` : "/";
   const partialsPath = siteRoot + "partials/";
 
-  // 1. Load Header
+  // Load Header
   loadHTML("header", partialsPath + "header.html").then(() => {
     const container = document.getElementById("header");
     if (container) {
@@ -49,22 +51,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 2. Load Footer
+  // Load Footer
   loadHTML("footer", partialsPath + "footer.html").then(() => {
     const container = document.getElementById("footer");
     if (container) fixInjectedPaths(container, siteRoot);
   });
 });
 
-// This function fixes links and images in your header/footer automatically
 function fixInjectedPaths(container, root) {
   container.querySelectorAll('a, img').forEach(el => {
     const attr = el.tagName === 'A' ? 'href' : 'src';
-    const val = el.getAttribute(attr);
+    let val = el.getAttribute(attr);
     
-    // If it's a local path, prepend the site root (e.g., /warm/)
-    if (val && !val.startsWith('http') && !val.startsWith('tel:') && !val.startsWith('mailto:')) {
-      const cleanVal = val.startsWith('/') ? val.substring(1) : val;
+    if (val && !val.startsWith('http') && !val.startsWith('tel:') && !val.startsWith('mailto:') && !val.startsWith('#')) {
+      // Strips any existing / or ../ or ./ so the path is clean
+      const cleanVal = val.replace(/^(\.\.\/|\.\/|\/)+/, '');
       el.setAttribute(attr, root + cleanVal);
     }
   });
