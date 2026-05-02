@@ -33,54 +33,39 @@ function loadHTML(id, file) {
 
 document.addEventListener("DOMContentLoaded", () => {
   const isGitHub = window.location.hostname.includes("github.io");
-  const repoName = "warm"; //
+  const repoName = "warm"; 
   
-  // 1. Determine the root path of the site
-  // If on GitHub, root is /warm/. If on custom domain, root is /
+  // Detect if we are on GitHub or a custom domain/localhost
   const siteRoot = isGitHub ? `/${repoName}/` : "/";
   const partialsPath = siteRoot + "partials/";
 
-  // 2. Load the Header
+  // 1. Load Header
   loadHTML("header", partialsPath + "header.html").then(() => {
-    const headerContainer = document.getElementById("header");
-    if (headerContainer) {
-      fixHeaderPaths(headerContainer, siteRoot);
-      
-      // Keep your existing fade-in logic
-      const headerEl = headerContainer.querySelector(".header");
+    const container = document.getElementById("header");
+    if (container) {
+      fixInjectedPaths(container, siteRoot);
+      const headerEl = container.querySelector(".header");
       if (headerEl) headerEl.classList.add("loaded");
     }
   });
 
-  // 3. Load the Footer
+  // 2. Load Footer
   loadHTML("footer", partialsPath + "footer.html").then(() => {
-      const footerContainer = document.getElementById("footer");
-      if (footerContainer) fixHeaderPaths(footerContainer, siteRoot);
+    const container = document.getElementById("footer");
+    if (container) fixInjectedPaths(container, siteRoot);
   });
 });
 
-/**
- * Automatically fixes links and images inside the injected HTML
- */
-function fixHeaderPaths(container, root) {
-  // Fix all navigation links
-  container.querySelectorAll('a').forEach(link => {
-    const href = link.getAttribute('href');
-    // Only fix local links (don't touch tel:, mailto:, or external http links)
-    if (href && !href.startsWith('http') && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
-      // Remove any leading slash the link might have to avoid double slashes
-      const cleanHref = href.startsWith('/') ? href.substring(1) : href;
-      link.setAttribute('href', root + cleanHref);
+// This function fixes links and images in your header/footer automatically
+function fixInjectedPaths(container, root) {
+  container.querySelectorAll('a, img').forEach(el => {
+    const attr = el.tagName === 'A' ? 'href' : 'src';
+    const val = el.getAttribute(attr);
+    
+    // If it's a local path, prepend the site root (e.g., /warm/)
+    if (val && !val.startsWith('http') && !val.startsWith('tel:') && !val.startsWith('mailto:')) {
+      const cleanVal = val.startsWith('/') ? val.substring(1) : val;
+      el.setAttribute(attr, root + cleanVal);
     }
   });
-/*
-  // Fix the Logo image
-  container.querySelectorAll('img').forEach(img => {
-    const src = img.getAttribute('src');
-    if (src && !src.startsWith('http')) {
-      const cleanSrc = src.startsWith('/') ? src.substring(1) : src;
-      img.setAttribute('src', root + cleanSrc);
-    }
-  });
-  */
 }
