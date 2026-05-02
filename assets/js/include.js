@@ -73,7 +73,7 @@ function fixHeaderPaths(container, root) {
       link.setAttribute('href', root + cleanHref);
     }
   });
-
+/*
   // Fix the Logo image
   container.querySelectorAll('img').forEach(img => {
     const src = img.getAttribute('src');
@@ -82,4 +82,5 @@ function fixHeaderPaths(container, root) {
       img.setAttribute('src', root + cleanSrc);
     }
   });
+  */
 }
