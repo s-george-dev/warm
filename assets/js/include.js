@@ -32,7 +32,7 @@ function loadHTML(id, file) {
 }
 
 
-//adjusts for file path
+//adjusts for file paths
 document.addEventListener("DOMContentLoaded", () => {
   const isGitHub = window.location.hostname.includes("github.io");
   const repoName = "warm"; 
