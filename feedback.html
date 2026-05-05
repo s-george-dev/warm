@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Warm Right Ltd — Client Feedback</title>
+  <link rel="icon" href="assets/images/favicon.png">
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/feedback.css">
+</head>
+<body class="feedback-page">
+
+  <header class="feedback-site-header">
+    <div class="header-container">
+      <img src="assets/images/logo.png" alt="Warm Right Ltd" class="feedback-logo">
+      <h1>Warm Right Ltd Client Feedback Page</h1>
+    </div>
+  </header>
+
+  <div class="feedback-container">
+    <!-- Progress Bar (Hidden by default) -->
+    <div id="mainProgressContainer" class="progress-container">
+        <!-- Labels for Full Path -->
+        <div id="labels-full" class="progress-labels path-labels">
+            <span>Details</span>
+            <span>Partner</span>
+            <span>Ratings</span>
+            <span>Repair</span>
+            <span>Comments</span>
+            <span>Final</span>
+            <span>Review</span>
+        </div>
+        <!-- Labels for Quick Path -->
+        <div id="labels-quick" class="progress-labels path-labels" style="display:none;">
+            <span>Details</span>
+            <span>Comments</span>
+            <span>Final</span>
+            <span>Review</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <form id="experienceForm" action="#" method="POST" novalidate>
+      
+      <!-- STEP 1: Choice -->
+      <section class="form-step active" data-step="1">
+        <div class="intro-text">
+            <h2>Thank you for visiting!</h2>
+            <p>We are dedicated to providing high-quality service and your satisfaction is our priority. Following our recent visit, we invite you to share your feedback—good or bad.</p>
+            <p>Any Personal Details and Information you provide will be treated in strict confidence and will <strong>not</strong> be passed to any third party.</p>
+        </div>
+        <div class="choice-grid">
+          <button type="button" class="choice-card" onclick="setFormPath('quick')">
+            <span class="icon">✍️</span>
+            <strong>Quick Review</strong>
+            <p>Name, Address & General Comment</p>
+          </button>
+          <button type="button" class="choice-card" onclick="setFormPath('full')">
+            <span class="icon">📋</span>
+            <strong>Full Experience Form</strong>
+            <p>Detailed survey for partner or insurer visits.</p>
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 2: Details -->
+      <section class="form-step" data-step="2">
+        <h3>Your Details</h3>
+        <div class="input-group"><label>Full Name</label><input type="text" name="name" required data-label="Full Name"></div>
+        <div class="input-group"><label>Email Address</label><input type="email" name="email" required data-label="Email"></div>
+        <div class="row">
+          <div class="input-group"><label>Address</label><input type="text" name="address_line" required data-label="Address"></div>
+          <div class="input-group"><label>Postcode</label><input type="text" name="postcode" required data-label="Postcode"></div>
+        </div>
+        <div class="form-nav">
+          <button type="button" class="btn secondary" onclick="prevStep()">Back</button>
+          <button type="button" class="btn primary" onclick="nextStep()">Next Page</button>
+        </div>
+      </section>
+
+      <!-- STEP 3: Partner -->
+      <section class="form-step" data-step="3">
+        <h3>About Your Visit</h3>
+        <div class="input-group">
+          <label>Was the visit direct or through a partner?</label>
+          <select name="service_source" id="serviceSource" onchange="togglePartnerFields()" data-label="Service Source">
+            <option value="direct">Direct with Warm Right Ltd</option>
+            <option value="partner">Through a Partner (Estate Agent/Insurer/Landlord)</option>
+          </select>
+        </div>
+        <div id="partnerFields" class="expandable-section">
+          <div class="expandable-inner">
+            <div class="input-group"><label>Partner Name (Insurer, Agent or Landlord)</label><input type="text" name="partner_name" data-label="Partner Name"></div>
+            <div class="input-group"><label>Job reference number (if applicable)</label><input type="text" name="job_ref" data-label="Job Reference"></div>
+          </div>
+        </div>
+        <div class="form-nav"><button type="button" class="btn secondary" onclick="prevStep()">Back</button><button type="button" class="btn primary" onclick="nextStep()">Next Page</button></div>
+      </section>
+
+      <!-- STEP 4: Main Body Ratings -->
+      <section class="form-step" data-step="4">
+        <fieldset class="rating-fieldset">
+          <legend>Main Body Experience</legend>
+          <div class="rating-block">
+            <label>Communication from Main Body</label>
+            <div class="slider-labels"><span>Very Poor</span><span>Excellent</span></div>
+            <input type="range" name="rating_main_comm" min="1" max="5" value="3" data-label="Main Body Comm">
+          </div>
+          <div class="input-group"><label>Comments regarding Main Body</label><textarea name="main_comments" rows="2" data-label="Main Body Comments"></textarea></div>
+        </fieldset>
+        <div class="form-nav"><button type="button" class="btn secondary" onclick="prevStep()">Back</button><button type="button" class="btn primary" onclick="nextStep()">Next Page</button></div>
+      </section>
+
+      <!-- STEP 5: Warm Right Ratings -->
+      <section class="form-step" data-step="5">
+        <fieldset class="rating-fieldset">
+          <legend>Warm Right Ltd Experience</legend>
+          <div class="rating-block">
+            <label>Communication from Engineer</label>
+            <div class="slider-labels"><span>Very Poor</span><span>Excellent</span></div>
+            <input type="range" name="rating_eng_comm" min="1" max="5" value="3" data-label="Engineer Comm">
+          </div>
+          <div class="input-group"><label>Comments regarding Engineer</label><textarea name="eng_comments" rows="2" data-label="Engineer Comments"></textarea></div>
+        </fieldset>
+        <div class="form-nav"><button type="button" class="btn secondary" onclick="prevStep()">Back</button><button type="button" class="btn primary" onclick="nextStep()">Next Page</button></div>
+      </section>
+
+      <!-- STEP 6: Repair Details -->
+      <section class="form-step" data-step="6">
+        <h3>About Your Repair/Service</h3>
+        <div class="input-group">
+          <label>Type of service carried out?</label>
+          <select name="repair_type" onchange="toggleOtherRepair(this)" data-label="Service Type">
+            <option value="boiler_service">Boiler Service</option><option value="boiler_repair">Boiler Repair</option><option value="plumbing">Plumbing</option><option value="other">Other</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Overall, were you satisfied with your repair/service?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="overall_sat" value="yes" onclick="toggleFollowUp(false)" data-label="Satisfied"> Yes</label>
+            <label><input type="radio" name="overall_sat" value="no" onclick="toggleFollowUp(false)"> No</label>
+            <label><input type="radio" name="overall_sat" value="unsure" onclick="toggleFollowUp(true)"> Unsure</label>
+          </div>
+        </div>
+        <div id="followUpGroup" class="expandable-section">
+            <div class="expandable-inner"><p>Would you like us to contact you next week to check the repair?</p>
+            <div class="radio-group"><label><input type="radio" name="check_up" value="yes"> Yes</label><label><input type="radio" name="check_up" value="no"> No</label></div></div>
+        </div>
+        <div class="form-nav"><button type="button" class="btn secondary" onclick="prevStep()">Back</button><button type="button" class="btn primary" onclick="nextStep()">Next Page</button></div>
+      </section>
+
+      <!-- STEP 7: Comments -->
+      <section class="form-step" data-step="7">
+        <h3>Your Comments</h3>
+        <p>Please leave a comment on your experience! Let us know how the engineer was or anything we could do differently.</p>
+        <div class="input-group"><textarea name="general_comments" rows="6" placeholder="Your feedback..." data-label="General Comments"></textarea></div>
+        <div class="form-nav"><button type="button" class="btn secondary" onclick="prevStep()">Back</button><button type="button" class="btn primary" onclick="nextStep()">Next Page</button></div>
+      </section>
+
+      <!-- STEP 8: Recommendation -->
+      <section class="form-step" data-step="8">
+        <h3>Final Questions</h3>
+        <div class="input-group">
+          <label>Would you recommend Warm Right Ltd to others?</label>
+          <div class="radio-group"><label><input type="radio" name="recommend" value="yes" required data-label="Recommend Us"> Yes</label><label><input type="radio" name="recommend" value="no"> No</label></div>
+        </div>
+        <div class="input-group">
+          <label>Would you like a representative to call you?</label>
+          <div class="radio-group"><label><input type="radio" name="rep_contact" value="yes" onclick="toggleRepFields(true)" data-label="Callback"> Yes</label><label><input type="radio" name="rep_contact" value="no" onclick="toggleRepFields(false)"> No</label></div>
+        </div>
+        <div id="repFields" class="expandable-section">
+            <div class="expandable-inner">
+                <div class="input-group"><label>Best contact number</label><input type="text" name="phone" data-label="Phone"></div>
+                <div class="input-group"><label>When should we call?</label><input type="text" name="call_time" placeholder="e.g. Wednesday morning" data-label="Call Time"></div>
+            </div>
+        </div>
+        <div class="form-nav"><button type="button" class="btn secondary" onclick="prevStep()">Back</button><button type="button" class="btn primary" onclick="showReviewPage()">Review Answers</button></div>
+      </section>
+
+      <!-- STEP 9: Review -->
+      <section class="form-step" data-step="9">
+        <h3>Check Your Answers</h3>
+        <div id="reviewSummary" class="review-summary-box"></div>
+        <div class="form-nav"><button type="button" class="btn secondary" onclick="prevStep()">Edit</button><button type="submit" class="btn primary">Submit Feedback</button></div>
+      </section>
+
+      <!-- STEP 10: Success -->
+      <section class="form-step" data-step="10">
+        <div class="success-message">
+          <span class="success-icon">✔️</span>
+          <h2>Thank You!</h2>
+          <p>Your feedback has been submitted. You will be redirected to our home page shortly...</p>
+        </div>
+      </section>
+
+      <input type="hidden" name="path_type" id="pathInput">
+    </form>
+  </div>
+
+  <footer class="feedback-site-footer">
+    <p>&copy; 2026 Warm Right Ltd. All rights reserved. Registered in England & Wales.</p>
+    <p><b>info@warmright.co.uk | 0800 756 6748 | www.warmright.co.uk</b></p>
+  </footer>
+
+  <script src="assets/js/feedback.js"></script>
+</body>
+</html>

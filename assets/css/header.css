@@ -61,7 +61,7 @@
   gap: 12px;
   background: var(--background-main);
   color:black;
-  border-radius: 20pt;
+  border-radius: 10pt;
  
 }
 
@@ -103,6 +103,12 @@
 }
 
 .nav a:hover {
+  color: #ffd166;
+  border-bottom: 2px solid #ffd166;
+}
+
+/* Keep the link orange and underlined when active[cite: 4] */
+.nav a.active {
   color: #ffd166;
   border-bottom: 2px solid #ffd166;
 }

@@ -98,19 +98,13 @@
 		<br> <b>info@warmright.uk</b></p>
       </a>
 
-      <a class="info-tile card" id="callback-toggle" href="#callback-form">
-        <img src="assets/images/contact.jpg" alt="Request a callback" />
-        <h3>🔁
- Request a Callback</h3>
-        <p>Leave your details and we’ll call you back at a convenient time</p>
-      </a>
-
-      <a class="info-tile card" id="contact-form-toggle" href="#contact-form">
-        <img src="assets/images/contact-form.png" alt="Send a Message" />
-        <h3>📝 Send a Message</h3>
-        <p>Use our form to tell us more about your issue</p>
-      </a>
-	  
+         
+     <a class="info-tile card request-callback-tile" id="callback-toggle" href="javascript:void(0)">
+       <img src="assets/images/contact.jpg" alt="Request a callback" />
+       <h3>🔁 Request a Callback</h3>
+       <p>Leave your details and we’ll call you back at a convenient time</p>
+     </a>
+     	  
 	  <a class="info-tile card" >
         <img src="assets/images/fax.png" alt="Send a Message" />
         <h3>🖨️ Fax</h3>
@@ -123,56 +117,7 @@
 	 
     </section>
 
-    <!-- Callback Form -->
-    <div id="callback-form" class="form-panel" style="display:none; margin-top:20px;">
-      <h2 class="card">Request a Call Back</h2>
-      <p class="article-gap card">
-        Fill in the form below and one of our team will give you a call.  
-        <br><br>
-        We aim to respond by the next working day — sooner if we can.
-      </p>
-      <form action="https://formspree.io/f/xjkalnqv" method="POST">
-        <fieldset  class="card">
-          <legend>Your details</legend>
-          <label  class="card">Name<input name="name" required></label>
-          <label  class="card">Email<input type="email" name="_replyto" required></label>
-          <label  class="card">Phone<input name="phone" required></label>
-          <label  class="card">Preferred callback time<input name="callback_time"></label>
-        </fieldset>
-        <div class="center card">
-          <button type="submit" class="btn centre-btn">Request Callback</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Contact Form -->
-    <div id="contact-form" class="form-panel" style="display:none; margin-top:20px;">
-      <h2 class="card">Send Us a Message</h2>
-      <p class="article-gap card">
-        Use this form to tell us what’s going on — the more detail you give, the quicker we can help.  
-      </p>
-
-      <form action="https://formspree.io/f/xjkalnqv" method="POST">
-        <fieldset  class="card">
-          <legend>Your Details</legend>
-          <label class="card">Name<input name="name" required></label>
-          <label class="card">Email<input type="email" name="_replyto" required></label>
-          <label class="card">Phone<input name="phone"></label>
-          <label class="card">Message<textarea name="message" required></textarea></label>
-        </fieldset>
-
-        <fieldset class="card">
-          <legend>Appliance Information</legend>
-          <label class="card">Make<input name="appliance_make"></label>
-          <label class="card">Model<input name="appliance_model"></label>
-          <label class="card">GC Number<input type="text" id="gc-number" name="gc-number" placeholder="e.g. 47-044-31"></label>
-        </fieldset>
-
-        <div class="center card">
-          <button type="submit" class="btn">Send Message</button>
-        </div>
-      </form>
-
+    
       
     </div>
   </main>

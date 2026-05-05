@@ -1,288 +1,321 @@
-window.initWarmRight = function() {
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("✅ DOM fully loaded, script running");
+
+  // Initial check for office status
+  updateOfficeStatus();
 
   /* ================================
-     NAVIGATION (Hamburger + Mobile)
+      REVEAL ANIMATIONS
   ================================== */
-  const menuToggle = document.querySelector('.menu-toggle');
-  const mobileNav  = document.querySelector('.mobile-nav');
-  const desktopNav = document.querySelector('.nav');
-  const overlay    = document.querySelector('.nav-overlay');
-  const wrapper    = document.querySelector('.hamburger-wrapper');
-
-  // Toggle mobile nav
-  if (menuToggle && mobileNav) {
-    menuToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = mobileNav.classList.toggle('open');
-      menuToggle.classList.toggle('open', isOpen);
-      document.body.classList.toggle('nav-open', isOpen);
-      if (overlay) overlay.classList.toggle('open', isOpen);
-      mobileNav.style.transform = '';
-      if (desktopNav) desktopNav.style.display = isOpen ? 'none' : '';
-
-      // 🧠 Re-evaluate Book Us button position after nav toggle
-      if (typeof adjustBookButton === 'function') {
-        adjustBookButton();
-      }
-
-      // 🌀 Spin animation on hamburger wrapper
-      if (wrapper) {
-        wrapper.classList.remove('spin');
-        void wrapper.offsetWidth;
-        wrapper.classList.add('spin');
-        wrapper.addEventListener('animationend', () => {
-          wrapper.classList.remove('spin');
-        }, { once: true });
+  const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        obs.unobserve(entry.target);
       }
     });
+  }, { threshold: 0.12 });
 
-    // Close nav if clicking outside
-    document.addEventListener('click', (evt) => {
-      if (mobileNav.classList.contains('open') &&
-          !mobileNav.contains(evt.target) &&
-          !menuToggle.contains(evt.target)) {
-        closeNav();
-      }
-    });
+  document.querySelectorAll('.card').forEach((c, i) => {
+    c.style.transitionDelay = `${i * 100}ms`;
+    observer.observe(c);
+  });
 
-    if (overlay) overlay.addEventListener('click', closeNav);
+  /* ================================
+      BACK TO TOP BUTTON
+  ================================== */
+  let backToTop = document.querySelector('.back-to-top');
+  if (!backToTop) {
+    backToTop = document.createElement('a');
+    backToTop.href = "#";
+    backToTop.className = "back-to-top";
+    backToTop.textContent = "↑";
+    document.body.appendChild(backToTop);
   }
 
-  // Swipe-to-close on mobile
-  let startX = 0, currentX = 0, isSwiping = false;
-  if (mobileNav) {
-    mobileNav.addEventListener('touchstart', (e) => {
-      if (!mobileNav.classList.contains('open')) return;
-      startX = e.touches[0].clientX;
-      isSwiping = true;
-    });
-
-    mobileNav.addEventListener('touchmove', (e) => {
-      if (!isSwiping) return;
-      currentX = e.touches[0].clientX;
-      const deltaX = currentX - startX;
-      if (deltaX > 0) {
-        mobileNav.style.transform = `translateX(${deltaX}px)`;
-      }
-    });
-
-    mobileNav.addEventListener('touchend', () => {
-      if (!isSwiping) return;
-      isSwiping = false;
-      const deltaX = currentX - startX;
-      if (deltaX > 80) {
-        closeNav();
-      } else {
-        mobileNav.style.transform = '';
-      }
-    });
-
-    // Dropdown toggles
-    mobileNav.querySelectorAll('.mobile-dropdown-button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const target = btn.nextElementSibling;
-        if (!target) return;
-        mobileNav.querySelectorAll('.mobile-dropdown-menu').forEach(m => {
-          if (m !== target) m.classList.remove('open');
-        });
-        target.classList.toggle('open');
-      });
-    });
-  }
-
-  function closeNav() {
-    mobileNav.classList.remove('open');
-    menuToggle.classList.remove('open');
-    document.body.classList.remove('nav-open');
-    if (overlay) overlay.classList.remove('open');
-    if (desktopNav) desktopNav.style.display = '';
-    mobileNav.style.transform = '';
-
-    // 🧠 Re-evaluate Book Us button position after nav closes
-    if (typeof adjustBookButton === 'function') {
-      adjustBookButton();
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 100) {
+      backToTop.classList.add('show');
+    } else {
+      backToTop.classList.remove('show');
     }
+  });
+
+  backToTop.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* ================================
+      CAROUSEL AUTO-SCROLL (Ping-Pong)
+  ================================== */
+  document.querySelectorAll('.carousel-container').forEach(container => {
+    const track = container.querySelector('.carousel-track');
+    if (!track) return;
+
+    const nextBtn = container.querySelector('.carousel-btn.right');
+    const prevBtn = container.querySelector('.carousel-btn.left');
+
+    let scrollSpeed = 1.2;
+    let isPaused = false;
+    let scrollDirection = 1;
+    let mobilePauseTimeout;
+
+    function animateScroll() {
+      if (!isPaused && track) {
+        const maxScroll = track.scrollWidth - track.clientWidth;
+        track.scrollLeft += scrollSpeed * scrollDirection;
+
+        if (scrollDirection === 1 && track.scrollLeft >= maxScroll - 2) {
+          scrollDirection = -1;
+        } else if (scrollDirection === -1 && track.scrollLeft <= 1) {
+          scrollDirection = 1;
+        }
+      }
+      requestAnimationFrame(animateScroll);
+    }
+
+    container.addEventListener('mouseenter', () => { isPaused = true; });
+    container.addEventListener('mouseleave', () => { isPaused = false; });
+
+    track.addEventListener('touchstart', () => {
+      isPaused = true;
+      clearTimeout(mobilePauseTimeout);
+      mobilePauseTimeout = setTimeout(() => { isPaused = false; }, 3000);
+    }, { passive: true });
+
+    function scrollByTile(direction = 1) {
+      const firstTile = track.querySelector('.info-tile');
+      const tileWidth = firstTile ? firstTile.offsetWidth + 20 : 240; 
+      track.scrollBy({ left: direction * tileWidth, behavior: 'smooth' });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        scrollByTile(1);
+        isPaused = true;
+        setTimeout(() => { isPaused = false; }, 1000);
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        scrollByTile(-1);
+        isPaused = true;
+        setTimeout(() => { isPaused = false; }, 1000);
+      });
+    }
+
+    requestAnimationFrame(animateScroll);
+  });
+
+  /* ================================
+      SLIDESHOW ROTATION
+  ================================== */
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+  if (slides.length > 0) {
+    setInterval(() => {
+      const outgoing = slides[current];
+      outgoing.classList.remove('active');
+      current = (current + 1) % slides.length;
+      const incoming = slides[current];
+      incoming.classList.add('active');
+    }, 6000);
   }
 
   /* ================================
-     BUSINESS HOURS CONFIG
+      MAP OVERLAY INTERACTION
   ================================== */
-  const businessHours = { start: 8, end: 18 }; // 8am–6pm
+  const mapOverlay = document.getElementById('mapOverlay');
+  const mapContainer = mapOverlay?.parentElement;
+  let mapResetTimer;
 
-  function isWithinBusinessHours() {
+  function activateMap() {
+    if (!mapContainer || !mapOverlay) return;
+    mapContainer.classList.add('active');
+    mapOverlay.classList.add('hidden');
+    clearTimeout(mapResetTimer);
+    mapResetTimer = setTimeout(() => {
+      mapContainer.classList.remove('active');
+      mapOverlay.classList.remove('hidden');
+    }, 30000);
+  }
+
+  if (mapOverlay) {
+    mapOverlay.addEventListener('click', activateMap);
+  }
+});
+
+/* ==========================================
+    OFFICE STATUS & IMAGE LOGIC
+========================================== */
+function isOfficeOpen() {
     const now = new Date();
-    const hour = now.getHours();
-    return hour >= businessHours.start && hour < businessHours.end;
-  }
-
-  /* ================================
-     CALL-TO-BOOK TILE (Contact Page)
-  ================================== */
-  const callTile      = document.getElementById("call-to-book");
-  const callTileTitle = document.getElementById("call-to-book-title");
-  const callTileText  = document.getElementById("call-to-book-text");
-
-  const defaultTitle = callTileTitle?.textContent.trim();
-  const defaultText  = callTileText?.textContent.trim();
-
-  function swapTileText(title, text, classToAdd, classToRemove) {
-    if (
-      callTileTitle.textContent.trim() === title &&
-      callTileText.textContent.trim() === text
-    ) return;
-
-    callTile.classList.add("fading");
-    setTimeout(() => {
-      callTileTitle.textContent = title;
-      callTileText.textContent  = text;
-      if (classToAdd) callTile.classList.add(classToAdd);
-      if (classToRemove) callTile.classList.remove(classToRemove);
-      callTile.classList.remove("fading");
-    }, 600);
-  }
-
-  if (callTile && callTileTitle && callTileText) {
-    if (isWithinBusinessHours()) {
-      let showingAlt = false;
-      setInterval(() => {
-        if (showingAlt) {
-          swapTileText(defaultTitle, defaultText, null, "call-open");
-        } else {
-          swapTileText("We’re Open Now!", "Call us today — we’re ready to help", "call-open", null);
-        }
-        showingAlt = !showingAlt;
-      }, 3000);
-
-      callTile.setAttribute("href", "tel:08007566748");
-    } else {
-      let showingClosed = false;
-      setInterval(() => {
-        if (showingClosed) {
-          swapTileText(defaultTitle, defaultText, null, "call-closed");
-        } else {
-          swapTileText("Office Closed", "Our office is currently closed for general enquiries", "call-closed", null);
-        }
-        showingClosed = !showingClosed;
-      }, 3000);
-
-      callTile.removeAttribute("href");
-      callTile.addEventListener("click", (e) => {
-        e.preventDefault();
-        if (callModal) callModal.style.display = "flex";
-      });
-    }
-  }
-
-  /* ================================
-     MOBILE NAV CALL BUTTON
-  ================================== */
-  document.querySelectorAll('.mobile-call-btn').forEach(btn => {
-    if (isWithinBusinessHours()) {
-      btn.setAttribute('href', 'tel:08007566748');
-    } else {
-      btn.removeAttribute('href');
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (callModal) callModal.style.display = 'flex';
-      });
-    }
-  });
-
-  /* ================================
-     FOOTER CALL BUTTON (Global)
-  ================================== */
-  document.querySelectorAll('.footer-call-btn').forEach(btn => {
-    if (isWithinBusinessHours()) {
-      btn.setAttribute('href', 'tel:08007566748');
-    } else {
-      btn.removeAttribute('href');
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (callModal) callModal.style.display = "flex";
-      });
-    }
-  });
-
- /* ================================
-    MODAL HANDLERS
-================================== */
-const callModal      = document.getElementById("call-modal");
-const modalClose     = document.getElementById("modal-close");
-const modalCallback   = document.getElementById("modal-callback");
-
-if (modalClose && callModal) {
-  modalClose.addEventListener("click", () => {
-    callModal.style.display = "none";
-  });
+    const hours = now.getHours();
+    // Returns true if between 09:00 and 17:59
+    return hours >= 9 && hours < 18;
 }
 
-if (modalCallback) {
-  modalCallback.addEventListener("click", () => {
-    callModal.style.display = "none";
-    const callbackForm = document.getElementById("callback-form");
-    if (callbackForm) {
-      callbackForm.style.display = "block";
-      callbackForm.scrollIntoView({ behavior: "smooth" });
+function updateOfficeStatus() {
+    // Target both potential IDs used across pages
+    const callTile = document.getElementById('call-to-book') || document.getElementById('call-us-tile');
+    if (!callTile) return;
+
+    const img = callTile.querySelector('img');
+    const title = document.getElementById('call-to-book-title') || callTile.querySelector('h3');
+    const text = document.getElementById('call-to-book-text') || callTile.querySelector('p');
+    
+    const open = isOfficeOpen();
+
+    if (open) {
+        if (img) img.src = "assets/images/office-open.jpg";
+        if (title) title.innerHTML = "📞 Call Us Now";
+        if (text) text.innerHTML = "Our team is available until 6pm today.<br><b>0800 756 6748</b>";
+    } else {
+        if (img) img.src = "assets/images/office-closed.jpg";
+        if (title) title.innerHTML = "🌙 Office Closed";
+        if (text) text.innerHTML = "Our office is currently closed.<br><b>Click here to request a callback.</b>";
     }
-  });
 }
 
-}; 
-
-
- /* ================================
-     BOOK US BUTTON (Responsive Float)
-  ================================== */
-  let bookBtn = document.querySelector('.book-us-btn');
-  if (!bookBtn) {
-    bookBtn = document.createElement('a');
-    bookBtn.href = "book-a-visit.html";
-    bookBtn.className = "book-us-btn";
-    bookBtn.textContent = "Book Us";
-    document.body.appendChild(bookBtn);
-  }
-
-  function adjustBookButton() {
-    const isMobile = window.innerWidth <= 768;
-    const scrollY = window.scrollY;
-    const windowHeight = window.innerHeight;
-    const docHeight = document.documentElement.scrollHeight;
-    const isAtBottom = scrollY + windowHeight >= docHeight - 10;
-
-    const navIsOpen = document.body.classList.contains('nav-open');
-    const shouldFloatCenter = isMobile && isAtBottom && !navIsOpen;
-
-    if (shouldFloatCenter) {
-      bookBtn.style.left = '50%';
-      bookBtn.style.right = 'auto';
-      bookBtn.style.transform = 'translateX(-50%)';
-      bookBtn.style.bottom = '55%';
-      bookBtn.style.fontSize = '1.3rem';
-      bookBtn.style.padding = '16px 24px';
-      bookBtn.style.opacity = '1';
-      bookBtn.style.pointerEvents = 'auto';
-      bookBtn.innerText = 'Click to book today';
-      bookBtn.style.width = '75%';
-    } else {
-      bookBtn.style.left = '';
-      bookBtn.style.right = '25px';
-      bookBtn.style.transform = '';
-      bookBtn.style.bottom = '25px';
-      bookBtn.style.fontSize = '';
-      bookBtn.style.padding = '';
-      bookBtn.style.opacity = '1';
-      bookBtn.style.pointerEvents = 'auto';
-      bookBtn.innerText = 'Book Us';
-      bookBtn.style.width = 'auto';
+/* ==========================================
+    MODAL & FORM LOGIC
+========================================== */
+function closeModal() {
+    const callModal = document.getElementById('call-modal');
+    if (callModal) {
+        callModal.style.display = 'none';
+        document.body.classList.remove('modal-open'); // Unlock scroll
+        
+        // Reset Views
+        document.getElementById('modal-initial-actions').style.display = 'block';
+        document.getElementById('modal-callback-form').style.display = 'none';
+        document.getElementById('modal-thank-you').style.display = 'none';
     }
+}
+
+document.addEventListener('click', (e) => {
+    const openBtn = e.target.closest('.footer-call-btn, .mobile-call-btn, #call-to-book, #call-us-tile, .request-callback-tile');
+
+    if (openBtn) {
+        const isOpen = isOfficeOpen();
+
+        // 1. If Open & Phone Tile: Allow normal tel: behavior and stop script
+        if (isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) {
+            return; 
+        }
+
+        // 2. If Closed & Phone Tile: Prevent dialing
+        if (!isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) {
+            e.preventDefault();
+        }
+
+        // 3. Open Modal Logic
+        const callModal = document.getElementById('call-modal');
+        const initialActions = document.getElementById('modal-initial-actions');
+        const callbackFormContainer = document.getElementById('modal-callback-form');
+        const backBtn = document.getElementById('btn-modal-back');
+
+        if (callModal) {
+            callModal.style.display = 'flex';
+            document.body.classList.add('modal-open'); // Lock scroll
+
+            // Direct load from tiles (Book a Visit / Contact Us)
+            if (openBtn.classList.contains('request-callback-tile')) {
+                if (initialActions) initialActions.style.display = 'none';
+                if (callbackFormContainer) callbackFormContainer.style.display = 'block';
+                if (backBtn) backBtn.innerText = "Close";
+            } else {
+                // Default load (Office Closed message)
+                if (initialActions) initialActions.style.display = 'block';
+                if (callbackFormContainer) callbackFormContainer.style.display = 'none';
+                if (backBtn) backBtn.innerText = "Back";
+            }
+        }
+    }
+
+    // Modal Navigation
+    if (e.target.id === 'btn-request-callback') {
+        document.getElementById('modal-initial-actions').style.display = 'none';
+        document.getElementById('modal-callback-form').style.display = 'block';
+    }
+
+    if (e.target.id === 'btn-modal-back') {
+        if (e.target.innerText === "Close") {
+            closeModal();
+        } else {
+            document.getElementById('modal-callback-form').style.display = 'none';
+            document.getElementById('modal-initial-actions').style.display = 'block';
+        }
+    }
+
+    // Close Triggers
+    if (e.target.classList.contains('call-modal-close') || 
+        e.target.classList.contains('modal-close-trigger') || 
+        e.target.id === 'call-modal') {
+        closeModal();
+    }
+});
+
+/**
+ * AJAX Form Submission (Formspree)
+ */
+document.addEventListener("submit", async (event) => {
+    if (event.target.id === 'footer-callback-form') {
+        event.preventDefault(); 
+        const form = event.target;
+        const data = new FormData(form);
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const thankYouSection = document.getElementById('modal-thank-you');
+        const formContainer = document.getElementById('modal-callback-form');
+
+        if (submitBtn) {
+            submitBtn.innerText = "Sending...";
+            submitBtn.disabled = true;
+        }
+
+        try {
+            const response = await fetch(form.action, {
+                method: form.method,
+                body: data,
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            if (response.ok) {
+                formContainer.style.display = 'none';
+                thankYouSection.style.display = 'block';
+                form.reset();
+            } else {
+                alert("Oops! There was a problem. Please email: info@warmright.co.uk");
+            }
+        } catch (error) {
+            alert("Connection error. Please try again.");
+        } finally {
+            if (submitBtn) {
+                submitBtn.innerText = "Submit Request";
+                submitBtn.disabled = false;
+            }
+        }
+    }
+});
+
+/* ==========================================
+    HEADER LOAD HELPER
+========================================== */
+function waitForHeaderAndInitNav(retries = 20) {
+  const toggle = document.querySelector('.menu-toggle');
+  
+  // Re-run status check in case tiles were loaded via partial
+  updateOfficeStatus();
+
+  if (toggle && typeof window.initWarmRight === "function") {
+    window.initWarmRight();
+  } else if (retries > 0) {
+    setTimeout(() => waitForHeaderAndInitNav(retries - 1), 150);
   }
+}
 
-  window.addEventListener('scroll', adjustBookButton);
-  window.addEventListener('resize', adjustBookButton);
-  adjustBookButton();
-
-
-// end initWarmRight
-
-// Initialise on DOM ready
-document.addEventListener("DOMContentLoaded", window.initWarmRight);
+waitForHeaderAndInitNav();

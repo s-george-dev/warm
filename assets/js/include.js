@@ -1,3 +1,6 @@
+/* ================================
+    PARTIAL LOADER (Fetch/XHR)
+   ================================ */
 function loadHTML(id, file) {
   const isLocal = window.location.protocol === "file:";
 
@@ -8,7 +11,8 @@ function loadHTML(id, file) {
       xhr.onreadystatechange = function () {
         if (xhr.readyState === 4) {
           if (xhr.status === 200 || xhr.status === 0) {
-            document.getElementById(id).innerHTML = xhr.responseText;
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = xhr.responseText;
             resolve();
           } else {
             console.error(`Failed to load local file ${file}: ${xhr.status}`);
@@ -25,48 +29,96 @@ function loadHTML(id, file) {
         return res.text();
       })
       .then(data => {
-        document.getElementById(id).innerHTML = data;
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = data;
       })
       .catch(err => console.error(err));
   }
 }
 
-
-//adjusts for file paths
+/* ================================
+    MAIN INITIALIZATION
+   ================================ */
 document.addEventListener("DOMContentLoaded", () => {
   const isGitHub = window.location.hostname.includes("github.io");
   const repoName = "warm"; 
   
-  // Sets root to /warm/ for GitHub, or / for everything else
   const siteRoot = isGitHub ? `/${repoName}/` : "/";
   const partialsPath = siteRoot + "partials/";
 
-  // Load Header
   loadHTML("header", partialsPath + "header.html").then(() => {
     const container = document.getElementById("header");
     if (container) {
       fixInjectedPaths(container, siteRoot);
+      highlightActivePage(container, isGitHub);
+      
       const headerEl = container.querySelector(".header");
       if (headerEl) headerEl.classList.add("loaded");
     }
   });
 
-  // Load Footer
   loadHTML("footer", partialsPath + "footer.html").then(() => {
     const container = document.getElementById("footer");
     if (container) fixInjectedPaths(container, siteRoot);
   });
 });
 
+/* ================================
+    PATH REPAIR LOGIC
+   ================================ */
 function fixInjectedPaths(container, root) {
   container.querySelectorAll('a, img').forEach(el => {
     const attr = el.tagName === 'A' ? 'href' : 'src';
     let val = el.getAttribute(attr);
     
     if (val && !val.startsWith('http') && !val.startsWith('tel:') && !val.startsWith('mailto:') && !val.startsWith('#')) {
-      // Strips any existing / or ../ or ./ so the path is clean
       const cleanVal = val.replace(/^(\.\.\/|\.\/|\/)+/, '');
       el.setAttribute(attr, root + cleanVal);
+    }
+  });
+}
+
+/* ================================
+    ACTIVE PAGE HIGHLIGHTER
+   ================================ */
+function highlightActivePage(container, isGitHub) {
+  const currentPath = window.location.pathname.toLowerCase();
+  const navLinks = container.querySelectorAll('a');
+
+  // 1. Clear all active classes
+  navLinks.forEach(link => link.classList.remove('active'));
+
+  // 2. Identify actual folder (Category)
+  const segments = currentPath.split('/').filter(Boolean);
+  
+  /**
+   * If GitHub: /warm/services/repairs.html -> segments are ["warm", "services", "repairs.html"]
+   * Folder is index 1.
+   * If Localhost: /services/repairs.html -> segments are ["services", "repairs.html"]
+   * Folder is index 0.
+   */
+  const currentFolder = isGitHub ? segments[1] : segments[0];
+
+  navLinks.forEach(link => {
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    const linkPath = link.pathname.toLowerCase();
+    const linkText = link.textContent.toLowerCase().trim();
+
+    // --- A. CHILD MATCH (The specific page) ---
+    if (currentPath === linkPath && !href.startsWith('#')) {
+      link.classList.add('active');
+    }
+
+    // --- B. PARENT MATCH (Services or Support) ---
+    // Look for links that match the current folder name but ARE NOT in the dropdown menu
+    if (currentFolder === 'services' || currentFolder === 'support') {
+      const isTopLevelTrigger = linkText.includes(currentFolder) && !link.closest('.dropdown-menu');
+      
+      if (isTopLevelTrigger) {
+        link.classList.add('active');
+      }
     }
   });
 }

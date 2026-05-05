@@ -1,15 +1,40 @@
 @media (max-width: 600px) {
   .header {
-    top: 0px;
+    top: 0px; /* Keep it tight to the top[cite: 6] */
   }
+
+  /* Reduce gaps to save horizontal space[cite: 3] */
+  .brand {
+    gap: 8px; 
+    padding-right: 10px;
+  }
+
   .brand img {
-    height: 40px;
+    height: 36px; /* Slightly smaller logo[cite: 6] */
   }
-  .card img {
-    height: 160px;
+
+  /* Shrink text sizes so they don't wrap aggressively[cite: 3] */
+  .brand .title {
+    font-size: 0.9rem;
+    line-height: 1.1;
   }
+
+  .brand .sub {
+    font-size: 0.7rem;
+    display: block; /* Ensures it stays under the title[cite: 3] */
+  }
+
+  /* Adjust header padding to prevent the hamburger from crowding[cite: 6] */
   .header-inner {
-    padding: 8px 0 10px 20px;
+    padding: 8px 12px;
+    gap: 5px;
+  }
+}
+
+/* Extra fix for very small phones (iPhone SE size) */
+@media (max-width: 380px) {
+  .brand .sub {
+    display: none; /* Hide subtitle on tiny screens to keep the logo/title legible[cite: 3] */
   }
 }
 @media (max-width: 767px) {

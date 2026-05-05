@@ -47,6 +47,12 @@
   padding: 8px 0;
 }
 
+/* Active state for mobile drawer links[cite: 6] */
+.mobile-item a.active {
+  color: #ffd166;
+  border-bottom: 2px solid #ffd166;
+}
+
 .mobile-nav .close-btn {
   align-self: flex-end;
   background: none;

@@ -1,13 +1,13 @@
 <footer class="footer">
   <div class="footer-content">
     <!-- Gas Safe -->
-   <div class="footer-section gas-safe">
-  <a class="footer-a" href="https://www.gassaferegister.co.uk" 
-     title="Click to visit the Gas Safe website" target="_blank">
-    <img src="../assets/images/gsr-logo.png" alt="Gas Safe Registered Logo" class="gas-safe-logo" />
-  </a>
-  <p>Gas Safe Registered: 968002</p>
-</div>
+    <div class="footer-section gas-safe">
+      <a class="footer-a" href="https://www.gassaferegister.co.uk" 
+         title="Click to visit the Gas Safe website" target="_blank">
+        <img src="../assets/images/gsr-logo.png" alt="Gas Safe Registered Logo" class="gas-safe-logo" />
+      </a>
+      <p>Gas Safe Registered: 968002</p>
+    </div>
 
     <!-- Contact -->
     <div class="footer-section">
@@ -36,21 +36,89 @@
   </div>
 </footer>
 
-<!--Call Modal (hidden until triggered by clicking on phone nubmer -->
 
+
+<!-- Call Modal -->
 <div id="call-modal" class="call-modal">
   <div class="call-modal-content">
-    <div class="call-modal-header">
-      <img src="assets/images/logo.png" alt="Warm Right Logo" class="call-modal-logo">
-      <span id="call-modal-close" class="call-modal-close">&times;</span>
-    </div>
-    <h2>Sorry our office is currently closed</h2>
-    <p>But you can still get in touch</p>
-    <div class="call-modal-actions">
-      <a href="/book-a-visit.html" class="btn primary">Book Online</a>
-      <a href="tel:08007566748" class="btn danger">Emergency</a>
-      <button id="modal-callback" class="btn secondary">Request a Callback</button>
-      <button id="call-modal-close-btn" class="btn close">Close</button>
-    </div>
+   <div class="call-modal-header">
+  <div class="modal-brand">
+    <img src="../assets/images/logo.png" alt="Warm Right Logo" class="call-modal-logo">
+    <span class="modal-brand-name">Warm Right Ltd</span>
   </div>
+  <span id="call-modal-close" class="call-modal-close">&times;</span>
+</div>
+
+    <!-- 1. Initial Actions (Buttons) -->
+    <div id="modal-initial-actions">
+      <h2 class="modal-title-single">Sorry our office is currently closed</h2>
+      <p class="modal-left-text">But you can still get in touch</p>
+      <div class="call-modal-actions">
+        <button class="btn primary" id="btn-request-callback">Request a Call Back</button>
+        <a href="tel:08007566748" class="btn danger">Emergency Call Out</a>
+        <button class="btn close modal-close-trigger">Close</button>
+      </div>
+    </div>
+
+    <!-- 2. The Form Section (Hidden by default) -->
+    <div id="modal-callback-form" style="display: none;">
+      <h2 class="modal-title-single">Request a Callback</h2>
+      <p class="modal-left-text">Please fill in your details and an engineer will be in touch.</p>
+      
+      <!-- Replace 'your-id-here' with your actual Formspree ID -->
+      <form id="footer-callback-form" action="https://formspree.io/f/xjkalnqv" method="POST">
+        <fieldset class="form-group-box">
+          <label for="modal-name">Name*</label>
+          <input type="text" id="modal-name" name="name" placeholder="Your full name" required>
+
+          <label for="modal-phone">Phone Number*</label>
+          <input type="tel" id="modal-phone" name="phone" placeholder="e.g. 07123 456789" required>
+
+          <label for="modal-email">Email Address (Optional)</label>
+          <input type="email" id="modal-email" name="email" placeholder="email@example.com">
+
+          <label for="modal-time">Preferred Callback Time*</label>
+          <select id="modal-time" name="time" required>
+            <option value="" disabled selected>Select a time...</option>
+            <option value="morning">Morning (8am - 12pm)</option>
+            <option value="afternoon">Afternoon (12pm - 4pm)</option>
+            <option value="evening">Evening (4pm - 6pm)</option>
+            <option value="anytime">Anytime (8am - 6pm)</option>
+          </select>
+
+          <label for="modal-desc">Brief Description*</label>
+          <textarea id="modal-desc" name="description" rows="3" placeholder="How can we help?" required></textarea>
+        </fieldset>
+
+        <div class="call-modal-actions">
+          <button type="submit" class="btn primary">Submit Request</button>
+          <button type="button" id="btn-modal-back" class="btn secondary">Back</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 3. The Thank You Section -->
+<div id="modal-thank-you" style="display: none; text-align: center; padding: 20px;">
+    <h2 class="modal-title-single">Thank You!</h2>
+    <p>A Warm Right customer service agent will contact you by the next working day.</p>
+    <!-- Added 'btn primary' classes here -->
+    <button class="btn primary modal-close-trigger" style="margin-top: 20px;">Close</button>
+</div>
+
+  </div>
+</div>
+
+
+
+ <!-- Lightbox / Gallery Overlay with Navigation -->
+<div id="review-lightbox" class="lightbox-overlay">
+  <span class="lightbox-close">&times;</span>
+  
+  <!-- Navigation Arrows -->
+  <button class="lightbox-nav prev" id="lightbox-prev">&#10094;</button>
+  <img class="lightbox-content" id="lightbox-img">
+  <button class="lightbox-nav next" id="lightbox-next">&#10095;</button>
+
+  <!-- Image counter (optional) -->
+  <div id="lightbox-counter" class="lightbox-counter"></div>
 </div>
