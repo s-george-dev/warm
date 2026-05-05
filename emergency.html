@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Connecting to Support — Warm Right Ltd</title>
+  <link rel="icon" href="assets/images/favicon.png">
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/header.css">
+  <style>
+    body.emergency-page {
+        background: #f4f7f9;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        margin: 0;
+    }
+    .emergency-header {
+        background: #062940; /* Brand Navy */
+        color: white;
+        padding: 20px;
+        text-align: center;
+        border-bottom: 4px solid #ffd166; /* Brand Gold */
+    }
+    .emergency-header img { height: 55px; }
+    .emergency-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .emergency-card {
+        background: white;
+        max-width: 500px;
+        width: 100%;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        text-align: center;
+        border-top: 6px solid #ffd166;
+    }
+    .emergency-card h2 { color: #062940; margin-bottom: 15px; font-size: 1.8rem; }
+    .emergency-card p { color: #555; line-height: 1.6; margin-bottom: 30px; font-size: 1.1rem; }
+
+    .spinner {
+        width: 70px;
+        height: 70px;
+        border: 6px solid #f0f0f0;
+        border-top: 6px solid #2b6777; /* Brand Teal */
+        border-radius: 50%;
+        margin: 0 auto 25px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    .btn-stack { display: flex; flex-direction: column; gap: 15px; }
+    .btn {
+        padding: 18px;
+        border-radius: 10px;
+        font-weight: bold;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        display: block;
+    }
+    .btn.primary { background: #2b6777; color: white; }
+    .btn.primary:hover { background: #062940; }
+    
+    .btn.cancel { background: #e9ecef; color: #495057; }
+    .btn.cancel:hover { background: #dee2e6; }
+
+    .btn.home { background: #062940; color: white; }
+
+    #countdown-number { font-weight: bold; color: #2b6777; font-size: 1.2rem; }
+  </style>
+</head>
+<body class="emergency-page">
+
+  <header class="emergency-header">
+    <div class="header-container">
+      <img src="assets/images/logo.png" alt="Warm Right Ltd">
+    </div>
+  </header>
+
+  <div class="emergency-container">
+    <div class="emergency-card">
+      
+      <!-- ACTIVE STATE -->
+      <div id="activeState">
+        <div class="spinner"></div>
+        <h2>Connecting to Support</h2>
+        <p>Please wait while we open your dialer... <br>
+        Auto-calling in <span id="countdown-number">5</span> seconds.</p>
+        
+        <div class="btn-stack">
+            <a href="tel:08007566748" class="btn primary">Call Now</a>
+            <button type="button" id="cancelTrigger" class="btn cancel">Cancel Call</button>
+        </div>
+      </div>
+
+      <!-- CANCELLED STATE -->
+      <div id="cancelledState" style="display:none;">
+        <h2>Call Cancelled</h2>
+        <p>The automatic connection was stopped. You can still call us manually or return to the main site.</p>
+        <div class="btn-stack">
+            <a href="tel:08007566748" class="btn primary">Call Now</a>
+            <a href="index.html" class="btn home">Back to Home Page</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let timerSeconds = 5;
+        const countdownDisplay = document.getElementById('countdown-number');
+        const activeState = document.getElementById('activeState');
+        const cancelledState = document.getElementById('cancelledState');
+        const cancelBtn = document.getElementById('cancelTrigger');
+        
+        // 1. Set the 5-second trigger for the dialer
+        const autoDialer = setTimeout(() => {
+            window.location.href = "tel:08007566748";
+            // 2. Redirect the background browser tab to home 1 second after dialer opens
+            setTimeout(() => {
+                window.location.href = "index.html";
+            }, 1000); 
+        }, 5000);
+
+        // 3. Handle the visual countdown
+        const countdownInterval = setInterval(() => {
+            timerSeconds--;
+            if (countdownDisplay && timerSeconds >= 0) {
+                countdownDisplay.textContent = timerSeconds;
+            }
+            if (timerSeconds <= 0) {
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+
+        // 4. Cancel Logic
+        cancelBtn.addEventListener('click', function() {
+            // Stop both timers
+            clearTimeout(autoDialer);
+            clearInterval(countdownInterval);
+            
+            // UI Update
+            activeState.style.display = 'none';
+            cancelledState.style.display = 'block';
+        });
+    });
+  </script>
+</body>
+</html>
