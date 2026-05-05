@@ -429,3 +429,66 @@ s1.charset='UTF-8';
 s1.setAttribute('crossorigin','*');
 s0.parentNode.insertBefore(s1,s0);
 })();
+
+
+/* ==========================================
+    BOOK US BUTTON (Responsive Float Injection)
+   ========================================== */
+(function() {
+    // 1. Check for button existence, then create and inject
+    let bookBtn = document.querySelector('.book-us-btn');
+    if (!bookBtn) {
+        bookBtn = document.createElement('a');
+        bookBtn.href = "book-a-visit.html";
+        bookBtn.className = "book-us-btn";
+        bookBtn.textContent = "Book Us";
+        document.body.appendChild(bookBtn);
+    }
+
+    // 2. Responsive adjustment logic
+    function adjustBookButton() {
+        const isMobile = window.innerWidth <= 768;
+        const scrollY = window.scrollY;
+        const windowHeight = window.innerHeight;
+        const docHeight = document.documentElement.scrollHeight;
+        
+        // Detection for bottom of the page (within 10px)
+        const isAtBottom = (scrollY + windowHeight) >= (docHeight - 10);
+        const navIsOpen = document.body.classList.contains('nav-open');
+
+        // Logic for the mobile "Footer-Center" state
+        const shouldFloatCenter = isMobile && isAtBottom && !navIsOpen;
+
+        if (shouldFloatCenter) {
+            bookBtn.style.left = '50%';
+            bookBtn.style.right = 'auto';
+            bookBtn.style.transform = 'translateX(-50%)';
+            bookBtn.style.bottom = '55%';
+            bookBtn.style.fontSize = '1.3rem';
+            bookBtn.style.padding = '16px 24px';
+            bookBtn.style.opacity = '1';
+            bookBtn.style.pointerEvents = 'auto';
+            bookBtn.innerText = 'Click to book today';
+            bookBtn.style.width = '75%';
+        } else {
+            // Restore standard floating corner state
+            bookBtn.style.left = '';
+            bookBtn.style.right = '25px';
+            bookBtn.style.transform = '';
+            bookBtn.style.bottom = '25px';
+            bookBtn.style.fontSize = '';
+            bookBtn.style.padding = '';
+            bookBtn.style.opacity = '1';
+            bookBtn.style.pointerEvents = 'auto';
+            bookBtn.innerText = 'Book Us';
+            bookBtn.style.width = 'auto';
+        }
+    }
+
+    // 3. Listeners for scroll and window resizing
+    window.addEventListener('scroll', adjustBookButton);
+    window.addEventListener('resize', adjustBookButton);
+    
+    // Initial call to set state on load
+    adjustBookButton();
+})();
