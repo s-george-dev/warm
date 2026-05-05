@@ -46,17 +46,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const siteRoot = isGitHub ? `/${repoName}/` : "/";
   const partialsPath = siteRoot + "partials/";
 
+  // Load Header
   loadHTML("header", partialsPath + "header.html").then(() => {
     const container = document.getElementById("header");
     if (container) {
       fixInjectedPaths(container, siteRoot);
       highlightActivePage(container, isGitHub);
       
+      // CRITICAL: Initialize navigation ONLY after header HTML is injected
+      if (typeof window.initWarmRight === "function") {
+        window.initWarmRight();
+      }
+      
       const headerEl = container.querySelector(".header");
       if (headerEl) headerEl.classList.add("loaded");
     }
   });
 
+  // Load Footer
   loadHTML("footer", partialsPath + "footer.html").then(() => {
     const container = document.getElementById("footer");
     if (container) fixInjectedPaths(container, siteRoot);
@@ -85,18 +92,9 @@ function highlightActivePage(container, isGitHub) {
   const currentPath = window.location.pathname.toLowerCase();
   const navLinks = container.querySelectorAll('a');
 
-  // 1. Clear all active classes
   navLinks.forEach(link => link.classList.remove('active'));
 
-  // 2. Identify actual folder (Category)
   const segments = currentPath.split('/').filter(Boolean);
-  
-  /**
-   * If GitHub: /warm/services/repairs.html -> segments are ["warm", "services", "repairs.html"]
-   * Folder is index 1.
-   * If Localhost: /services/repairs.html -> segments are ["services", "repairs.html"]
-   * Folder is index 0.
-   */
   const currentFolder = isGitHub ? segments[1] : segments[0];
 
   navLinks.forEach(link => {
@@ -106,16 +104,12 @@ function highlightActivePage(container, isGitHub) {
     const linkPath = link.pathname.toLowerCase();
     const linkText = link.textContent.toLowerCase().trim();
 
-    // --- A. CHILD MATCH (The specific page) ---
     if (currentPath === linkPath && !href.startsWith('#')) {
       link.classList.add('active');
     }
 
-    // --- B. PARENT MATCH (Services or Support) ---
-    // Look for links that match the current folder name but ARE NOT in the dropdown menu
     if (currentFolder === 'services' || currentFolder === 'support') {
       const isTopLevelTrigger = linkText.includes(currentFolder) && !link.closest('.dropdown-menu');
-      
       if (isTopLevelTrigger) {
         link.classList.add('active');
       }

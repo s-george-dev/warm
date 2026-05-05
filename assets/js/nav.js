@@ -1,6 +1,26 @@
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("✅ DOM fully loaded, script running");
+/**
+ * Global Navigation Initializer
+ * This is called by include.js after the header is injected.
+ */
+window.initWarmRight = function() {
+    const menuToggle = document.querySelector('.menu-toggle');
+    const navLinks = document.querySelector('.nav-links');
 
+    if (menuToggle && navLinks) {
+        // Remove existing listener to prevent double-binding
+        menuToggle.replaceWith(menuToggle.cloneNode(true));
+        const newToggle = document.querySelector('.menu-toggle');
+
+        newToggle.addEventListener('click', () => {
+            navLinks.classList.toggle('active');
+            newToggle.classList.toggle('open');
+            document.body.classList.toggle('nav-open');
+        });
+        console.log("📂 Navigation initialized");
+    }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
   // Initial check for office status
   updateOfficeStatus();
 
@@ -47,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ================================
-      CAROUSEL AUTO-SCROLL (Ping-Pong)
+      CAROUSEL AUTO-SCROLL
   ================================== */
   document.querySelectorAll('.carousel-container').forEach(container => {
     const track = container.querySelector('.carousel-track');
@@ -150,24 +170,21 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==========================================
-    OFFICE STATUS & IMAGE LOGIC
+    OFFICE STATUS LOGIC
 ========================================== */
 function isOfficeOpen() {
     const now = new Date();
     const hours = now.getHours();
-    // Returns true if between 09:00 and 17:59
     return hours >= 9 && hours < 18;
 }
 
 function updateOfficeStatus() {
-    // Target both potential IDs used across pages
     const callTile = document.getElementById('call-to-book') || document.getElementById('call-us-tile');
     if (!callTile) return;
 
     const img = callTile.querySelector('img');
     const title = document.getElementById('call-to-book-title') || callTile.querySelector('h3');
     const text = document.getElementById('call-to-book-text') || callTile.querySelector('p');
-    
     const open = isOfficeOpen();
 
     if (open) {
@@ -188,9 +205,7 @@ function closeModal() {
     const callModal = document.getElementById('call-modal');
     if (callModal) {
         callModal.style.display = 'none';
-        document.body.classList.remove('modal-open'); // Unlock scroll
-        
-        // Reset Views
+        document.body.classList.remove('modal-open');
         document.getElementById('modal-initial-actions').style.display = 'block';
         document.getElementById('modal-callback-form').style.display = 'none';
         document.getElementById('modal-thank-you').style.display = 'none';
@@ -199,83 +214,48 @@ function closeModal() {
 
 document.addEventListener('click', (e) => {
     const openBtn = e.target.closest('.footer-call-btn, .mobile-call-btn, #call-to-book, #call-us-tile, .request-callback-tile');
-
     if (openBtn) {
         const isOpen = isOfficeOpen();
+        if (isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) return; 
+        if (!isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) e.preventDefault();
 
-        // 1. If Open & Phone Tile: Allow normal tel: behavior and stop script
-        if (isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) {
-            return; 
-        }
-
-        // 2. If Closed & Phone Tile: Prevent dialing
-        if (!isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) {
-            e.preventDefault();
-        }
-
-        // 3. Open Modal Logic
         const callModal = document.getElementById('call-modal');
-        const initialActions = document.getElementById('modal-initial-actions');
-        const callbackFormContainer = document.getElementById('modal-callback-form');
-        const backBtn = document.getElementById('btn-modal-back');
-
         if (callModal) {
             callModal.style.display = 'flex';
-            document.body.classList.add('modal-open'); // Lock scroll
-
-            // Direct load from tiles (Book a Visit / Contact Us)
+            document.body.classList.add('modal-open');
             if (openBtn.classList.contains('request-callback-tile')) {
-                if (initialActions) initialActions.style.display = 'none';
-                if (callbackFormContainer) callbackFormContainer.style.display = 'block';
-                if (backBtn) backBtn.innerText = "Close";
+                document.getElementById('modal-initial-actions').style.display = 'none';
+                document.getElementById('modal-callback-form').style.display = 'block';
+                document.getElementById('btn-modal-back').innerText = "Close";
             } else {
-                // Default load (Office Closed message)
-                if (initialActions) initialActions.style.display = 'block';
-                if (callbackFormContainer) callbackFormContainer.style.display = 'none';
-                if (backBtn) backBtn.innerText = "Back";
+                document.getElementById('modal-initial-actions').style.display = 'block';
+                document.getElementById('modal-callback-form').style.display = 'none';
+                document.getElementById('btn-modal-back').innerText = "Back";
             }
         }
     }
-
-    // Modal Navigation
     if (e.target.id === 'btn-request-callback') {
         document.getElementById('modal-initial-actions').style.display = 'none';
         document.getElementById('modal-callback-form').style.display = 'block';
     }
-
     if (e.target.id === 'btn-modal-back') {
-        if (e.target.innerText === "Close") {
-            closeModal();
-        } else {
+        if (e.target.innerText === "Close") closeModal();
+        else {
             document.getElementById('modal-callback-form').style.display = 'none';
             document.getElementById('modal-initial-actions').style.display = 'block';
         }
     }
-
-    // Close Triggers
-    if (e.target.classList.contains('call-modal-close') || 
-        e.target.classList.contains('modal-close-trigger') || 
-        e.target.id === 'call-modal') {
-        closeModal();
-    }
+    if (e.target.classList.contains('call-modal-close') || e.target.id === 'call-modal') closeModal();
 });
 
-/**
- * AJAX Form Submission (Formspree)
- */
 document.addEventListener("submit", async (event) => {
     if (event.target.id === 'footer-callback-form') {
         event.preventDefault(); 
         const form = event.target;
         const data = new FormData(form);
         const submitBtn = form.querySelector('button[type="submit"]');
-        const thankYouSection = document.getElementById('modal-thank-you');
-        const formContainer = document.getElementById('modal-callback-form');
-
-        if (submitBtn) {
-            submitBtn.innerText = "Sending...";
-            submitBtn.disabled = true;
-        }
+        submitBtn.innerText = "Sending...";
+        submitBtn.disabled = true;
 
         try {
             const response = await fetch(form.action, {
@@ -283,39 +263,24 @@ document.addEventListener("submit", async (event) => {
                 body: data,
                 headers: { 'Accept': 'application/json' }
             });
-            
             if (response.ok) {
-                formContainer.style.display = 'none';
-                thankYouSection.style.display = 'block';
+                document.getElementById('modal-callback-form').style.display = 'none';
+                document.getElementById('modal-thank-you').style.display = 'block';
                 form.reset();
-            } else {
-                alert("Oops! There was a problem. Please email: info@warmright.co.uk");
-            }
-        } catch (error) {
-            alert("Connection error. Please try again.");
-        } finally {
-            if (submitBtn) {
-                submitBtn.innerText = "Submit Request";
-                submitBtn.disabled = false;
-            }
+            } else alert("Oops! Problem submitting form.");
+        } catch (error) { alert("Connection error."); }
+        finally {
+            submitBtn.innerText = "Submit Request";
+            submitBtn.disabled = false;
         }
     }
 });
 
-/* ==========================================
-    HEADER LOAD HELPER
-========================================== */
+// Polling fallback
 function waitForHeaderAndInitNav(retries = 20) {
   const toggle = document.querySelector('.menu-toggle');
-  
-  // Re-run status check in case tiles were loaded via partial
   updateOfficeStatus();
-
-  if (toggle && typeof window.initWarmRight === "function") {
-    window.initWarmRight();
-  } else if (retries > 0) {
-    setTimeout(() => waitForHeaderAndInitNav(retries - 1), 150);
-  }
+  if (toggle && typeof window.initWarmRight === "function") window.initWarmRight();
+  else if (retries > 0) setTimeout(() => waitForHeaderAndInitNav(retries - 1), 150);
 }
-
 waitForHeaderAndInitNav();
