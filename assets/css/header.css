@@ -1,192 +1,148 @@
-/* === Header base === */
+/* 1. GLOBAL FIXES */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* 2. HEADER BASE */
 .header {
   position: absolute;
   top: 20px;
   left: 0;
-  width: 100%;
+  right: 0;
+  width: 95%;
+  max-width: 1200px;
+  margin: 0 auto;
   z-index: 1000;
-  overflow: visible;
   background: var(--nav-background);
-  color: #fff;  /*not needed? */
-  border-radius: 0 0 16px 16px;
+  border-radius: 12px;
   transition: opacity 0.4s ease, transform 0.4s ease;
   opacity: 0;
   transform: translateY(-12px);
 }
-.header {
-  max-width: 1200px;
-  margin: 0 auto;
-  left: 0;
-  right: 0;
-}
-
-
 
 .header.loaded {
   opacity: 1;
   transform: none;
 }
 
-.brand-separator {
-  width: 2px;
-  height: 40px;
-  background: rgba(255, 255, 255, 0.3);
-  margin-left: 0px;
-  margin-right: 0px;
-  flex-shrink: 0;
-  transition: opacity 0.3s ease;
-  visibility:hidden;
-
-}
-@media (max-width: 800px) {
-  .brand-separator {
-    display: none;
-  }
-}
-
-
-
-/* === Header inner & brand === */
 .header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
-  gap: 12px;
+  padding: 10px 15px;
 }
 
+/* 3. BRANDING */
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--background-main);
-  color:black;
-  border-radius: 10pt;
- 
-}
-
-.brand img {
-  height: 46px;
-  width: auto;
-}
-
-.brand .title {
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--nav-background);
-}
-
-.brand .sub {
-  font-size: 0.85rem;
-  color: var(--nav-background);
- /* color: rgba(255, 255, 255, 0.9); */
-}
-
-/* === Nav links === */
-.nav {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  flex-wrap: wrap;
-  row-gap: 8px;
-}
-
-.nav a {
-  color: #fff;
-  text-decoration: none;
-  font-weight: 600;
-  padding: 8px 10px;
+  gap: 10px;
+  background: #fff;
+  padding: 5px 12px;
   border-radius: 8px;
-  display: inline-block;
-  border-bottom: 2px solid transparent; /*fix for the wrap and jump in nav */
-  transition: border-color 0.3s ease;
+}
+.brand img { height: 35px; width: auto; }
+.brand .title { font-weight: 700; color: var(--nav-background); font-size: 1rem; }
+.brand .sub { font-size: 0.85rem; color: var(--nav-background); }
+
+#headbrand { text-decoration: none; }
+
+/* 4. NAVIGATION & HIGHLIGHTING */
+.nav { display: flex; gap: 15px; align-items: center; }
+.nav a { 
+  color: #fff; 
+  text-decoration: none; 
+  font-weight: 600; 
+  font-size: 0.9rem; 
+  padding: 8px 10px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
 }
 
-.nav a:hover {
+.nav a:hover, .nav a.active {
   color: #ffd166;
   border-bottom: 2px solid #ffd166;
 }
 
-/* Keep the link orange and underlined when active[cite: 4] */
-.nav a.active {
-  color: #ffd166;
-  border-bottom: 2px solid #ffd166;
-}
-
-/* === Dropdown menus === */
-.dropdown {
-  position: relative;
-}
-
+/* 5. DROPDOWN (Desktop) */
+.dropdown { position: relative; }
 .dropdown-menu {
-  display: none; /* hidden until hover */
+  display: none;
   position: absolute;
   top: 100%;
   left: 0;
-  background: #083155;
-  color: #fff;
-  min-width: 220px;
-  border-radius: 8px;
-  padding: 8px 0;
-  box-shadow: 0 10px 30px rgba(2, 12, 34, 0.18);
-  z-index: 1100;
+  background: #fff;
+  min-width: 260px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  padding: 10px 0;
+  z-index: 1200;
 }
+.dropdown:hover .dropdown-menu { display: block; }
 
 .dropdown-menu a {
-  display: block; 
-  padding: 8px 12px;
-  color: #fff;
-  border-radius: 6px;
-  z-index: 1000000;
+  display: block;
+  padding: 10px 16px;
+  color: #0a2c66 !important;
+  font-size: 0.9rem;
+  border-bottom: 2px solid transparent !important;
 }
 
-.dropdown:hover .dropdown-menu {
-  display: block; /* show menu on hover */
+.dropdown-menu a:hover, .dropdown-menu a.active {
+  background: rgba(10, 44, 102, 0.05);
+  color: #ffd166 !important;
+  border-bottom: 2px solid #ffd166 !important;
 }
 
-/* === Responsive adjustments === */
+/* 6. MOBILE OVERRIDES */
 @media (max-width: 800px) {
-  .header-inner {
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .nav {
-    display: flex;
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-
-  .nav a.active {
-    color: #ffd166;
-    font-weight: 700;
-  }
-
+  .nav { display: none !important; }
+  .header { top: 10px; width: 92%; }
+  
   .menu-toggle {
-    display: block;
-    margin-left: auto;
-	position:fixed;
-	top: 0;
-	right: 15px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+  }
+
+  .hamburger-icon, .hamburger-icon::before, .hamburger-icon::after {
+    background: #fff;
   }
 }
 
-/* === Container fixes to prevent clipping === */
-.container {
-  overflow: visible;
-  position: static;
-  z-index: auto;
+/* --- Floating Book Us Button --- */
+.floating-book-btn {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  background-color: var(--highlight-amber) !important; /* Fixed variable name from variables.css */
+  color: #fff !important; /* Forced white text */
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-weight: 700;
+  text-decoration: none;
+  z-index: 2000;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  transition: all 0.3s ease;
+  display: block;
 }
 
-/* prevent big nav loading on mobile */
-@media (max-width: 800px) {
-  .nav {
-    display: none !important;
-  }
+/* Update this specific block in your header.css */
+.floating-book-btn.at-bottom {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 120px; /* Increased this to move it up slightly from the bottom edge */
+  width: 85%;
+  text-align: center;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 1.2rem;
 }
 
-#headbrand{
-	text-decoration:none;
-	color: var(--nav-text)
-}

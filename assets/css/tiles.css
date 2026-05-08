@@ -147,42 +147,29 @@
   position: relative;
   overflow: hidden;
   max-width: 100%;
-  padding: 20px;       /* optional: space around tiles */
-  border-radius: 12px; /* optional: rounded edges */
+  padding: 20px;
+  border-radius: 12px;
 }
-
 
 .carousel-track {
   display: flex;
   overflow-x: auto;
   scroll-behavior: smooth;
-  gap: 20px;              /* 👈 adds space between tiles */
-  padding: 10px;          /* optional: breathing room at edges */
-  scrollbar-width: none;  /* Firefox hide scrollbar */
-  background:none;
+  gap: 20px;
+  padding: 10px;
+  scrollbar-width: none;
+  background: none;
 }
+
 .carousel-track::-webkit-scrollbar {
-  display: none;          /* Chrome/Safari hide scrollbar */
+  display: none;
 }
 
 .carousel-track .info-tile {
-  flex: 0 0 auto;         /* don’t shrink, keep natural width */
-  width: 220px;           /* 👈 match your grid’s min width */
+  flex: 0 0 auto;
+  width: 220px;
 }
 
-.carousel-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0,0,0,0.5);
-  color: var(--text-primary);
-  border: none;
-  font-size: 2rem;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  z-index: 10;
-}
-/* hide arrows by default */
 .carousel-btn {
   position: absolute;
   top: 50%;
@@ -197,12 +184,14 @@
   opacity: 0;
   transition: opacity 0.3s ease;
 }
-/* show arrows when hovering over container */
+
 .carousel-container:hover .carousel-btn {
   opacity: 1;
 }
-.carousel-btn.left { left: 10px; color:white; }
-.carousel-btn.right { right: 10px; color:white; }
+
+.carousel-btn.left { left: 10px; color: white; }
+.carousel-btn.right { right: 10px; color: white; }
+
 
 /* BOILER FAULTS PAGE */
 

@@ -1,7 +1,7 @@
 /* === Menu Toggle Button === */
 .menu-toggle {
   display: none;
-  background: transparent;
+ /* background: transparent; */
   border: none;
   color: var(--nav-text);
   font-size: 1em;
@@ -151,9 +151,10 @@
   bottom: -8px;
 }
 
+
 /* === Morph into X === */
 .menu-toggle.open .hamburger-icon {
- background: transparent;
+ background-color: transparent;
 }
 
 .menu-toggle.open .hamburger-icon::before {
@@ -167,7 +168,7 @@
 }
 
 .hamburger-wrapper {
-  background-color: var(--nav-background);
+ /* background-color: var(--nav-background); */
   padding: 15px;
   border-radius: 6px;
   display: flex;
@@ -177,6 +178,10 @@
   
 }
 
+.menu-toggle.open,
+.menu-toggle.open .hamburger-wrapper {
+  background-color: transparent !important;
+}
 
 
 /* === Call Button === */
@@ -200,4 +205,19 @@
 
 .call-btn:hover {
   background-color: #218838;
+}
+
+.brand {
+  min-width: 0;
+  flex: 1;
+}
+
+.brand div {
+  min-width: 0;
+}
+
+.brand .title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

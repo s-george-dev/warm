@@ -1,286 +1,382 @@
-/**
- * Global Navigation Initializer
- * This is called by include.js after the header is injected.
- */
 window.initWarmRight = function() {
-    const menuToggle = document.querySelector('.menu-toggle');
-    const navLinks = document.querySelector('.nav-links');
-
-    if (menuToggle && navLinks) {
-        // Remove existing listener to prevent double-binding
-        menuToggle.replaceWith(menuToggle.cloneNode(true));
-        const newToggle = document.querySelector('.menu-toggle');
-
-        newToggle.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
-            newToggle.classList.toggle('open');
-            document.body.classList.toggle('nav-open');
-        });
-        console.log("📂 Navigation initialized");
-    }
-};
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Initial check for office status
-  updateOfficeStatus();
 
   /* ================================
-      REVEAL ANIMATIONS
+     NAVIGATION (Hamburger + Mobile)
   ================================== */
-  const observer = new IntersectionObserver((entries, obs) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        obs.unobserve(entry.target);
+  const menuToggle = document.querySelector('.menu-toggle');
+  const mobileNav  = document.querySelector('.mobile-nav');
+  const desktopNav = document.querySelector('.nav');
+  const overlay    = document.querySelector('.nav-overlay');
+  const wrapper    = document.querySelector('.hamburger-wrapper');
+
+  function closeNav() {
+    if (!mobileNav || !menuToggle) return;
+    mobileNav.classList.remove('open');
+    menuToggle.classList.remove('open');
+    document.body.classList.remove('nav-open');
+    overlay?.classList.remove('open');
+    if (desktopNav) desktopNav.style.display = '';
+    mobileNav.style.transform = '';
+
+    if (typeof adjustBookButton === 'function') {
+      adjustBookButton();
+    }
+  }
+
+  if (menuToggle && mobileNav) {
+    menuToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = mobileNav.classList.toggle('open');
+      menuToggle.classList.toggle('open', isOpen);
+      document.body.classList.toggle('nav-open', isOpen);
+      overlay?.classList.toggle('open', isOpen);
+      if (desktopNav) desktopNav.style.display = isOpen ? 'none' : '';
+      mobileNav.style.transform = '';
+
+      if (wrapper) {
+        wrapper.classList.remove('spin');
+        void wrapper.offsetWidth;
+        wrapper.classList.add('spin');
+        wrapper.addEventListener('animationend', () => {
+          wrapper.classList.remove('spin');
+        }, { once: true });
+      }
+
+      if (typeof adjustBookButton === 'function') {
+        adjustBookButton();
       }
     });
-  }, { threshold: 0.12 });
 
-  document.querySelectorAll('.card').forEach((c, i) => {
-    c.style.transitionDelay = `${i * 100}ms`;
-    observer.observe(c);
-  });
-
-  /* ================================
-      BACK TO TOP BUTTON
-  ================================== */
-  let backToTop = document.querySelector('.back-to-top');
-  if (!backToTop) {
-    backToTop = document.createElement('a');
-    backToTop.href = "#";
-    backToTop.className = "back-to-top";
-    backToTop.textContent = "↑";
-    document.body.appendChild(backToTop);
-  }
-
-  window.addEventListener('scroll', () => {
-    if (window.scrollY > 100) {
-      backToTop.classList.add('show');
-    } else {
-      backToTop.classList.remove('show');
-    }
-  });
-
-  backToTop.addEventListener('click', (e) => {
-    e.preventDefault();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  /* ================================
-      CAROUSEL AUTO-SCROLL
-  ================================== */
-  document.querySelectorAll('.carousel-container').forEach(container => {
-    const track = container.querySelector('.carousel-track');
-    if (!track) return;
-
-    const nextBtn = container.querySelector('.carousel-btn.right');
-    const prevBtn = container.querySelector('.carousel-btn.left');
-
-    let scrollSpeed = 1.2;
-    let isPaused = false;
-    let scrollDirection = 1;
-    let mobilePauseTimeout;
-
-    function animateScroll() {
-      if (!isPaused && track) {
-        const maxScroll = track.scrollWidth - track.clientWidth;
-        track.scrollLeft += scrollSpeed * scrollDirection;
-
-        if (scrollDirection === 1 && track.scrollLeft >= maxScroll - 2) {
-          scrollDirection = -1;
-        } else if (scrollDirection === -1 && track.scrollLeft <= 1) {
-          scrollDirection = 1;
-        }
+    document.addEventListener('click', (evt) => {
+      if (mobileNav.classList.contains('open') &&
+          !mobileNav.contains(evt.target) &&
+          !menuToggle.contains(evt.target)) {
+        closeNav();
       }
-      requestAnimationFrame(animateScroll);
-    }
+    });
 
-    container.addEventListener('mouseenter', () => { isPaused = true; });
-    container.addEventListener('mouseleave', () => { isPaused = false; });
+    overlay?.addEventListener('click', closeNav);
+  }
 
-    track.addEventListener('touchstart', () => {
-      isPaused = true;
-      clearTimeout(mobilePauseTimeout);
-      mobilePauseTimeout = setTimeout(() => { isPaused = false; }, 3000);
-    }, { passive: true });
+  /* ================================
+     SWIPE-TO-CLOSE (Mobile)
+  ================================== */
+  let startX = 0, currentX = 0, isSwiping = false;
 
-    function scrollByTile(direction = 1) {
-      const firstTile = track.querySelector('.info-tile');
-      const tileWidth = firstTile ? firstTile.offsetWidth + 20 : 240; 
-      track.scrollBy({ left: direction * tileWidth, behavior: 'smooth' });
-    }
+  if (mobileNav) {
+    mobileNav.addEventListener('touchstart', (e) => {
+      if (!mobileNav.classList.contains('open')) return;
+      startX = e.touches[0].clientX;
+      isSwiping = true;
+    });
 
-    if (nextBtn) {
-      nextBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        scrollByTile(1);
-        isPaused = true;
-        setTimeout(() => { isPaused = false; }, 1000);
+    mobileNav.addEventListener('touchmove', (e) => {
+      if (!isSwiping) return;
+      currentX = e.touches[0].clientX;
+      const deltaX = currentX - startX;
+      if (deltaX > 0) {
+        mobileNav.style.transform = `translateX(${deltaX}px)`;
+      }
+    });
+
+    mobileNav.addEventListener('touchend', () => {
+      if (!isSwiping) return;
+      isSwiping = false;
+      const deltaX = currentX - startX;
+
+      if (deltaX > 80) {
+        closeNav();
+      } else {
+        mobileNav.style.transform = '';
+      }
+    });
+
+    mobileNav.querySelectorAll('.mobile-dropdown-button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.nextElementSibling;
+        if (!target) return;
+
+        mobileNav.querySelectorAll('.mobile-dropdown-menu').forEach(m => {
+          if (m !== target) m.classList.remove('open');
+        });
+
+        target.classList.toggle('open');
       });
-    }
+    });
+  }
 
-    if (prevBtn) {
-      prevBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        scrollByTile(-1);
-        isPaused = true;
-        setTimeout(() => { isPaused = false; }, 1000);
-      });
-    }
+  /* ================================
+     BUSINESS HOURS CONFIG
+  ================================== */
+  const businessHours = { start: 8, end: 18 };
 
-    requestAnimationFrame(animateScroll);
+  function isWithinBusinessHours() {
+    const now = new Date();
+    const hour = now.getHours();
+    return hour >= businessHours.start && hour < businessHours.end;
+  }
+
+  /* ================================
+     MODAL ELEMENTS (DECLARED ONCE)
+  ================================== */
+  const callModal            = document.getElementById("call-modal");
+  const modalCloseX          = document.getElementById("call-modal-close");
+  const modalRequestCallback = document.getElementById("btn-request-callback");
+  const modalBack            = document.getElementById("btn-modal-back");
+  const callbackTile         = document.getElementById("callback-toggle");
+  const callbackForm         = document.getElementById("footer-callback-form");
+
+  const modalInitial   = document.getElementById("modal-initial-actions");
+  const modalForm      = document.getElementById("modal-callback-form");
+  const modalThankYou  = document.getElementById("modal-thank-you");
+
+  function showClosedScreen() {
+    if (modalInitial)  modalInitial.style.display = "block";
+    if (modalForm)     modalForm.style.display = "none";
+    if (modalThankYou) modalThankYou.style.display = "none";
+  }
+
+  function showFormOnly() {
+    if (modalInitial)  modalInitial.style.display = "none";
+    if (modalForm)     modalForm.style.display = "block";
+    if (modalThankYou) modalThankYou.style.display = "none";
+  }
+
+  function showThankYou() {
+    if (modalInitial)  modalInitial.style.display = "none";
+    if (modalForm)     modalForm.style.display = "none";
+    if (modalThankYou) modalThankYou.style.display = "block";
+  }
+
+  /* ================================
+     CALLBACK-DIRECT CLASS SUPPORT
+  ================================== */
+  document.querySelectorAll(".callback-direct").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!callModal) return;
+
+      callModal.style.display = "flex";
+      showFormOnly();
+    });
   });
 
   /* ================================
-      SLIDESHOW ROTATION
+     CALL-TO-BOOK TILE
   ================================== */
-  const slides = document.querySelectorAll('.slide');
-  let current = 0;
-  if (slides.length > 0) {
-    setInterval(() => {
-      const outgoing = slides[current];
-      outgoing.classList.remove('active');
-      current = (current + 1) % slides.length;
-      const incoming = slides[current];
-      incoming.classList.add('active');
-    }, 6000);
+  const callTile      = document.getElementById("call-to-book");
+  const callTileTitle = document.getElementById("call-to-book-title");
+  const callTileText  = document.getElementById("call-to-book-text");
+
+  const defaultTitle = callTileTitle?.textContent.trim();
+  const defaultText  = callTileText?.textContent.trim();
+
+  function swapTileText(title, text, classToAdd, classToRemove) {
+    if (!callTile || !callTileTitle || !callTileText) return;
+
+    if (
+      callTileTitle.textContent.trim() === title &&
+      callTileText.textContent.trim() === text
+    ) return;
+
+    callTile.classList.add("fading");
+    setTimeout(() => {
+      callTileTitle.textContent = title;
+      callTileText.textContent  = text;
+      if (classToAdd) callTile.classList.add(classToAdd);
+      if (classToRemove) callTile.classList.remove(classToRemove);
+      callTile.classList.remove("fading");
+    }, 600);
+  }
+
+  if (callTile && callTileTitle && callTileText) {
+    if (isWithinBusinessHours()) {
+      let showingAlt = false;
+      setInterval(() => {
+        if (showingAlt) {
+          swapTileText(defaultTitle, defaultText, null, "call-open");
+        } else {
+          swapTileText("We’re Open Now!", "Call us today — we’re ready to help", "call-open", null);
+        }
+        showingAlt = !showingAlt;
+      }, 3000);
+
+      callTile.setAttribute("href", "tel:08007566748");
+    } else {
+      let showingClosed = false;
+      setInterval(() => {
+        if (showingClosed) {
+          swapTileText(defaultTitle, defaultText, null, "call-closed");
+        } else {
+          swapTileText("Office Closed", "Our office is currently closed for general enquiries", "call-closed", null);
+        }
+        showingClosed = !showingClosed;
+      }, 3000);
+
+      callTile.removeAttribute("href");
+      callTile.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (callModal) {
+          callModal.style.display = "flex";
+          showClosedScreen();
+        }
+      });
+    }
   }
 
   /* ================================
-      MAP OVERLAY INTERACTION
+     MOBILE NAV CALL BUTTON
   ================================== */
-  const mapOverlay = document.getElementById('mapOverlay');
-  const mapContainer = mapOverlay?.parentElement;
-  let mapResetTimer;
-
-  function activateMap() {
-    if (!mapContainer || !mapOverlay) return;
-    mapContainer.classList.add('active');
-    mapOverlay.classList.add('hidden');
-    clearTimeout(mapResetTimer);
-    mapResetTimer = setTimeout(() => {
-      mapContainer.classList.remove('active');
-      mapOverlay.classList.remove('hidden');
-    }, 30000);
-  }
-
-  if (mapOverlay) {
-    mapOverlay.addEventListener('click', activateMap);
-  }
-});
-
-/* ==========================================
-    OFFICE STATUS LOGIC
-========================================== */
-function isOfficeOpen() {
-    const now = new Date();
-    const hours = now.getHours();
-    return hours >= 9 && hours < 18;
-}
-
-function updateOfficeStatus() {
-    const callTile = document.getElementById('call-to-book') || document.getElementById('call-us-tile');
-    if (!callTile) return;
-
-    const img = callTile.querySelector('img');
-    const title = document.getElementById('call-to-book-title') || callTile.querySelector('h3');
-    const text = document.getElementById('call-to-book-text') || callTile.querySelector('p');
-    const open = isOfficeOpen();
-
-    if (open) {
-        if (img) img.src = "assets/images/office-open.jpg";
-        if (title) title.innerHTML = "📞 Call Us Now";
-        if (text) text.innerHTML = "Our team is available until 6pm today.<br><b>0800 756 6748</b>";
+  document.querySelectorAll('.mobile-call-btn').forEach(btn => {
+    if (isWithinBusinessHours()) {
+      btn.setAttribute('href', 'tel:08007566748');
     } else {
-        if (img) img.src = "assets/images/office-closed.jpg";
-        if (title) title.innerHTML = "🌙 Office Closed";
-        if (text) text.innerHTML = "Our office is currently closed.<br><b>Click here to request a callback.</b>";
-    }
-}
-
-/* ==========================================
-    MODAL & FORM LOGIC
-========================================== */
-function closeModal() {
-    const callModal = document.getElementById('call-modal');
-    if (callModal) {
-        callModal.style.display = 'none';
-        document.body.classList.remove('modal-open');
-        document.getElementById('modal-initial-actions').style.display = 'block';
-        document.getElementById('modal-callback-form').style.display = 'none';
-        document.getElementById('modal-thank-you').style.display = 'none';
-    }
-}
-
-document.addEventListener('click', (e) => {
-    const openBtn = e.target.closest('.footer-call-btn, .mobile-call-btn, #call-to-book, #call-us-tile, .request-callback-tile');
-    if (openBtn) {
-        const isOpen = isOfficeOpen();
-        if (isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) return; 
-        if (!isOpen && (openBtn.id === 'call-to-book' || openBtn.id === 'call-us-tile')) e.preventDefault();
-
-        const callModal = document.getElementById('call-modal');
+      btn.removeAttribute('href');
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         if (callModal) {
-            callModal.style.display = 'flex';
-            document.body.classList.add('modal-open');
-            if (openBtn.classList.contains('request-callback-tile')) {
-                document.getElementById('modal-initial-actions').style.display = 'none';
-                document.getElementById('modal-callback-form').style.display = 'block';
-                document.getElementById('btn-modal-back').innerText = "Close";
-            } else {
-                document.getElementById('modal-initial-actions').style.display = 'block';
-                document.getElementById('modal-callback-form').style.display = 'none';
-                document.getElementById('btn-modal-back').innerText = "Back";
-            }
+          callModal.style.display = 'flex';
+          showClosedScreen();
         }
+      });
     }
-    if (e.target.id === 'btn-request-callback') {
-        document.getElementById('modal-initial-actions').style.display = 'none';
-        document.getElementById('modal-callback-form').style.display = 'block';
-    }
-    if (e.target.id === 'btn-modal-back') {
-        if (e.target.innerText === "Close") closeModal();
-        else {
-            document.getElementById('modal-callback-form').style.display = 'none';
-            document.getElementById('modal-initial-actions').style.display = 'block';
+  });
+
+  /* ================================
+     FOOTER CALL BUTTON
+  ================================== */
+  document.querySelectorAll('.footer-call-btn').forEach(btn => {
+    if (isWithinBusinessHours()) {
+      btn.setAttribute('href', 'tel:08007566748');
+    } else {
+      btn.removeAttribute('href');
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (callModal) {
+          callModal.style.display = "flex";
+          showClosedScreen();
         }
+      });
     }
-    if (e.target.classList.contains('call-modal-close') || e.target.id === 'call-modal') closeModal();
-});
+  });
 
-document.addEventListener("submit", async (event) => {
-    if (event.target.id === 'footer-callback-form') {
-        event.preventDefault(); 
-        const form = event.target;
-        const data = new FormData(form);
-        const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.innerText = "Sending...";
-        submitBtn.disabled = true;
+  /* ================================
+     MODAL HANDLERS
+  ================================== */
 
-        try {
-            const response = await fetch(form.action, {
-                method: form.method,
-                body: data,
-                headers: { 'Accept': 'application/json' }
-            });
-            if (response.ok) {
-                document.getElementById('modal-callback-form').style.display = 'none';
-                document.getElementById('modal-thank-you').style.display = 'block';
-                form.reset();
-            } else alert("Oops! Problem submitting form.");
-        } catch (error) { alert("Connection error."); }
-        finally {
-            submitBtn.innerText = "Submit Request";
-            submitBtn.disabled = false;
-        }
-    }
-});
+  // Request a Callback tile
+  if (callbackTile) {
+    callbackTile.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!callModal) return;
+      callModal.style.display = "flex";
+      showFormOnly();
+    });
+  }
 
-// Polling fallback
-function waitForHeaderAndInitNav(retries = 20) {
-  const toggle = document.querySelector('.menu-toggle');
-  updateOfficeStatus();
-  if (toggle && typeof window.initWarmRight === "function") window.initWarmRight();
-  else if (retries > 0) setTimeout(() => waitForHeaderAndInitNav(retries - 1), 150);
+  // X button
+  if (modalCloseX) {
+    modalCloseX.addEventListener("click", () => {
+      if (callModal) callModal.style.display = "none";
+    });
+  }
+
+  // Grey Close buttons
+  document.querySelectorAll(".modal-close-trigger").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (callModal) callModal.style.display = "none";
+    });
+  });
+
+  // Request Callback button inside closed screen
+  if (modalRequestCallback) {
+    modalRequestCallback.addEventListener("click", () => {
+      showFormOnly();
+    });
+  }
+
+  // Back button on form → close modal
+  if (modalBack) {
+    modalBack.addEventListener("click", () => {
+      if (callModal) callModal.style.display = "none";
+    });
+  }
+
+  // AJAX form submission
+  if (callbackForm) {
+    callbackForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(callbackForm);
+
+      try {
+        await fetch(callbackForm.action, {
+          method: "POST",
+          body: formData,
+          headers: { "Accept": "application/json" }
+        });
+      } catch (err) {
+        console.error("Callback form submission failed", err);
+      }
+
+      showThankYou();
+    });
+  }
+
+}; // end initWarmRight
+
+
+/* ================================
+   BOOK US BUTTON (Responsive Float)
+================================== */
+let bookBtn = document.querySelector('.book-us-btn');
+if (!bookBtn) {
+  bookBtn = document.createElement('a');
+  bookBtn.href = "book-a-visit.html";
+  bookBtn.className = "book-us-btn";
+  bookBtn.textContent = "Book Us";
+  document.body.appendChild(bookBtn);
 }
-waitForHeaderAndInitNav();
+
+function adjustBookButton() {
+  const isMobile = window.innerWidth <= 768;
+  const scrollY = window.scrollY;
+  const windowHeight = window.innerHeight;
+  const docHeight = document.documentElement.scrollHeight;
+  const isAtBottom = scrollY + windowHeight >= docHeight - 10;
+
+  const navIsOpen = document.body.classList.contains('nav-open');
+  const shouldFloatCenter = isMobile && isAtBottom && !navIsOpen;
+
+  if (shouldFloatCenter) {
+    bookBtn.style.left = '50%';
+    bookBtn.style.right = 'auto';
+    bookBtn.style.transform = 'translateX(-50%)';
+    bookBtn.style.bottom = '55%';
+    bookBtn.style.fontSize = '1.3rem';
+    bookBtn.style.padding = '16px 24px';
+    bookBtn.style.opacity = '1';
+    bookBtn.style.pointerEvents = 'auto';
+    bookBtn.innerText = 'Click to book today';
+    bookBtn.style.width = '75%';
+  } else {
+    bookBtn.style.left = '';
+    bookBtn.style.right = '25px';
+    bookBtn.style.transform = '';
+    bookBtn.style.bottom = '25px';
+    bookBtn.style.fontSize = '';
+    bookBtn.style.padding = '';
+    bookBtn.style.opacity = '1';
+    bookBtn.style.pointerEvents = 'auto';
+    bookBtn.innerText = 'Book Us';
+    bookBtn.style.width = 'auto';
+  }
+}
+
+window.addEventListener('scroll', adjustBookButton);
+window.addEventListener('resize', adjustBookButton);
+adjustBookButton();
+
+if (window.initWarmRight) {
+    window.initWarmRight();
+}
