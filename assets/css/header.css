@@ -116,13 +116,13 @@ html, body {
   }
 }
 
-/* --- Floating Book Us Button --- */
+/* --- Floating Book Us Button - */
 .floating-book-btn {
   position: fixed;
   bottom: 25px;
   right: 25px;
-  background-color: var(--highlight-amber) !important; /* Fixed variable name from variables.css */
-  color: #fff !important; /* Forced white text */
+  background-color: var(--highlight-amber) !important; 
+  color: #fff !important;
   padding: 12px 24px;
   border-radius: 50px;
   font-weight: 700;
@@ -133,7 +133,7 @@ html, body {
   display: block;
 }
 
-/* Update this specific block in your header.css */
+
 .floating-book-btn.at-bottom {
   right: auto;
   left: 50%;
@@ -145,4 +145,3 @@ html, body {
   padding: 16px;
   font-size: 1.2rem;
 }
-

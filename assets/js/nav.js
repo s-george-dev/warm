@@ -18,9 +18,7 @@ window.initWarmRight = function() {
     if (desktopNav) desktopNav.style.display = '';
     mobileNav.style.transform = '';
 
-    if (typeof adjustBookButton === 'function') {
-      adjustBookButton();
-    }
+   
   }
 
   if (menuToggle && mobileNav) {
@@ -42,9 +40,6 @@ window.initWarmRight = function() {
         }, { once: true });
       }
 
-      if (typeof adjustBookButton === 'function') {
-        adjustBookButton();
-      }
     });
 
     document.addEventListener('click', (evt) => {
@@ -117,7 +112,7 @@ window.initWarmRight = function() {
   }
 
   /* ================================
-     MODAL ELEMENTS (DECLARED ONCE)
+     MODAL ELEMENTS
   ================================== */
   const callModal            = document.getElementById("call-modal");
   const modalCloseX          = document.getElementById("call-modal-close");
@@ -148,9 +143,6 @@ window.initWarmRight = function() {
     if (modalThankYou) modalThankYou.style.display = "block";
   }
 
-  /* ================================
-     CALLBACK-DIRECT CLASS SUPPORT
-  ================================== */
   document.querySelectorAll(".callback-direct").forEach(el => {
     el.addEventListener("click", (e) => {
       e.preventDefault();
@@ -213,7 +205,7 @@ window.initWarmRight = function() {
         showingClosed = !showingClosed;
       }, 3000);
 
-      callTile.removeAttribute("href");
+      callTile.removeAttribute('href');
       callTile.addEventListener("click", (e) => {
         e.preventDefault();
         if (callModal) {
@@ -263,8 +255,6 @@ window.initWarmRight = function() {
   /* ================================
      MODAL HANDLERS
   ================================== */
-
-  // Request a Callback tile
   if (callbackTile) {
     callbackTile.addEventListener("click", (e) => {
       e.preventDefault();
@@ -274,35 +264,30 @@ window.initWarmRight = function() {
     });
   }
 
-  // X button
   if (modalCloseX) {
     modalCloseX.addEventListener("click", () => {
       if (callModal) callModal.style.display = "none";
     });
   }
 
-  // Grey Close buttons
   document.querySelectorAll(".modal-close-trigger").forEach(btn => {
     btn.addEventListener("click", () => {
       if (callModal) callModal.style.display = "none";
     });
   });
 
-  // Request Callback button inside closed screen
   if (modalRequestCallback) {
     modalRequestCallback.addEventListener("click", () => {
       showFormOnly();
     });
   }
 
-  // Back button on form → close modal
   if (modalBack) {
     modalBack.addEventListener("click", () => {
       if (callModal) callModal.style.display = "none";
     });
   }
 
-  // AJAX form submission
   if (callbackForm) {
     callbackForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -316,7 +301,7 @@ window.initWarmRight = function() {
           headers: { "Accept": "application/json" }
         });
       } catch (err) {
-        console.error("Callback form submission failed", err);
+        console.error("We are sorry. There seems to be a technical problem. Please contact us at info@warmright.uk, letting us know that there is an issue with the feedback submission form. We will pass the information on to our technical team. Thank you.", err);
       }
 
       showThankYou();
@@ -326,57 +311,7 @@ window.initWarmRight = function() {
 }; // end initWarmRight
 
 
-/* ================================
-   BOOK US BUTTON (Responsive Float)
-================================== */
-let bookBtn = document.querySelector('.book-us-btn');
-if (!bookBtn) {
-  bookBtn = document.createElement('a');
-  bookBtn.href = "book-a-visit.html";
-  bookBtn.className = "book-us-btn";
-  bookBtn.textContent = "Book Us";
-  document.body.appendChild(bookBtn);
-}
-
-function adjustBookButton() {
-  const isMobile = window.innerWidth <= 768;
-  const scrollY = window.scrollY;
-  const windowHeight = window.innerHeight;
-  const docHeight = document.documentElement.scrollHeight;
-  const isAtBottom = scrollY + windowHeight >= docHeight - 10;
-
-  const navIsOpen = document.body.classList.contains('nav-open');
-  const shouldFloatCenter = isMobile && isAtBottom && !navIsOpen;
-
-  if (shouldFloatCenter) {
-    bookBtn.style.left = '50%';
-    bookBtn.style.right = 'auto';
-    bookBtn.style.transform = 'translateX(-50%)';
-    bookBtn.style.bottom = '55%';
-    bookBtn.style.fontSize = '1.3rem';
-    bookBtn.style.padding = '16px 24px';
-    bookBtn.style.opacity = '1';
-    bookBtn.style.pointerEvents = 'auto';
-    bookBtn.innerText = 'Click to book today';
-    bookBtn.style.width = '75%';
-  } else {
-    bookBtn.style.left = '';
-    bookBtn.style.right = '25px';
-    bookBtn.style.transform = '';
-    bookBtn.style.bottom = '25px';
-    bookBtn.style.fontSize = '';
-    bookBtn.style.padding = '';
-    bookBtn.style.opacity = '1';
-    bookBtn.style.pointerEvents = 'auto';
-    bookBtn.innerText = 'Book Us';
-    bookBtn.style.width = 'auto';
-  }
-}
-
-window.addEventListener('scroll', adjustBookButton);
-window.addEventListener('resize', adjustBookButton);
-adjustBookButton();
 
 if (window.initWarmRight) {
-    window.initWarmRight();
+  window.initWarmRight();
 }

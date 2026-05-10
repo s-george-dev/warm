@@ -81,9 +81,10 @@ function highlightActivePage(container, isGitHub) {
 
     // Parent Section Highlighting (Folder match)
     if (currentFolder === 'services' || currentFolder === 'support') {
-      if (el.textContent.toLowerCase().includes(currentFolder)) {
-        el.classList.add('active');
-      }
+     if (el.dataset.section === currentFolder) {
+    el.classList.add('active');
+}
+
     }
   });
 }

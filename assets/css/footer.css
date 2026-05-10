@@ -275,7 +275,7 @@ body.modal-open {
     z-index: 1000;
     transition: all 0.4s ease;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    bottom: 160px;
+    bottom: 100px;
     background: #ff9900;
     color: #fff;
     width: 50px;

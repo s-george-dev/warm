@@ -1,4 +1,4 @@
-console.log("MAIN JS VERSION", 1);
+console.log("MAIN JS VERSION", 3);
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -61,140 +61,81 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ================================
-       CAROUSEL AUTO-SCROLL (OLD SMOOTH VERSION)
+       CAROUSEL AUTO-SCROLL - FIXED
   ================================== */
   document.querySelectorAll('.carousel-container').forEach(container => {
-
     const track = container.querySelector('.carousel-track');
+    if (!track) return;
+
     const tiles = Array.from(track.querySelectorAll('.info-tile'));
     const prevBtn = container.querySelector('.carousel-btn.left');
     const nextBtn = container.querySelector('.carousel-btn.right');
 
-    let scrollSpeed = 0.5;
+    let scrollSpeed = 0.6;
     let isPaused = false;
     let isUserScrolling = false;
     let lastScrollLeft = 0;
     let scrollTimeout;
     let scrollDirection = 1;
 
-    /* === AUTO SCROLL === */
     function animateScroll() {
-      if (!isPaused && !isUserScrolling && track) {
-        track.scrollLeft += scrollSpeed * scrollDirection;
-
-        if (track.scrollLeft >= track.scrollWidth - track.clientWidth - 1) {
-          scrollDirection = -1;
-        } else if (track.scrollLeft <= 0) {
-          scrollDirection = 1;
-        }
+      if (isPaused || isUserScrolling || !track) {
+        requestAnimationFrame(animateScroll);
+        return;
       }
+
+      track.scrollLeft += scrollSpeed * scrollDirection;
+
+      const maxScroll = track.scrollWidth - track.clientWidth;
+
+      if (scrollDirection === 1 && track.scrollLeft >= maxScroll - 5) {
+        scrollDirection = -1;
+        track.scrollLeft = maxScroll;
+      } else if (scrollDirection === -1 && track.scrollLeft <= 5) {
+        scrollDirection = 1;
+        track.scrollLeft = 0;
+      }
+
       requestAnimationFrame(animateScroll);
     }
 
-    /* === USER SCROLL PAUSE === */
-    track.addEventListener('scroll', () => {
-      if (Math.abs(track.scrollLeft - lastScrollLeft) > 1) {
-        isUserScrolling = true;
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-          isUserScrolling = false;
-        }, 3000); // freeze for 3 seconds after user scroll
-      }
-      lastScrollLeft = track.scrollLeft;
-    });
-
-    /* === TOUCH PAUSE === */
-    track.addEventListener('touchstart', () => { isPaused = true; });
-    track.addEventListener('touchend', () => { isPaused = false; });
-
-    /* === HOVER PAUSE === */
-    container.addEventListener('mouseenter', () => { isPaused = true; });
-    container.addEventListener('mouseleave', () => { isPaused = false; });
-
-    /* === BUTTONS === */
-    function scrollByTile(direction = 1) {
-      const tileWidth = tiles[0]?.offsetWidth + 20 || 300;
-      track.scrollBy({ left: direction * tileWidth, behavior: 'smooth' });
-    }
-
-    if (nextBtn) {
-      nextBtn.addEventListener('click', () => {
-        scrollByTile(1);
-        isPaused = true;
-        setTimeout(() => { isPaused = false; }, 1500);
+    // User interaction handling
+    if (track) {
+      track.addEventListener('scroll', () => {
+        if (Math.abs(track.scrollLeft - lastScrollLeft) > 2) {
+          isUserScrolling = true;
+          clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => { isUserScrolling = false; }, 1500);
+        }
+        lastScrollLeft = track.scrollLeft;
       });
+
+      // Hover + Touch pause
+      container.addEventListener('mouseenter', () => isPaused = true);
+      container.addEventListener('mouseleave', () => isPaused = false);
+
+      track.addEventListener('touchstart', () => isPaused = true);
+      track.addEventListener('touchend', () => isPaused = false);
     }
 
-    if (prevBtn) {
-      prevBtn.addEventListener('click', () => {
-        scrollByTile(-1);
-        isPaused = true;
-        setTimeout(() => { isPaused = false; }, 1500);
-      });
+    // Buttons
+    function scrollByTile(dir = 1) {
+      const tileWidth = tiles[0]?.offsetWidth + 24 || 280;
+      track.scrollBy({ left: dir * tileWidth, behavior: 'smooth' });
     }
 
-    /* ================================
-         DRAG + SWIPE (INSIDE LOOP!)
-    ================================== */
-    let isDown = false;
-    let startX;
-    let scrollLeftStart;
+    if (nextBtn) nextBtn.addEventListener('click', () => { scrollByTile(1); isPaused=true; setTimeout(()=>isPaused=false,1400); });
+    if (prevBtn) prevBtn.addEventListener('click', () => { scrollByTile(-1); isPaused=true; setTimeout(()=>isPaused=false,1400); });
 
-    // Desktop drag
-    track.addEventListener('mousedown', (e) => {
-      isDown = true;
-      isPaused = true;
-      startX = e.pageX - track.offsetLeft;
-      scrollLeftStart = track.scrollLeft;
-    });
-
-    track.addEventListener('mouseleave', () => {
-      isDown = false;
-      isPaused = false;
-    });
-
-    track.addEventListener('mouseup', () => {
-      isDown = false;
-      isPaused = false;
-    });
-
-    track.addEventListener('mousemove', (e) => {
-      if (!isDown) return;
-      e.preventDefault();
-      const x = e.pageX - track.offsetLeft;
-      const walk = (x - startX) * 2.2;
-      track.scrollLeft = scrollLeftStart - walk;
-    });
-
-    // Mobile swipe
-    track.addEventListener('touchstart', (e) => {
-      isPaused = true;
-      startX = e.touches[0].pageX;
-      scrollLeftStart = track.scrollLeft;
-    });
-
-    track.addEventListener('touchmove', (e) => {
-      const x = e.touches[0].pageX;
-      const walk = (x - startX) * 1.8;
-      track.scrollLeft = scrollLeftStart - walk;
-    });
-
-    track.addEventListener('touchend', () => {
-      isPaused = false;
-    });
-
-    /* Start auto-scroll */
+    // Start animation
     requestAnimationFrame(animateScroll);
-
-  }); // end forEach
+  });
 
 }); // end DOMContentLoaded
-
 
 /* ================================
     SUPPORT FUNCTIONS
 ================================== */
-
 function updateTileImages() {
   const callTile = document.getElementById('call-to-book');
   if (!callTile) return;
