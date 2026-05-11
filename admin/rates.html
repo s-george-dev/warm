@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin - Schedule of Rates</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    img { max-width: 80px; }
+    .form { margin: 20px 0; padding: 20px; border: 1px solid #ddd; background: #f9f9f9; }
+    input, textarea { width: 100%; margin: 8px 0; padding: 10px; box-sizing: border-box; }
+    button { margin: 5px; padding: 10px 16px; }
+    .preview { max-width: 200px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Admin - Schedule of Rates</h1>
+  <button onclick="logout()">Logout</button>
+
+  <div class="form">
+    <h2 id="formTitle">Add New Rate</h2>
+    
+    <input id="title" placeholder="Title" required><br>
+    <textarea id="description" placeholder="Description" rows="3"></textarea><br>
+    <input id="price" placeholder="Price (e.g. £65.00 + VAT)" required><br>
+    
+    <input id="image" type="file" accept="image/*"><br>
+    <img id="imagePreview" class="preview" style="display:none;"><br>
+    
+    <button id="saveBtn">Save Rate</button>
+    <button onclick="resetForm()">Cancel</button>
+  </div>
+
+  <table id="ratesTable">
+    <thead>
+      <tr>
+        <th>Image</th>
+        <th>Title</th>
+        <th>Description</th>
+        <th>Price</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    // Initialize Supabase once
+    const supabase = Supabase.createClient(
+      'https://axampuprcnauxbbijmmt.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+    );
+
+    let editingId = null;
+
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = 'login.html';
+        return false;
+      }
+      return true;
+    }
+
+    function showPreview(file) {
+      const preview = document.getElementById('imagePreview');
+      if (file) {
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+      }
+    }
+
+    document.getElementById('image').addEventListener('change', (e) => showPreview(e.target.files[0]));
+
+    async function loadRates() {
+      const { data, error } = await supabase.from('rates').select('*').order('created_at', { ascending: false });
+      if (error) return console.error(error);
+
+      const tbody = document.querySelector('#ratesTable tbody');
+      tbody.innerHTML = data.map(rate => `
+        <tr>
+          <td>${rate.image_url ? `<img src="${rate.image_url}" alt="">` : 'No image'}</td>
+          <td>${rate.title}</td>
+          <td>${rate.description || ''}</td>
+          <td>${rate.price}</td>
+          <td>
+            <button onclick="editRate('${rate.id}')">Edit</button>
+            <button onclick="deleteRate('${rate.id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function saveRate() {
+      const title = document.getElementById('title').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const price = document.getElementById('price').value.trim();
+      const file = document.getElementById('image').files[0];
+
+      if (!title || !price) return alert("Title and Price are required");
+
+      let image_url = null;
+      if (file) {
+        const fileName = `${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage.from('rates-images').upload(fileName, file);
+        if (uploadError) return alert("Image upload failed: " + uploadError.message);
+        image_url = supabase.storage.from('rates-images').getPublicUrl(fileName).data.publicUrl;
+      }
+
+      const payload = { title, description, price, image_url };
+
+      const { error } = editingId 
+        ? await supabase.from('rates').update(payload).eq('id', editingId)
+        : await supabase.from('rates').insert(payload);
+
+      if (error) alert("Save failed: " + error.message);
+      else {
+        alert("Saved successfully!");
+        resetForm();
+        loadRates();
+      }
+    }
+
+    window.editRate = async (id) => {
+      const { data } = await supabase.from('rates').select('*').eq('id', id).single();
+      if (!data) return;
+      editingId = id;
+      document.getElementById('formTitle').textContent = 'Edit Rate';
+      document.getElementById('title').value = data.title;
+      document.getElementById('description').value = data.description || '';
+      document.getElementById('price').value = data.price;
+      document.getElementById('saveBtn').textContent = 'Update Rate';
+    };
+
+    window.deleteRate = async (id) => {
+      if (!confirm('Delete this item?')) return;
+      await supabase.from('rates').delete().eq('id', id);
+      loadRates();
+    };
+
+    window.resetForm = () => {
+      editingId = null;
+      document.getElementById('formTitle').textContent = 'Add New Rate';
+      document.getElementById('title').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('price').value = '';
+      document.getElementById('image').value = '';
+      document.getElementById('imagePreview').style.display = 'none';
+      document.getElementById('saveBtn').textContent = 'Save Rate';
+    };
+
+    window.logout = async () => {
+      await supabase.auth.signOut();
+      window.location.href = 'login.html';
+    };
+
+    // Initialize
+    document.getElementById('saveBtn').addEventListener('click', saveRate);
+    checkAuth().then(loggedIn => {
+      if (loggedIn) loadRates();
+    });
+  </script>
+</body>
+</html>

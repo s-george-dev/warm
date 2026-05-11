@@ -28,25 +28,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const siteRoot = isGitHub ? "/warm/" : "/";
   const partialsPath = siteRoot + "partials/";
 
-  loadHTML("header", partialsPath + "header.html").then(() => {
-    const container = document.getElementById("header");
-    if (container) {
-      fixInjectedPaths(container, siteRoot);
+  Promise.all([
+    loadHTML("header", partialsPath + "header.html"),
+    loadHTML("footer", partialsPath + "footer.html")
+  ]).then(() => {
+    const headerContainer = document.getElementById("header");
+    if (headerContainer) {
+      fixInjectedPaths(headerContainer, siteRoot);
+      highlightActivePage(headerContainer, isGitHub);
       
-      // RUN HIGHLIGHTER
-      highlightActivePage(container, isGitHub);
-      
-      if (typeof window.initWarmRight === "function") {
-        window.initWarmRight();
-      }
-      const headerEl = container.querySelector(".header");
+      const headerEl = headerContainer.querySelector(".header");
       if (headerEl) headerEl.classList.add("loaded");
     }
-  });
 
-  loadHTML("footer", partialsPath + "footer.html").then(() => {
-    const container = document.getElementById("footer");
-    if (container) fixInjectedPaths(container, siteRoot);
+    const footerContainer = document.getElementById("footer");
+    if (footerContainer) fixInjectedPaths(footerContainer, siteRoot);
+
+    // Force initWarmRight after everything is loaded
+    if (typeof window.initWarmRight === "function") {
+      window.initWarmRight();
+    }
+
+    document.dispatchEvent(new Event("includesLoaded"));
   });
 });
 
@@ -88,3 +91,4 @@ function highlightActivePage(container, isGitHub) {
     }
   });
 }
+document.dispatchEvent(new Event("includesLoaded"));

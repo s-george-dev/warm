@@ -1,4 +1,19 @@
 window.initWarmRight = function() {
+  // Re-run on pages where header loads late
+  setTimeout(() => {
+    // Re-attach all modal / tile handlers in case elements were added late
+    const callModal = document.getElementById("call-modal");
+    if (callModal) {
+      // Re-attach click handlers for tiles/buttons that open modal
+      document.querySelectorAll('#call-to-book, .footer-call-btn, .mobile-call-btn, .request-callback-tile, .callback-direct').forEach(el => {
+        el.addEventListener('click', (e) => {
+          // existing logic from your file...
+        }, { once: true });
+      });
+    }
+  }, 300);
+
+  /* rest of your existing code... */
 
   /* ================================
      NAVIGATION (Hamburger + Mobile)
@@ -312,6 +327,6 @@ window.initWarmRight = function() {
 
 
 
-if (window.initWarmRight) {
+document.addEventListener("includesLoaded", () => {
   window.initWarmRight();
-}
+});

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Login</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 50px; }
+    input { display: block; width: 320px; margin: 12px 0; padding: 12px; font-size: 16px; }
+    button { padding: 12px 24px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h2>Admin Login</h2>
+  
+  <input id="email" type="email" placeholder="Email" required><br>
+  <input id="password" type="password" placeholder="Password" required><br><br>
+  <button id="loginBtn">Login</button>
+  <p id="msg" style="color:red; margin-top:15px;"></p>
+
+  <script>
+    // Correct UMD build usage
+    const supabase = Supabase.createClient(
+      'https://axampuprcnauxbbijmmt.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+    );
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const msgEl = document.getElementById('msg');
+
+      msgEl.style.color = "blue";
+      msgEl.textContent = "Logging in...";
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        msgEl.style.color = "red";
+        msgEl.textContent = error.message;
+      } else {
+        msgEl.style.color = "green";
+        msgEl.textContent = "Login successful! Redirecting...";
+        setTimeout(() => window.location.href = 'rates.html', 800);
+      }
+    });
+  </script>
+</body>
+</html>

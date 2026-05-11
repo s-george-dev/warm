@@ -159,3 +159,20 @@ function initTestimonials() {
     });
   });
 }
+
+// Ensure map works even if loaded late
+function initMapOverlay() {
+  const mapOverlay = document.getElementById('mapOverlay');
+  if (mapOverlay) {
+    mapOverlay.addEventListener('click', function activateMap() {
+      const container = this.parentElement;
+      if (container) {
+        container.classList.add('active');
+        this.classList.add('hidden');
+      }
+    });
+  }
+}
+
+document.addEventListener("DOMContentLoaded", initMapOverlay);
+document.addEventListener("includesLoaded", initMapOverlay);

@@ -53,16 +53,20 @@
 	overflow:visible;
 }
 
-.tile-image {
-  height: 180px;
+.info-tile {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.tile-image img {
+.info-tile img {
   width: 100%;
-  height: 100%;
+  height: 180px; /* or whatever height you want */
   object-fit: cover;
+  flex-shrink: 0;
+  display: block;
 }
+
 
 /* FEATURE TILE */
 .feature-tile.split-left,
