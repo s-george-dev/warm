@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin - Schedule of Rates</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Manage Schedule of Rates</h1>
+  
+  <div id="form">
+    <input id="title" placeholder="Title" required>
+    <textarea id="description" placeholder="Description"></textarea>
+    <input id="price" placeholder="Price e.g. £65 + VAT" required>
+    <input id="image" type="file" accept="image/*">
+    <button id="saveBtn">Save</button>
+  </div>
+
+  <table id="ratesTable"></table>
+
+  <script>
+    const supabase = Supabase.createClient('YOUR_SUPABASE_URL', 'YOUR_ANON_KEY');
+
+    let editingId = null;
+
+    async function loadRates() {
+      const { data } = await supabase.from('rates').select('*');
+      // render table with Edit/Delete buttons
+    }
+
+    document.getElementById('saveBtn').onclick = async () => {
+      const file = document.getElementById('image').files[0];
+      let imageUrl = '';
+
+      if (file) {
+        const { data } = await supabase.storage.from('rates-images').upload(file.name, file);
+        imageUrl = supabase.storage.from('rates-images').getPublicUrl(data.path).data.publicUrl;
+      }
+
+      const payload = {
+        title: document.getElementById('title').value,
+        description: document.getElementById('description').value,
+        price: document.getElementById('price').value,
+        image_url: imageUrl || null
+      };
+
+      if (editingId) {
+        await supabase.from('rates').update(payload).eq('id', editingId);
+      } else {
+        await supabase.from('rates').insert(payload);
+      }
+
+      loadRates();
+      // clear form
+    };
+
+    loadRates();
+  </script>
+</body>
+</html>

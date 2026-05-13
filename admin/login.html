@@ -2,47 +2,287 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Admin Login</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login | Warm Right Ltd</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 50px; }
-    input { display: block; width: 320px; margin: 12px 0; padding: 12px; font-size: 16px; }
-    button { padding: 12px 24px; font-size: 16px; }
+    :root {
+      --primary-blue: #004a99;
+      --accent-orange: #ff8c00;
+      --bg-gray: #f4f7f6;
+      --white: #ffffff;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-gray);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .login-card {
+      background: var(--white);
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .logo img {
+      height: 60px;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      color: var(--primary-blue);
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    p.subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .input-group {
+      text-align: left;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #444;
+      font-size: 14px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 16px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--primary-blue);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #003a7a;
+    }
+
+    #msg {
+      margin-top: 20px;
+      font-size: 14px;
+      min-height: 20px;
+    }
+
+    .btn-secondary {
+        background-color: transparent;
+        color: var(--primary-blue);
+        border: 1px solid var(--primary-blue);
+        margin-top: 15px;
+    }
   </style>
 </head>
 <body>
-  <h2>Admin Login</h2>
-  
-  <input id="email" type="email" placeholder="Email" required><br>
-  <input id="password" type="password" placeholder="Password" required><br><br>
-  <button id="loginBtn">Login</button>
-  <p id="msg" style="color:red; margin-top:15px;"></p>
+
+  <div class="login-card">
+    <div class="logo">
+      <img src="../assets/images/logo.png" alt="Warm Right Ltd">
+    </div>
+
+    <div id="login-fields">
+        <h2>Admin Access</h2>
+        <p class="subtitle">This area is for administrators only.<br><br>If you are not an administrator, please click <a href="../index.html">here</a></p>
+
+        <div class="input-group">
+          <label for="email">Username</label>
+          <input id="email" type="email" placeholder="Please enter your username" value="stephanvgeorge@gmail.com">
+        </div>
+
+        <div class="input-group">
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••">
+        </div>
+
+        <div style="text-align: right; margin-top: -10px; margin-bottom: 20px;">
+            <a href="#" id="forgot-password" style="color: var(--primary-blue); font-size: 12px; text-decoration: none;">Forgot Password?</a>
+        </div>
+        <button id="loginBtn">Secure Log In</button>
+    </div>
+
+    <div id="mfa-section" style="display: none;">
+        <h2>Security Verification</h2>
+        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
+            Enter the 6-digit code from your authenticator app to continue.
+        </p>
+        <div class="input-group">
+            <input type="text" id="mfa-otp" placeholder="000 000" maxlength="6" 
+               style="text-align: center; letter-spacing: 4px; font-size: 20px; font-weight: bold;">
+        </div>
+        <button id="mfaBtn" onclick="verifyLoginMFA()">Verify & Login</button>
+        <button class="btn-secondary" onclick="window.location.reload()">Back to Login</button>
+    </div>
+
+    <p id="msg"></p>
+  </div>
 
   <script>
-    // Correct UMD build usage
-    const supabase = Supabase.createClient(
-      'https://axampuprcnauxbbijmmt.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
-    );
+    let db;
 
+    function initSupabase() {
+      const lib = window.supabase || window.Supabase;
+      if (!lib) {
+        setTimeout(initSupabase, 100);
+        return;
+      }
+      db = lib.createClient(
+        'https://axampuprcnauxbbijmmt.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+      );
+    }
+
+    initSupabase();
+
+    // --- STEP 1: INITIAL LOGIN ---
     document.getElementById('loginBtn').addEventListener('click', async () => {
-      const email = document.getElementById('email').value;
+      if (!db) return;
+
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
-      const msgEl = document.getElementById('msg');
+      const msg = document.getElementById('msg');
 
-      msgEl.style.color = "blue";
-      msgEl.textContent = "Logging in...";
+      msg.style.color = "var(--primary-blue)";
+      msg.textContent = "Authenticating...";
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await db.auth.signInWithPassword({ email, password });
 
       if (error) {
-        msgEl.style.color = "red";
-        msgEl.textContent = error.message;
+        msg.style.color = "#ef4444";
+        msg.textContent = error.message;
       } else {
-        msgEl.style.color = "green";
-        msgEl.textContent = "Login successful! Redirecting...";
-        setTimeout(() => window.location.href = 'rates.html', 800);
+        // --- CHECK IF MFA IS REQUIRED ---
+        const { data: { nextLevel, currentLevel } } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
+
+        if (nextLevel === 'aal2' && nextLevel !== currentLevel) {
+            // MFA is enabled for this user
+            document.getElementById('login-fields').style.display = 'none';
+            document.getElementById('mfa-section').style.display = 'block';
+            msg.textContent = "";
+            document.getElementById('mfa-otp').focus();
+        } else {
+            // No MFA, proceed normally
+            msg.style.color = "#10b981";
+            msg.textContent = "Access Granted. Redirecting...";
+            setTimeout(() => { window.location.href = 'admin-landed.html'; }, 800);
+        }
       }
+    });
+
+    // --- STEP 2: VERIFY MFA ---
+    async function verifyLoginMFA() {
+        const otp = document.getElementById('mfa-otp').value.trim();
+        const msg = document.getElementById('msg');
+
+        if (otp.length < 6) {
+            msg.style.color = "#ef4444";
+            msg.textContent = "Please enter the 6-digit code.";
+            return;
+        }
+
+        msg.style.color = "var(--primary-blue)";
+        msg.textContent = "Verifying code...";
+
+        // 1. Get the enrolled factor
+        const { data: factors } = await db.auth.mfa.listFactors();
+        const factor = factors.totp[0];
+
+        // 2. Create Challenge
+        const { data: challengeData, error: challengeError } = await db.auth.mfa.challenge({ factorId: factor.id });
+        if (challengeError) {
+            msg.style.color = "#ef4444";
+            msg.textContent = challengeError.message;
+            return;
+        }
+
+        // 3. Verify Challenge
+        const { error: verifyError } = await db.auth.mfa.verify({
+            factorId: factor.id,
+            challengeId: challengeData.id,
+            code: otp
+        });
+
+        if (verifyError) {
+            msg.style.color = "#ef4444";
+            msg.textContent = "Invalid code. Please try again.";
+        } else {
+            msg.style.color = "#10b981";
+            msg.textContent = "Verification Successful. Redirecting...";
+            setTimeout(() => { window.location.href = 'admin-landed.html'; }, 800);
+        }
+    }
+
+    // Smart "Enter" Key Support
+    document.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+          // If MFA is visible, verify MFA. Otherwise, do standard login.
+          if (document.getElementById('mfa-section').style.display === 'block') {
+              verifyLoginMFA();
+          } else {
+              document.getElementById('loginBtn').click();
+          }
+      }
+    });
+	
+	// Reset password
+	document.getElementById('forgot-password').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const msg = document.getElementById('msg');
+
+        if (!email) {
+            msg.style.color = "#ef4444";
+            msg.textContent = "Please enter your email address first.";
+            return;
+        }
+
+        const { error } = await db.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + '/admin/reset-password.html',
+        });
+
+        if (error) {
+            msg.style.color = "#ef4444";
+            msg.textContent = error.message;
+        } else {
+            msg.style.color = "var(--primary-blue)";
+            msg.textContent = "Password reset email sent! Check your inbox.";
+        }
     });
   </script>
 </body>

@@ -2,165 +2,291 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Admin - Schedule of Rates</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Manage Rates | Warm Right Ltd</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 30px; }
-    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
-    img { max-width: 80px; }
-    .form { margin: 20px 0; padding: 20px; border: 1px solid #ddd; background: #f9f9f9; }
-    input, textarea { width: 100%; margin: 8px 0; padding: 10px; box-sizing: border-box; }
-    button { margin: 5px; padding: 10px 16px; }
-    .preview { max-width: 200px; margin: 10px 0; }
+    :root {
+      --primary-blue: #004a99;
+      --accent-orange: #ff8c00;
+      --light-gray: #f4f7f6;
+      --white: #ffffff;
+      --text-dark: #333;
+    }
+
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: var(--light-gray); color: var(--text-dark); visibility: hidden; }
+
+    /* Navigation Bar */
+    nav {
+      background: var(--white);
+      padding: 10px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .logo img { height: 50px; }
+
+    .nav-buttons { display: flex; gap: 10px; }
+
+    /* Buttons */
+    button { 
+      padding: 10px 18px; 
+      border-radius: 6px; 
+      border: none; 
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: 0.2s;
+    }
+    .btn-primary { background: var(--primary-blue); color: white; }
+    .btn-primary:hover { background: #003a7a; }
+    .btn-accent { background: var(--accent-orange); color: white; }
+    .btn-accent:hover { background: #e67e00; }
+    .btn-outline { background: transparent; border: 1px solid #ccc; color: #666; }
+    .btn-outline:hover { background: #eee; }
+    .btn-danger { background: #ef4444; color: white; }
+
+    /* Layout Containers */
+    .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+    
+    #table-view, #form-view { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    
+    .hidden { display: none !important; }
+
+    /* Form Grid: Split Left/Right */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    .form-left input, .form-left textarea {
+      width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px;
+    }
+
+    .form-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #fafafa;
+      border: 2px dashed #ddd;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .form-right img { max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+
+    /* Professional Table */
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th { text-align: left; background: #f9f9f9; padding: 15px; color: var(--primary-blue); border-bottom: 2px solid #eee; }
+    td { padding: 15px; border-bottom: 1px solid #eee; }
+    tr:hover { background: #fcfcfc; }
+    .table-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
+
+    .price-tag { font-weight: bold; color: var(--primary-blue); }
   </style>
 </head>
 <body>
-  <h1>Admin - Schedule of Rates</h1>
-  <button onclick="logout()">Logout</button>
 
-  <div class="form">
-    <h2 id="formTitle">Add New Rate</h2>
+  <nav>
+    <div class="logo"><img src="../assets/images/logo.png" alt="Warm Right Ltd"></div>
+    <div class="nav-buttons">
+      <button id="add-btn" class="btn-accent" onclick="showFormMode()">+ Add New Rate</button>
+      <button class="btn-outline" onclick="location.href='admin-landed.html'">Hub</button>
+      <button class="btn-danger" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
     
-    <input id="title" placeholder="Title" required><br>
-    <textarea id="description" placeholder="Description" rows="3"></textarea><br>
-    <input id="price" placeholder="Price (e.g. £65.00 + VAT)" required><br>
-    
-    <input id="image" type="file" accept="image/*"><br>
-    <img id="imagePreview" class="preview" style="display:none;"><br>
-    
-    <button id="saveBtn">Save Rate</button>
-    <button onclick="resetForm()">Cancel</button>
+    <div id="table-view">
+      <h2 style="margin-top:0">Current Schedule of Rates</h2>
+      <table id="ratesTable">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Title</th>
+            <th>Price (Ex VAT)</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="form-view" class="hidden">
+      <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 20px;">
+        <h2 id="formTitle" style="margin:0">Add New Rate</h2>
+        <button class="btn-outline" onclick="showTableMode()">Cancel & Close</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-left">
+          <label>Title</label>
+          <input id="title" placeholder="e.g. Boiler Service">
+          
+          <label>Description</label>
+          <textarea id="description" rows="4" placeholder="Detailed description..."></textarea>
+          
+          <label>Price Ex. VAT (£)</label>
+          <input id="price_ex_vat" type="number" step="0.01">
+          
+          <label>VAT Amount (£)</label>
+          <input id="vat_amount" type="number" step="0.01">
+          
+          <label>Total Inc. VAT (£)</label>
+          <input id="price_inc_vat" type="number" step="0.01">
+
+          <button id="saveBtn" class="btn-primary" style="width:100%; padding:15px; margin-top:10px;">Save Rate Information</button>
+        </div>
+
+        <div class="form-right">
+          <img id="imagePreview" src="assets/images/placeholder.jpg" alt="Preview">
+          <p style="color:#666; font-size: 14px;">Resolution looks best at 4:3 or 16:9 ratio</p>
+          <input type="file" id="image" accept="image/*" style="display:none;">
+          <button class="btn-accent" onclick="document.getElementById('image').click()">Change Picture</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <table id="ratesTable">
-    <thead>
-      <tr>
-        <th>Image</th>
-        <th>Title</th>
-        <th>Description</th>
-        <th>Price</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
   <script>
-    // Initialize Supabase once
-    const supabase = Supabase.createClient(
-      'https://axampuprcnauxbbijmmt.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
-    );
-
+    let db;
     let editingId = null;
 
-    async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = 'login.html';
-        return false;
-      }
-      return true;
+    async function checkSecurity() {
+      const lib = window.supabase || window.Supabase;
+      if (!lib) { setTimeout(checkSecurity, 50); return; }
+      db = lib.createClient('https://axampuprcnauxbbijmmt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ');
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; } 
+      else { document.body.style.visibility = 'visible'; loadRates(); }
     }
 
-    function showPreview(file) {
-      const preview = document.getElementById('imagePreview');
-      if (file) {
-        preview.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
-      }
+    // Toggle logic
+    function showFormMode() {
+      document.getElementById('table-view').classList.add('hidden');
+      document.getElementById('add-btn').classList.add('hidden');
+      document.getElementById('form-view').classList.remove('hidden');
     }
 
-    document.getElementById('image').addEventListener('change', (e) => showPreview(e.target.files[0]));
-
-    async function loadRates() {
-      const { data, error } = await supabase.from('rates').select('*').order('created_at', { ascending: false });
-      if (error) return console.error(error);
-
-      const tbody = document.querySelector('#ratesTable tbody');
-      tbody.innerHTML = data.map(rate => `
-        <tr>
-          <td>${rate.image_url ? `<img src="${rate.image_url}" alt="">` : 'No image'}</td>
-          <td>${rate.title}</td>
-          <td>${rate.description || ''}</td>
-          <td>${rate.price}</td>
-          <td>
-            <button onclick="editRate('${rate.id}')">Edit</button>
-            <button onclick="deleteRate('${rate.id}')">Delete</button>
-          </td>
-        </tr>
-      `).join('');
+    function showTableMode() {
+      document.getElementById('form-view').classList.add('hidden');
+      document.getElementById('table-view').classList.remove('hidden');
+      document.getElementById('add-btn').classList.remove('hidden');
+      resetForm();
     }
 
-    async function saveRate() {
-      const title = document.getElementById('title').value.trim();
-      const description = document.getElementById('description').value.trim();
-      const price = document.getElementById('price').value.trim();
-      const file = document.getElementById('image').files[0];
-
-      if (!title || !price) return alert("Title and Price are required");
-
-      let image_url = null;
-      if (file) {
-        const fileName = `${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage.from('rates-images').upload(fileName, file);
-        if (uploadError) return alert("Image upload failed: " + uploadError.message);
-        image_url = supabase.storage.from('rates-images').getPublicUrl(fileName).data.publicUrl;
-      }
-
-      const payload = { title, description, price, image_url };
-
-      const { error } = editingId 
-        ? await supabase.from('rates').update(payload).eq('id', editingId)
-        : await supabase.from('rates').insert(payload);
-
-      if (error) alert("Save failed: " + error.message);
-      else {
-        alert("Saved successfully!");
-        resetForm();
-        loadRates();
-      }
-    }
-
-    window.editRate = async (id) => {
-      const { data } = await supabase.from('rates').select('*').eq('id', id).single();
-      if (!data) return;
-      editingId = id;
-      document.getElementById('formTitle').textContent = 'Edit Rate';
-      document.getElementById('title').value = data.title;
-      document.getElementById('description').value = data.description || '';
-      document.getElementById('price').value = data.price;
-      document.getElementById('saveBtn').textContent = 'Update Rate';
-    };
-
-    window.deleteRate = async (id) => {
-      if (!confirm('Delete this item?')) return;
-      await supabase.from('rates').delete().eq('id', id);
-      loadRates();
-    };
+    window.logout = async () => { if (db) await db.auth.signOut(); window.location.href = 'login.html'; };
 
     window.resetForm = () => {
       editingId = null;
       document.getElementById('formTitle').textContent = 'Add New Rate';
       document.getElementById('title').value = '';
       document.getElementById('description').value = '';
-      document.getElementById('price').value = '';
+      document.getElementById('price_ex_vat').value = '';
+      document.getElementById('vat_amount').value = '';
+      document.getElementById('price_inc_vat').value = '';
       document.getElementById('image').value = '';
-      document.getElementById('imagePreview').style.display = 'none';
-      document.getElementById('saveBtn').textContent = 'Save Rate';
+      document.getElementById('imagePreview').src = 'assets/images/placeholder.jpg';
+      document.getElementById('saveBtn').textContent = 'Save Rate Information';
     };
 
-    window.logout = async () => {
-      await supabase.auth.signOut();
-      window.location.href = 'login.html';
+    async function loadRates() {
+      const { data, error } = await db.from('rates').select('*').order('created_at', { ascending: false });
+      const tbody = document.querySelector('#ratesTable tbody');
+      tbody.innerHTML = data.map(rate => `
+        <tr>
+          <td><img src="${rate.image_url || 'assets/images/placeholder.jpg'}" class="table-img"></td>
+          <td><strong>${rate.title}</strong></td>
+          <td class="price-tag">£${rate.price_ex_vat}</td>
+          <td style="text-align: right;">
+            <button class="btn-outline" onclick="editRate('${rate.id}')">Edit</button>
+            <button class="btn-outline" style="color:red; border-color:rgba(255,0,0,0.2)" onclick="deleteRate('${rate.id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    window.editRate = async (id) => {
+      const { data } = await db.from('rates').select('*').eq('id', id).single();
+      if (!data) return;
+      editingId = id;
+      showFormMode();
+      document.getElementById('formTitle').textContent = 'Editing: ' + data.title;
+      document.getElementById('title').value = data.title;
+      document.getElementById('description').value = data.description || '';
+      document.getElementById('price_ex_vat').value = data.price_ex_vat;
+      document.getElementById('vat_amount').value = data.vat_amount;
+      document.getElementById('price_inc_vat').value = data.price_inc_vat;
+      document.getElementById('imagePreview').src = data.image_url || 'assets/images/placeholder.jpg';
+      document.getElementById('saveBtn').textContent = 'Update Rate Information';
     };
 
-    // Initialize
-    document.getElementById('saveBtn').addEventListener('click', saveRate);
-    checkAuth().then(loggedIn => {
-      if (loggedIn) loadRates();
+    window.deleteRate = async (id) => {
+      if (!confirm('Permanently delete this rate?')) return;
+      await db.from('rates').delete().eq('id', id);
+      loadRates();
+    };
+
+    async function saveRate() {
+      const title = document.getElementById('title').value.trim();
+      const file = document.getElementById('image').files[0];
+      if (!title) return alert("Title is required");
+
+      let image_url = null;
+      if (file) {
+        const fileName = `${Date.now()}-${file.name}`;
+        await db.storage.from('rates-images').upload(fileName, file);
+        image_url = db.storage.from('rates-images').getPublicUrl(fileName).data.publicUrl;
+      }
+
+      const payload = { 
+        title, 
+        description: document.getElementById('description').value,
+        price_ex_vat: document.getElementById('price_ex_vat').value,
+        vat_amount: document.getElementById('vat_amount').value,
+        price_inc_vat: document.getElementById('price_inc_vat').value
+      };
+      if (image_url) payload.image_url = image_url;
+
+      const { error } = editingId ? await db.from('rates').update(payload).eq('id', editingId) : await db.from('rates').insert([payload]);
+      
+      if (error) alert(error.message);
+      else showTableMode(); loadRates();
+    }
+
+    // Bidirectional Calculator
+    const exVatInput = document.getElementById('price_ex_vat');
+    const incVatInput = document.getElementById('price_inc_vat');
+    const vatAmountInput = document.getElementById('vat_amount');
+
+    exVatInput.addEventListener('input', () => {
+      const val = parseFloat(exVatInput.value) || 0;
+      vatAmountInput.value = (val * 0.2).toFixed(2);
+      incVatInput.value = (val * 1.2).toFixed(2);
     });
+
+    incVatInput.addEventListener('input', () => {
+      const val = parseFloat(incVatInput.value) || 0;
+      exVatInput.value = (val / 1.2).toFixed(2);
+      vatAmountInput.value = (val - (val / 1.2)).toFixed(2);
+    });
+
+    document.getElementById('image').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) document.getElementById('imagePreview').src = URL.createObjectURL(file);
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', saveRate);
+    checkSecurity();
   </script>
 </body>
 </html>

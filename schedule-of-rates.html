@@ -55,133 +55,75 @@
     We believe in clear, upfront pricing — no hidden fees, no surprises. Below you'll find our most requested services, each with a simple breakdown of costs. All prices are subject to 20% VAT.
   </p>
 
-  <!-- Standard Call -->
-  <div class="feature-tile split-left card" id="standard-call">
-    <img src="/assets/images/standard-call.jpg" alt="Standard Call">
-    <div class="tile-text">
-      <h2>Standard Call</h2>
-      <p>Fixed price for up to 1 hour of fault diagnosis and repair. If parts or extra time are needed, we’ll quote clearly before proceeding.</p>
-      <p><strong>£65.00 + VAT</strong> (£78.00 inc VAT)</p>
-    </div>
-  </div>
+<div id="rates-container" class="dynamic-grid">
+  <p class="loading-text">Loading current rates...</p>
+</div>
 
-  <!-- Out of Hours (Weekdays & Saturday) -->
-  <div class="feature-tile split-right card id="out-of-hours">
-    <img src="/assets/images/out-of-hours.jpg" alt="Out of Hours">
-    <div class="tile-text">
-      <h2>Out of Hours</h2>
-      <p>Evening and weekend support when you need it most. Applies weekdays 6pm–9am and Saturdays 9am–5pm. Additional £50 charge applies between 10pm–6am.</p>
-      <p><strong>£85.00 + VAT</strong> (£102.00 inc VAT)</p>
-    </div>
-  </div>
 
-  <!-- Emergency Call (Sunday & Bank Holidays) -->
-  <div class="feature-tile split-left card" id="emergency-call">
-    <img src="assets/images/emergency.jpg" alt="Emergency Call">
-    <div class="tile-text">
-      <h2>Emergency Call</h2>
-      <p>For urgent issues on Sundays, Bank Holidays, or overnight weekends. Additional £50 charge applies between 10pm–6am.</p>
-      <p><strong>£120.00 + VAT</strong> (£144.00 inc VAT)</p>
-    </div>
-  </div>
 
-  <!-- Boiler Service -->
-  <div class="feature-tile split-right card" id="boiler-service">
-    <img src="assets/images/boiler-service.jpg" alt="Boiler Service">
-    <div class="tile-text">
-      <h2>Boiler Service</h2>
-      <p>Annual servicing for boilers in working order. Oil boilers requiring soot removal are charged at £30/hr. Parts not included.</p>
-      <p><strong>£65.00 + VAT</strong> (£78.00 inc VAT)</p>
-    </div>
-  </div>
 
-  <!-- Landlord Safety Certificate -->
-  <div class="feature-tile split-left card" id="landlords-certificate">
-    <img src="assets/images/landlord-cp12.jpg" alt="Landlord Certificate">
-    <div class="tile-text">
-      <h2>Landlord Safety Certificate (CP12)</h2>
-      <p>Includes up to 3 appliances. Additional appliances charged at £5 each. Full documentation provided.</p>
-      <p><strong>£65.00 + VAT</strong> (£78.00 inc VAT)</p>
-    </div>
-  </div>
 
-  <!-- HomeBuyers Report -->
-  <div class="feature-tile split-right card" id="homebuyers-report">
-    <img src="assets/images/homebuyers-report.jpg" alt="HomeBuyers Report">
-    <div class="tile-text">
-      <h2>HomeBuyers Report</h2>
-      <p>Detailed heating system inspection before purchase. Plumbing report available on request. Ideal for peace of mind.</p>
-      <p><strong>£100.00 + VAT</strong> (£120.00 inc VAT)</p>
-    </div>
-  </div>
-
-  <!-- Powerflushing -->
-  <div class="feature-tile split-left card" id="powerflushing">
-    <img src="assets/images/powerflushing.jpg" alt="Powerflushing">
-    <div class="tile-text">
-      <h2>Powerflushing</h2>
-      <p>Removes sludge and debris to improve circulation and efficiency. Includes up to 10 radiators. <strong>Currently suspended</strong>.</p>
-      <p><strong>£500.00 + VAT</strong> (£600.00 inc VAT)</p>
-    </div>
-  </div>
-
-  <!-- Chemical Flushing -->
-  <div class="feature-tile split-right card" id="chemical-flushing">
-    <img src="assets/images/chemical-flush.jpg" alt="Chemical Flushing">
-    <div class="tile-text">
-      <h2>Chemical Flushing</h2>
-      <p>Two-visit process to clean and protect your system. Includes flushing agent and inhibitor refill.</p>
-      <p><strong>£260.00 + VAT</strong> (£312.00 inc VAT)</p>
-    </div>
-  </div>
-
-  <!-- Descaling -->
-  <div class="feature-tile split-left card" id="descaling">
-    <img src="assets/images/descaling.jpg" alt="Descaling">
-    <div class="tile-text">
-      <h2>Descaling</h2>
-      <p>Removes limescale buildup that causes boiler noise and poor performance. <strong>Currently suspended</strong>.</p>
-      <p><strong>£550.00 + VAT</strong> (£660.00 inc VAT)</p>
-    </div>
-  </div>
-
-  <!-- Second Opinion -->
-  <div class="feature-tile split-right card" id="second-opinion">
-    <img src="assets/images/second-opinion.jpg" alt="Second Opinion">
-    <div class="tile-text">
-      <h2>Second Opinion</h2>
-      <p>Unbiased engineer review of any plumbing or heating issue. Ideal if you’ve been told a system needs replacing and want a trusted second look.</p>
-      <p><strong>£65.00 + VAT</strong> (£78.00 inc VAT)</p>
-    </div>
-  </div>
+ 
 
 </section>
   </main>
 
   <footer id="footer"></footer>
 <!-- <button id="theme-toggle">Toggle Dark Mode</button>           TO BE ADDED LATER   -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  async function loadPublicRates() {
+  const lib = window.supabase || window.Supabase;
+  if (!lib) { setTimeout(loadPublicRates, 100); return; }
+
+  const db = lib.createClient(
+    'https://axampuprcnauxbbijmmt.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+  );
+
+  const { data: rates, error } = await db
+    .from('rates')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (error) return console.error("Error loading rates:", error);
+
+  const container = document.getElementById('rates-container');
+  if (!container) return;
+
+  // Clear the "Loading..." message
+  container.innerHTML = '';
+
+  container.innerHTML = rates.map((rate, index) => {
+    const sideClass = (index % 2 === 0) ? 'split-left' : 'split-right';
+    
+    // We add 'visible' so the CSS actually shows them
+    // We add a style delay so they fade in one by one (optional but looks great)
+    const delay = index * 100; 
+
+    return `
+      <div class="feature-tile ${sideClass} card visible" 
+           style="transition-delay: ${delay}ms;" 
+           id="rate-${rate.id}">
+        <img src="${rate.image_url || 'assets/images/placeholder.jpg'}" alt="${rate.title}">
+        <div class="tile-text">
+          <h2>${rate.title}</h2>
+          <p>${rate.description || ''}</p>
+          <p>
+            <strong>£${parseFloat(rate.price_ex_vat || 0).toFixed(2)} + VAT</strong> 
+            (£${parseFloat(rate.price_inc_vat || 0).toFixed(2)} inc VAT)
+          </p>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+loadPublicRates();
+</script>
+  
+  
   <script src="assets/js/include.js"></script>
   <script src="assets/js/nav.js"></script>
   <script src="assets/js/main.js"></script>
 </body>
 </html>
-
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 

@@ -32,7 +32,7 @@ h1{
 
 h2{
 	margin: 10px 0 10px 0;
-	font-size:2em;
+	font-size:1.8em;
 	position:relative;
 }
 
@@ -548,10 +548,10 @@ section.article-gap .faq + .faq {
 
 /* Expandable Content Logic */
 .review-content {
-    max-height: 4.5em; /* Show about 3 lines */
-    overflow: hidden;
-    transition: max-height 0.4s ease-out;
-    position: relative;
+  position: relative;
+  overflow: hidden;
+  max-height: none; /* Show full text by default */
+  transition: max-height 0.4s ease;
 }
 
 .review-card.expanded .review-content {
@@ -582,25 +582,6 @@ section.article-gap .faq + .faq {
 @media (max-width: 992px) { .review-masonry { column-count: 2; } }
 @media (max-width: 600px) { .review-masonry { column-count: 1; } }
 
-/* The content wrapper that clips the text */
-.review-content {
-    max-height: 4.5em; /* Exactly 3 lines */
-    overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0, 1, 0, 1); /* Smoother expansion */
-    position: relative;
-}
-
-/* The Gradient Fade (Only shows when NOT expanded) */
-.review-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 20px;
-    background: linear-gradient(transparent, #fffaf5); /* Fades to card background color */
-    transition: opacity 0.3s;
-}
 
 .review-card.expanded .review-content {
     max-height: 2000px; /* High enough to show any review */
@@ -618,7 +599,75 @@ section.article-gap .faq + .faq {
     border-top: 1px solid #eee;
     padding-top: 15px;
 }
+/* Ensure the container is ready for the absolute-positioned fade */
+.review-content {
+  position: relative;
+  overflow: hidden;
+  max-height: none; /* Show full text for short reviews */
+}
 
+/* 1. THE FADE FIX: Only apply to long, collapsed reviews */
+.review-content.is-long:not(.expanded)::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(transparent, #ffffff); /* Matches your card white */
+  pointer-events: none;
+  display: block;
+}
+
+/* Hide the fade when expanded */
+.review-content.expanded::after {
+  display: none !important;
+}
+
+/* Standard height for long reviews */
+.review-content.is-long:not(.expanded) {
+  max-height: 100px; /* Adjust to fit your design */
+}
+
+/* Smooth transition when opening */
+.review-content.expanded {
+  max-height: 1000px;
+  transition: max-height 0.6s ease-in-out;
+}
+/* --- DYNAMIC REVIEW CONTENT ENGINE --- */
+
+/* 1. Base style: Short reviews show fully with no fade */
+.review-content {
+    position: relative;
+    overflow: hidden;
+    max-height: none; 
+    transition: max-height 0.5s ease-in-out;
+}
+
+/* 2. Long reviews: Capped at exactly 3 lines (4.5em) */
+.review-content.is-long:not(.expanded) {
+    max-height: 4.5em; 
+}
+
+/* 3. The Fade: Only exists on long, collapsed reviews */
+.review-content.is-long:not(.expanded)::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 25px; /* Subtle fade at the bottom of the 3rd line */
+    background: linear-gradient(to bottom, rgba(255,250,245,0), #fffaf5); 
+    pointer-events: none;
+}
+
+/* 4. Expanded state: Show everything and kill the fade */
+.review-content.expanded {
+    max-height: 1500px; /* Large enough for any review */
+}
+
+.review-content.expanded::after {
+    display: none !important;
+}
 /* ==========================================
    PHOTO GRID SIZE LIMITS
    ========================================== */
@@ -659,6 +708,23 @@ section.article-gap .faq + .faq {
     background-color: rgba(0, 0, 0, 0.9);
     align-items: center;
     justify-content: center;
+}
+
+.review-content.is-long::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background: linear-gradient(transparent, #ffffff); /* Match card background color */
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+/* Remove fade when user clicks 'Read More' */
+.review-content.expanded.is-long::after {
+  opacity: 0;
 }
 
 .lightbox-content {

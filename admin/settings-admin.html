@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Settings | Warm Right Ltd</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root { 
+      --primary-blue: #004a99; 
+      --bg-gray: #f4f7f6; 
+      --text-gray: #666;
+      --error-red: #ef4444;
+      --success-green: #22c55e;
+    }
+    
+    body { font-family: 'Segoe UI', sans-serif; background: var(--bg-gray); margin: 0; visibility: hidden; }
+
+    /* Top Navigation with Identity Header */
+    nav {
+      background: #fff;
+      padding: 10px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .nav-left { display: flex; align-items: center; gap: 20px; }
+    .nav-right { display: flex; align-items: center; gap: 15px; }
+    .logo img { height: 50px; }
+
+    /* Identity Section */
+    .nav-user {
+      display: flex;
+      align-items: center; gap: 12px; padding-right: 15px; border-right: 1px solid #eee;
+    }
+    .nav-avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #f0f0f0; }
+    .nav-name { font-size: 14px; font-weight: 600; color: #333; }
+
+    /* Layout Containers */
+    .container { max-width: 550px; margin: 40px auto; padding: 0 20px; }
+    .card { background: white; padding: 35px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
+
+    .settings-nav { display: flex; justify-content: center; gap: 5px; margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px; flex-wrap: wrap; }
+    .nav-btn { background: none; border: none; padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--text-gray); cursor: pointer; border-radius: 6px; transition: 0.2s; }
+    .nav-btn:hover { background: #f0f4f8; }
+    .nav-btn.active { background: var(--primary-blue); color: white; }
+
+    .settings-section { display: none; text-align: left; animation: fadeIn 0.3s ease; }
+    .settings-section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    h2 { color: #333; margin-top: 0; font-size: 22px; text-align: center; }
+    .tab-desc { color: #777; font-size: 14px; margin-bottom: 25px; text-align: center; display: block; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+
+    input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 15px; outline: none; margin-bottom: 15px; }
+    input:focus { border-color: var(--primary-blue); }
+    input:disabled { background-color: #f9f9f9; color: #888; cursor: not-allowed; }
+
+    /* Password Wrapper & Eye Icon */
+    .password-wrapper { position: relative; width: 100%; margin-bottom: 15px; }
+    .password-wrapper input { padding-right: 48px; margin-bottom: 0; }
+    .toggle-eye { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); height: 38px; width: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; border: none; background: none; opacity: 0.5; transition: 0.2s; padding: 0; }
+    .toggle-eye svg { width: 24px; height: 24px; fill: #555; }
+
+    /* Validation Checklist */
+    .validation-list { text-align: left; margin: 15px 0 25px 0; padding: 0; list-style: none; }
+    .validation-list li { font-size: 13px; color: var(--text-gray); display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .validation-list li.valid { color: var(--success-green); font-weight: 600; }
+    .validation-list li.invalid { color: var(--error-red); }
+    .status-icon { font-size: 14px; width: 16px; display: inline-block; text-align: center; }
+
+    .btn-primary { width: 100%; padding: 14px; background: var(--primary-blue); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .btn-outline { background: transparent; border: 1px solid #ccc; color: #666; cursor: pointer; padding: 8px 15px; border-radius: 6px; }
+    .btn-danger { background: transparent; border: 1px solid var(--error-red); color: var(--error-red); cursor: pointer; padding: 8px 15px; border-radius: 6px; font-weight: 600; }
+
+    /* FIXED QR CODE CONTAINER */
+    #mfa-qr-container { margin: 20px auto; padding: 10px; background: white; border: 1px solid #eee; border-radius: 8px; display: block; width: fit-content; }
+   #mfa-qr-container svg, #mfa-qr-container img { 
+  display: block; 
+  
+  margin: 0 auto; 
+}
+    
+    .secret-key-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 14px; word-break: break-all; margin-bottom: 20px; color: #333; }
+
+    #msg { margin-top: 20px; font-size: 14px; font-weight: 600; min-height: 20px; text-align: center; line-height: 1.5; }
+    .avatar-box { text-align: center; margin-bottom: 20px; }
+    #avatar-preview { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #eee; background: #fafafa; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-left">
+      <div class="logo"><img src="../assets/images/logo.png" alt="Warm Right Ltd"></div>
+      <button class="btn-outline" onclick="location.href='admin-landed.html'">Hub</button>
+    </div>
+    <div class="nav-right">
+      <div class="nav-user">
+        <span class="nav-name" id="nav-display-name">Admin</span>
+        <img src="../assets/images/avatar-default.avif" class="nav-avatar" id="nav-avatar-img">
+      </div>
+      <button class="btn-danger" onclick="handleLogout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <div class="settings-nav">
+        <button class="nav-btn active" onclick="showTab('email-tab', this)">Email</button>
+        <button class="nav-btn" onclick="showTab('password-tab', this)">Password</button>
+        <button class="nav-btn" onclick="showTab('mfa-tab', this)">MFA</button>
+        <button class="nav-btn" onclick="showTab('display-tab', this)">Identity</button>
+        <button class="nav-btn" onclick="showTab('avatar-tab', this)">Avatar</button>
+      </div>
+
+      <!-- 1. EMAIL TAB -->
+      <div id="email-tab" class="settings-section active">
+        <h2>Update Email</h2>
+        <span class="tab-desc">Change the primary email for this admin account.</span>
+        <label>Current Email Address</label>
+        <input type="text" id="current-email" disabled>
+        <label>New Email Address</label>
+        <input type="email" id="new-email" placeholder="Enter your new email address">
+        <button class="btn-primary" onclick="handleEmailUpdate()">Request Email Change</button>
+      </div>
+
+      <!-- 2. PASSWORD TAB -->
+      <div id="password-tab" class="settings-section">
+        <h2>Change Password</h2>
+        <span class="tab-desc">Ensure your account remains secure.</span>
+        <label>New Password</label>
+        <div class="password-wrapper">
+          <input type="password" id="new-password" placeholder="Enter your new password" onkeyup="validatePassword()">
+          <button type="button" class="toggle-eye" onclick="toggleVisibility('new-password', this)">
+            <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          </button>
+        </div>
+        <label style="margin-top: 15px;">Confirm Password</label>
+        <div class="password-wrapper">
+          <input type="password" id="confirm-password" placeholder="Repeat your new password">
+          <button type="button" class="toggle-eye" onclick="toggleVisibility('confirm-password', this)">
+            <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          </button>
+        </div>
+        <ul class="validation-list">
+          <li id="req-length" class="invalid"><span class="status-icon">✘</span> Minimum 6 characters</li>
+          <li id="req-cap" class="invalid"><span class="status-icon">✘</span> One capital letter</li>
+          <li id="req-num" class="invalid"><span class="status-icon">✘</span> One number</li>
+          <li id="req-sym" class="invalid"><span class="status-icon">✘</span> One special symbol</li>
+        </ul>
+        <button id="updateBtn" class="btn-primary" disabled onclick="handlePasswordUpdate()">Update Password</button>
+      </div>
+
+      <!-- 3. MFA TAB -->
+      <div id="mfa-tab" class="settings-section">
+        <h2>Multi-Factor Authentication</h2>
+        <span class="tab-desc">Protect your account with a secondary 6-digit code.</span>
+        <div id="mfa-init" style="text-align: center; padding: 20px; border: 1px dashed #ddd; border-radius: 8px;">
+          <p style="font-size: 14px; color: #666; margin-bottom: 20px;">MFA is currently <strong>Disabled</strong>.</p>
+          <button class="btn-primary" style="width: auto; padding: 12px 25px;" onclick="startMFAEnrollment()">Begin MFA Setup</button>
+        </div>
+        <div id="mfa-setup" style="display:none; text-align: center;">
+          <p style="font-size: 14px; color: var(--primary-blue); font-weight: 600;">Scan this with your Authenticator App:</p>
+          <div id="mfa-qr-container"></div>
+          <div style="max-width: 320px; margin: 0 auto; text-align: left;">
+            <label>Or enter setup key manually:</label>
+            <div id="mfa-secret-key" class="secret-key-box">Generating...</div>
+            <label>Enter 6-digit code from app</label>
+            <input type="text" id="mfa-code" placeholder="000 000" maxlength="6" style="text-align: center; letter-spacing: 4px; font-size: 20px; font-weight: bold;">
+            <button class="btn-primary" onclick="verifyMFAFactor()">Activate & Verify</button>
+            <button class="btn-outline" style="width: 100%; margin-top: 10px; border: none; font-size: 12px;" onclick="cancelMFA()">Cancel Setup</button>
+          </div>
+        </div>
+        <div id="mfa-active" style="display:none; text-align: center; padding: 20px; border: 1px solid var(--success-green); border-radius: 8px; background: #f0fdf4;">
+          <div style="color: var(--success-green); font-size: 40px; margin-bottom: 10px;">✔</div>
+          <h3 style="margin: 0; color: #166534;">MFA Protection Active</h3>
+          <p style="font-size: 13px; color: #166534; margin: 10px 0 20px;">Your account is now secured with AAL2 protection.</p>
+          <button class="btn-outline" style="color: var(--error-red); border-color: var(--error-red); font-size: 12px;" onclick="unenrollMFA()">Disable MFA</button>
+        </div>
+      </div>
+
+      <!-- 4. IDENTITY TAB -->
+      <div id="display-tab" class="settings-section">
+        <h2>Display Name</h2>
+        <span class="tab-desc">Update how your name appears in the admin hub.</span>
+        <label>Display Name</label>
+        <input type="text" id="display-name" placeholder="e.g. Braden">
+        <button class="btn-primary" onclick="handleNameUpdate()">Update Name</button>
+      </div>
+
+      <!-- 5. AVATAR TAB -->
+      <div id="avatar-tab" class="settings-section">
+        <h2>Profile Picture</h2>
+        <span class="tab-desc">Upload a photo to personalize your account.</span>
+        <div class="avatar-box">
+          <img id="avatar-preview" src="../assets/images/avatar-default.avif" alt="Avatar Preview">
+        </div>
+        <input type="file" id="avatar-upload" accept="image/*" onchange="previewAvatar()">
+        <button class="btn-primary" onclick="handleAvatarUpdate()">Upload New Photo</button>
+      </div>
+
+      <p id="msg"></p>
+    </div>
+  </div>
+
+  <script>
+    let db;
+    let currentFactorId = null;
+
+    async function checkSecurity() {
+      const lib = window.supabase || window.Supabase;
+      if (!lib) { setTimeout(checkSecurity, 50); return; }
+      db = lib.createClient('https://axampuprcnauxbbijmmt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ');
+      
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; return; } 
+      document.body.style.visibility = 'visible';
+
+      const user = session.user;
+      const userMeta = user.user_metadata;
+      const defaultAvatar = "../assets/images/avatar-default.avif";
+
+      document.getElementById('current-email').value = user.email;
+      const displayName = userMeta.display_name || "Admin";
+      document.getElementById('nav-display-name').textContent = displayName;
+      if(document.getElementById('display-name')) document.getElementById('display-name').value = displayName;
+
+      // Ensure the URL is valid or fallback
+      const avatarUrl = userMeta.avatar_url || defaultAvatar;
+      document.getElementById('nav-avatar-img').src = avatarUrl;
+      document.getElementById('avatar-preview').src = avatarUrl;
+
+      const { data: factors } = await db.auth.mfa.listFactors();
+      if (factors && factors.totp.find(f => f.status === 'verified')) {
+        document.getElementById('mfa-init').style.display = 'none';
+        document.getElementById('mfa-active').style.display = 'block';
+      }
+    }
+
+    function showTab(tabId, btn) {
+      document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+      document.getElementById('msg').textContent = '';
+    }
+
+    async function handleLogout() {
+      await db.auth.signOut();
+      window.location.href = 'login.html';
+    }
+
+    async function handleEmailUpdate() {
+      const newEmail = document.getElementById('new-email').value.trim();
+      const msg = document.getElementById('msg');
+      if (!newEmail) return;
+      msg.style.color = "var(--primary-blue)";
+      msg.textContent = "Processing request...";
+      const { error } = await db.auth.updateUser({ email: newEmail });
+      if (error) {
+        msg.style.color = "var(--error-red)";
+        msg.textContent = error.message;
+      } else {
+        msg.style.color = "var(--success-green)";
+        msg.innerHTML = "<b>Request Sent!</b><br>You MUST verify BOTH verification links sent to your old and new emails.<br>Logging out in 5s...";
+        setTimeout(handleLogout, 5000);
+      }
+    }
+
+    // --- MFA FIX: CLEANS UP "GHOST" FACTORS FIRST ---
+   async function startMFAEnrollment() {
+  const msg = document.getElementById('msg');
+  msg.style.color = "var(--primary-blue)";
+  msg.textContent = "Connecting...";
+
+  try {
+    // 1. GHOST BUSTING (Fix for Fault #2)
+    // db.auth.getUser() provides the full list of all factors, even unverified ones
+    const { data: { user } } = await db.auth.getUser();
+    
+    if (user && user.factors) {
+      const unverifiedFactors = user.factors.filter(f => f.status === 'unverified');
+      for (const f of unverifiedFactors) {
+        // We delete any setup that didn't finish properly
+        await db.auth.mfa.unenroll({ factorId: f.id });
+      }
+    }
+
+    // 2. START NEW ENROLLMENT
+    const { data, error } = await db.auth.mfa.enroll({ factorType: 'totp' });
+    
+    if (error) {
+      msg.style.color = "var(--error-red)";
+      msg.textContent = error.message;
+      return;
+    }
+
+    currentFactorId = data.id;
+
+    // 3. QR RENDER FIX (Final Version)
+    const qrContainer = document.getElementById('mfa-qr-container');
+    
+    // We strip the Data URI prefix and decode the string so only the raw <svg> remains
+    const cleanSvg = data.totp.qr_code.replace(/^data:image\/svg\+xml;utf-8,/, '');
+    qrContainer.innerHTML = decodeURIComponent(cleanSvg);
+
+    document.getElementById('mfa-secret-key').textContent = data.totp.secret;
+    document.getElementById('mfa-init').style.display = 'none';
+    document.getElementById('mfa-setup').style.display = 'block';
+    msg.textContent = "";
+
+  } catch (err) {
+    msg.style.color = "var(--error-red)";
+    msg.textContent = "An unexpected error occurred. Please refresh.";
+    console.error(err);
+  }
+}
+
+    async function verifyMFAFactor() {
+      const code = document.getElementById('mfa-code').value.trim();
+      const msg = document.getElementById('msg');
+      if (code.length < 6) return;
+      const { data: challengeData, error: challengeError } = await db.auth.mfa.challenge({ factorId: currentFactorId });
+      if (challengeError) { alert(challengeError.message); return; }
+      const { error: verifyError } = await db.auth.mfa.verify({ factorId: currentFactorId, challengeId: challengeData.id, code: code });
+      if (verifyError) { msg.style.color = "var(--error-red)"; msg.textContent = "Invalid code."; } 
+      else { location.reload(); }
+    }
+
+    async function unenrollMFA() {
+      if (!confirm("Disable MFA?")) return;
+      const { data: factors } = await db.auth.mfa.listFactors();
+      const activeFactor = factors.totp.find(f => f.status === 'verified');
+      if (activeFactor) {
+        await db.auth.mfa.unenroll({ factorId: activeFactor.id });
+        location.reload();
+      }
+    }
+
+    function previewAvatar() {
+      const fileInput = document.getElementById('avatar-upload');
+      const preview = document.getElementById('avatar-preview');
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = e => preview.src = e.target.result;
+        reader.readAsDataURL(file);
+      }
+    }
+
+    async function handleAvatarUpdate() {
+      const fileInput = document.getElementById('avatar-upload');
+      const file = fileInput.files[0];
+      if(!file) return;
+      const msg = document.getElementById('msg');
+      msg.style.color = "var(--primary-blue)";
+      msg.textContent = "Uploading...";
+
+      const { data: { session } } = await db.auth.getSession();
+      const fileName = `${session.user.id}-${Date.now()}.${file.name.split('.').pop()}`;
+      
+      // FIXED: Using 'avatars' bucket per your setup
+      const { error: uploadError } = await db.storage.from('avatars').upload(fileName, file, { upsert: true });
+      if (uploadError) { msg.style.color = "var(--error-red)"; msg.textContent = "Upload failed: " + uploadError.message; return; }
+      
+      const { data: { publicUrl } } = db.storage.from('avatars').getPublicUrl(fileName);
+      
+      // Update metadata with the string URL
+      const { error: updateError } = await db.auth.updateUser({ data: { avatar_url: publicUrl } });
+      if (updateError) { msg.style.color = "var(--error-red)"; msg.textContent = updateError.message; }
+      else { location.reload(); }
+    }
+
+    // --- RESTORED PASSWORD LOGIC ---
+    function toggleVisibility(id, btn) {
+      const input = document.getElementById(id);
+      const path = btn.querySelector('path');
+      const open = "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z";
+      const closed = "M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.26 2.7-2.89 3.44-4.74-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z";
+      if (input.type === 'password') { input.type = 'text'; path.setAttribute('d', closed); } 
+      else { input.type = 'password'; path.setAttribute('d', open); }
+    }
+
+    function validatePassword() {
+      const val = document.getElementById('new-password').value;
+      const tests = {
+        length: val.length >= 6,
+        cap: /[A-Z]/.test(val),
+        num: /\d/.test(val),
+        sym: /[!@#$%^&*(),.?":{}|<> ]/.test(val)
+      };
+      Object.keys(tests).forEach(key => {
+        const el = document.getElementById(`req-${key}`);
+        const icon = el.querySelector('.status-icon');
+        if (tests[key]) { el.className = 'valid'; icon.textContent = '✔'; }
+        else { el.className = 'invalid'; icon.textContent = '✘'; }
+      });
+      document.getElementById('updateBtn').disabled = !Object.values(tests).every(v => v === true);
+    }
+
+    async function handlePasswordUpdate() {
+      const pass = document.getElementById('new-password').value;
+      const { error } = await db.auth.updateUser({ password: pass });
+      if (error) alert(error.message); else alert("Password updated successfully!");
+    }
+
+    async function handleNameUpdate() {
+      const name = document.getElementById('display-name').value.trim();
+      const { error } = await db.auth.updateUser({ data: { display_name: name } });
+      if (error) alert(error.message); else location.reload();
+    }
+
+    checkSecurity();
+  </script>
+</body>
+</html>

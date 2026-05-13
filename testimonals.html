@@ -31,78 +31,150 @@
  <main class="container section">
   <h2 class="section-heading card">Customer Feedback</h2>
   
-  <section class="review-masonry">
+  <section class="review-masonry" id="testimonials-container">
+  <p>Loading the latest reviews...</p>
+</section>
     
-    <!-- Review 1: Expandable Text -->
-    <div class="review-card card">
-      <div class="review-header">
-        <div class="user-avatar" style="background-color: #062940;">B</div>
-        <div class="review-meta">
-          <h3>Braden Loveland <span class="v-check">✓</span></h3>
-          <span class="review-date">February 2026</span>
-        </div>
-      </div>
-      <div class="review-stars">★★★★★</div>
-      <h4 class="review-subject">Fast Boiler Repair</h4>
-      <div class="review-content">
-        <p class="review-body">
-          Our boiler stopped working on the coldest night of the year. I sent a request and was surprised by how quickly the team got back to me. The engineer arrived the next morning, had the part in the van, and fixed it within an hour. I can't recommend them enough for their transparency and speed. Truly a life saver when we needed it most.
-        </p>
-      </div>
-      <button class="read-more-btn">Read more</button>
-    </div>
-
-    <!-- Review with Images & Expansion -->
-<div class="review-card card">
-  <div class="review-header">
-    <div class="user-avatar" style="background-color: #2b6777;">S</div>
-    <div class="review-meta">
-      <h3>Sarah Jenkins <span class="v-check">✓</span></h3>
-      <span class="review-date">January 2026</span>
-    </div>
-  </div>
-  <div class="review-stars">★★★★★</div>
-  <h4 class="review-subject">Incredible Turnaround Time</h4>
+   
   
-  <div class="review-content">
-    <p class="review-body">
-      I was honestly dreading having to call a plumber for our burst pipe, but Sarah from the team was fantastic. Not only did they arrive within 40 minutes of my request, but they also took the time to explain exactly what had caused the pressure build-up. They even checked our boiler settings while they were here just to make sure everything was running efficiently. It's rare to find a company that actually cares about the long-term health of your home's systems rather than just a quick fix. 
-    </p>
-  </div>
-  <button class="read-more-btn">Read more</button>
-
-  <!-- Photo grid stays visible or you can move it inside .review-content if preferred -->
-  <div class="review-photo-grid">
-    <div class="photo-item"><img src="assets/images/office-open.jpg" alt="Installation"></div>
-    <div class="photo-item"><img src="assets/images/family-offer.jpg" alt="Installation"></div>
-    <div class="photo-item"><img src="assets/images/trades.jpg" alt="Installation"></div>
-    <div class="photo-item plus-overlay" data-count="+1">
-       
-    </div>
-  </div>
-</div>
-
-  </section>
-  
-  <!-- Lightbox / Gallery Overlay with Navigation -->
-<div id="review-lightbox" class="lightbox-overlay">
-  <span class="lightbox-close">&times;</span>
-  
-  <!-- Navigation Arrows -->
-  <button class="lightbox-nav prev" id="lightbox-prev">&#10094;</button>
-  <img class="lightbox-content" id="lightbox-img">
-  <button class="lightbox-nav next" id="lightbox-next">&#10095;</button>
-
-  <!-- Image counter (optional) -->
-  <div id="lightbox-counter" class="lightbox-counter"></div>
-</div>
+ 
 
 </main>
 
   <footer id="footer"></footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  let currentGalleryImages = [];
+  let currentImageIndex = 0;
 
+  async function loadPublicTestimonials() {
+    const lib = window.supabase || window.Supabase;
+    if (!lib) { setTimeout(loadPublicTestimonials, 100); return; }
+
+    const db = lib.createClient('https://axampuprcnauxbbijmmt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ');
+
+    const { data: reviews, error } = await db.from('testimonials').select('*').order('review_date', { ascending: false });
+
+    if (error) return console.error(error);
+
+    const container = document.getElementById('testimonials-container');
+    container.innerHTML = '';
+
+    reviews.forEach((review, index) => {
+      const initial = review.customer_name ? review.customer_name.charAt(0).toUpperCase() : '?';
+      const formattedDate = new Date(review.review_date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+      
+      // LOGIC: Only apply 'is-long' if characters > 180
+      const isLong = review.content.length > 180;
+
+      let photoGridHtml = '';
+      if (review.review_type === 'photo' && review.image_urls?.length > 0) {
+        const images = review.image_urls;
+        const showOverlay = images.length > 4;
+        const imagesData = JSON.stringify(images).replace(/"/g, '&quot;');
+
+        photoGridHtml = `
+          <div class="review-photo-grid" data-images="${imagesData}">
+            ${images.slice(0, 4).map((url, i) => {
+              if (i === 3 && showOverlay) {
+                return `<div class="photo-item plus-overlay" data-index="3" data-count="+${images.length - 3}"><img src="${url}"></div>`;
+              }
+              return `<div class="photo-item" data-index="${i}"><img src="${url}"></div>`;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      container.innerHTML += `
+        <div class="review-card card visible" style="transition-delay: ${index * 100}ms;">
+          <div class="review-header">
+            <div class="user-avatar" style="background-color: #062940;">${initial}</div>
+            <div class="review-meta">
+              <h3>${review.customer_name} <span class="v-check">✓</span></h3>
+              <span class="review-date">${formattedDate}</span>
+            </div>
+          </div>
+          <div class="review-stars" style="color: #ffd700; margin: 10px 0;">${'★'.repeat(review.rating)}</div>
+          ${review.subject ? `<h4 class="review-subject" style="margin: 5px 0 10px 0; font-size: 1rem; color: #062940;">${review.subject}</h4>` : ''}
+          <div class="review-content ${isLong ? 'is-long' : ''}">
+            <p class="review-body">${review.content}</p>
+          </div>
+          
+          ${isLong ? '<button class="read-more-btn">Read more</button>' : ''}
+          ${photoGridHtml}
+        </div>
+      `;
+    });
+
+    initInteractions();
+  }
+
+  function initInteractions() {
+    // Read More Logic
+    document.querySelectorAll('.read-more-btn').forEach(btn => {
+      btn.onclick = function() {
+        const content = this.previousElementSibling;
+        content.classList.toggle('expanded');
+        this.textContent = content.classList.contains('expanded') ? 'Read less' : 'Read more';
+      };
+    });
+
+    // Gallery Logic
+    document.querySelectorAll('.photo-item').forEach(item => {
+      item.onclick = function() {
+        const grid = this.closest('.review-photo-grid');
+        currentGalleryImages = JSON.parse(grid.getAttribute('data-images'));
+        currentImageIndex = parseInt(this.getAttribute('data-index'));
+        
+        const overlay = document.getElementById('review-lightbox');
+        overlay.style.display = 'flex';
+        updateLightboxImage();
+      };
+    });
+  }
+
+  function updateLightboxImage() {
+    const img = document.getElementById('lightbox-img');
+    const counter = document.getElementById('lightbox-counter');
+    if (!img) return;
+
+    img.src = currentGalleryImages[currentImageIndex];
+    if (counter) counter.textContent = `${currentImageIndex + 1} / ${currentGalleryImages.length}`;
+  }
+
+  // --- GLOBAL DELEGATE (Fixes buttons not working in footer) ---
+  document.addEventListener('click', function(e) {
+    const lightbox = document.getElementById('review-lightbox');
+    if (!lightbox || lightbox.style.display !== 'flex') return;
+
+    // 1. Prev Button
+    if (e.target.closest('.prev')) {
+      e.stopPropagation();
+      currentImageIndex = (currentImageIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length;
+      updateLightboxImage();
+    }
+    // 2. Next Button
+    else if (e.target.closest('.next')) {
+      e.stopPropagation();
+      currentImageIndex = (currentImageIndex + 1) % currentGalleryImages.length;
+      updateLightboxImage();
+    }
+    // 3. Close Button or Backdrop
+    else if (e.target.closest('.lightbox-close') || e.target === lightbox) {
+      lightbox.style.display = 'none';
+    }
+  });
+
+  loadPublicTestimonials();
+</script>
   <script src="assets/js/include.js"></script>
   <script src="assets/js/nav.js"></script>
   <script src="assets/js/main.js"></script>
+  
+  <div id="image-modal" class="modal" onclick="this.style.display='none'">
+  <span class="close-modal">&times;</span>
+  <img class="modal-content" id="modal-img">
+</div>
+
 </body>
 </html>

@@ -442,3 +442,15 @@
     box-sizing: border-box;
   }
 
+/* Targeted fix: Only affects the Call Us tile on desktop */
+#call-to-book {
+    height: 100% !important; /* Forces it to match the height of its neighbors in the grid */
+    display: flex !important;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Ensures the container respects equal heights without breaking other components */
+.tile-grid {
+    align-items: stretch !important;
+}

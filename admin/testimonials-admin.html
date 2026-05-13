@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Testimonials | Warm Right Ltd</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary-blue: #004a99;
+      --accent-orange: #ff8c00;
+      --light-gray: #f4f7f6;
+      --white: #ffffff;
+      --text-dark: #333;
+    }
+
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light-gray); color: var(--text-dark); visibility: hidden; }
+
+    /* Navigation */
+    nav {
+      background: var(--white);
+      padding: 10px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .logo img { height: 50px; }
+    .nav-buttons { display: flex; gap: 10px; }
+
+    /* Buttons */
+    button { padding: 10px 18px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-primary { background: var(--primary-blue); color: white; }
+    .btn-accent { background: var(--accent-orange); color: white; }
+    .btn-outline { background: transparent; border: 1px solid #ccc; color: #666; }
+    .btn-danger { background: #ef4444; color: white; }
+
+    /* Containers */
+    .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+    #table-view, #form-view { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .hidden { display: none !important; }
+
+    /* Form Split Layout */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    .form-left label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: var(--primary-blue); }
+    .form-left input, .form-left textarea, .form-left select { 
+      width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; 
+    }
+
+    /* Multi-Image Gallery Styling */
+    .form-right { background: #fafafa; border: 2px dashed #ddd; border-radius: 12px; padding: 20px; text-align: center; }
+    #image-gallery { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
+      gap: 10px; 
+      width: 100%; 
+      margin-top: 15px; 
+    }
+    .gallery-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    
+    /* Professional Table */
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th { text-align: left; background: #f9f9f9; padding: 15px; color: var(--primary-blue); border-bottom: 2px solid #eee; }
+    td { padding: 15px; border-bottom: 1px solid #eee; }
+    .type-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; background: #eee; }
+    .stars { color: #ffd700; font-size: 18px; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo"><img src="../assets/images/logo.png" alt="Warm Right Ltd"></div>
+    <div class="nav-buttons">
+      <button id="add-btn" class="btn-accent" onclick="showFormMode()">+ New Testimonial</button>
+      <button class="btn-outline" onclick="location.href='admin-landed.html'">Hub</button>
+      <button class="btn-danger" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    
+    <div id="table-view">
+      <h2 style="margin-top:0">Customer Testimonials</h2>
+      <table id="testimonialTable">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Rating</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="form-view" class="hidden">
+      <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 20px;">
+        <h2 id="formTitle" style="margin:0">Add Testimonial</h2>
+        <button class="btn-outline" onclick="showTableMode()">Cancel & Close</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-left">
+          <label>Review Category</label>
+          <select id="review_type" onchange="toggleImageSection()">
+            <option value="standard">Standard (Text Only)</option>
+            <option value="photo">Photo Review (With Gallery)</option>
+          </select>
+
+          <label>Customer Name</label>
+          <input id="customer_name" placeholder="e.g. Sarah Jenkins">
+
+          <label>Review Date</label>
+          <input id="review_date" type="date">
+
+          <label>Star Rating</label>
+          <select id="rating">
+            <option value="5">5 Stars</option>
+            <option value="4">4 Stars</option>
+            <option value="3">3 Stars</option>
+            <option value="2">2 Stars</option>
+            <option value="1">1 Star</option>
+          </select>
+            <label>Punchy Subject Line</label>
+<input id="subject" placeholder="e.g. Fast Boiler Repair">
+          <label>Review Content</label>
+          <textarea id="content" rows="6" placeholder="Paste the customer review here..."></textarea>
+
+          <button id="saveBtn" class="btn-primary" style="width:100%; padding:15px;" onclick="saveTestimonial()">Save Testimonial</button>
+        </div>
+
+        <div class="form-right" id="image-section">
+          <label style="font-weight: bold; color: var(--primary-blue);">Review Images</label>
+          <div id="image-gallery">
+            <p id="no-images-msg" style="color:#999; font-size:14px; grid-column: 1/-1;">No photos selected</p>
+          </div>
+          <input type="file" id="image-input" accept="image/*" multiple style="display:none;" onchange="previewFiles()">
+          <button class="btn-accent" id="upload-btn" onclick="document.getElementById('image-input').click()" style="margin-top:20px;">Add Multiple Photos</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let db;
+    let editingId = null;
+    let existingImageUrls = []; 
+	let selectedFiles = [];
+
+    async function checkSecurity() {
+      const lib = window.supabase || window.Supabase;
+      if (!lib) { setTimeout(checkSecurity, 50); return; }
+      db = lib.createClient('https://axampuprcnauxbbijmmt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ');
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; } 
+      else { document.body.style.visibility = 'visible'; loadTestimonials(); }
+    }
+
+    function showFormMode() {
+      document.getElementById('table-view').classList.add('hidden');
+      document.getElementById('add-btn').classList.add('hidden');
+      document.getElementById('form-view').classList.remove('hidden');
+      toggleImageSection();
+    }
+
+    function showTableMode() {
+      document.getElementById('form-view').classList.add('hidden');
+      document.getElementById('table-view').classList.remove('hidden');
+      document.getElementById('add-btn').classList.remove('hidden');
+      resetForm();
+    }
+
+    function toggleImageSection() {
+      const type = document.getElementById('review_type').value;
+      const section = document.getElementById('image-section');
+      const btn = document.getElementById('upload-btn');
+      section.style.opacity = (type === 'standard') ? '0.4' : '1';
+      btn.disabled = (type === 'standard');
+    }
+
+    function previewFiles() {
+      const files = Array.from(document.getElementById('image-input').files);
+      const gallery = document.getElementById('image-gallery');
+      selectedFiles = files;
+      gallery.innerHTML = files.length ? '' : '<p id="no-images-msg" style="color:#999; font-size:14px; grid-column: 1/-1;">No photos selected</p>';
+      files.forEach(file => {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.className = 'gallery-img';
+        gallery.appendChild(img);
+      });
+    }
+
+    async function loadTestimonials() {
+  const { data, error } = await db.from('testimonials').select('*').order('review_date', { ascending: false });
+  if (error) return console.error(error);
+
+  const tbody = document.querySelector('#testimonialTable tbody');
+  
+  tbody.innerHTML = data.map(t => {
+    // 1. Format the date to dd/mm/yyyy
+    const formattedDate = new Date(t.review_date).toLocaleDateString('en-GB');
+
+    // 2. Get the age and color
+    const ageInfo = getReviewAgeInfo(t.review_date);
+
+    return `
+      <tr>
+        <td><strong>${t.customer_name}</strong></td>
+        <td>
+          <div style="font-size: 14px;">${formattedDate}</div>
+          <div style="font-size: 11px; font-weight: bold; color: ${ageInfo.color};">
+            ${ageInfo.ageText}
+          </div>
+        </td>
+        <td><span class="type-badge">${t.review_type}</span></td>
+        <td class="stars">${'★'.repeat(t.rating)}</td>
+        <td style="text-align: right;">
+          <button class="btn-outline" onclick="editTestimonial('${t.id}')">Edit</button>
+          <button class="btn-outline" style="color:red" onclick="deleteTestimonial('${t.id}')">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+    function getReviewAgeInfo(dateStr) {
+  const now = new Date();
+  const reviewDate = new Date(dateStr);
+  const diffInMs = now - reviewDate;
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  let ageText = "";
+  let color = "inherit"; // Default text color
+
+  if (diffInDays <= 31) {
+    // Under a month
+    ageText = `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`;
+  } else if (diffInDays < 365) {
+    // Under a year
+    const months = Math.floor(diffInDays / 30.44);
+    ageText = `${months} month${months === 1 ? '' : 's'} ago`;
+  } else {
+    // Over a year
+    const years = Math.floor(diffInDays / 365);
+    ageText = `${years} year${years === 1 ? '' : 's'} ago`;
+    
+    // Color coding based on your rules
+    if (years >= 2) {
+      color = "#ef4444"; // Red
+    } else if (years >= 1) {
+      color = "#ff8c00"; // Orange
+    }
+  }
+
+  return { ageText, color };
+}  
+
+
+
+    async function saveTestimonial() {
+  const name = document.getElementById('customer_name').value.trim();
+  const type = document.getElementById('review_type').value;
+  if (!name) return alert("Customer name is required");
+
+  let finalImageUrls = [];
+
+  // If new files were selected, upload them
+  if (type === 'photo' && selectedFiles.length > 0) {
+    const uploadPromises = selectedFiles.map(async (file) => {
+      const fileName = `review-${Date.now()}-${file.name}`;
+      const { error } = await db.storage.from('testimonial-images').upload(fileName, file);
+      if (error) throw error;
+      return db.storage.from('testimonial-images').getPublicUrl(fileName).data.publicUrl;
+    });
+    finalImageUrls = await Promise.all(uploadPromises);
+  } else {
+    // If no NEW files were picked, keep the ones we already had (if editing)
+    finalImageUrls = editingId ? existingImageUrls : [];
+  }
+
+  const payload = {
+    customer_name: name,
+    subject: document.getElementById('subject').value,
+    review_date: document.getElementById('review_date').value,
+    review_type: type,
+    rating: parseInt(document.getElementById('rating').value),
+    content: document.getElementById('content').value,
+    image_urls: finalImageUrls // Now this contains either the new or the old ones
+  };
+
+  const { error } = editingId ? 
+    await db.from('testimonials').update(payload).eq('id', editingId) : 
+    await db.from('testimonials').insert([payload]);
+
+  if (error) alert(error.message);
+  else showTableMode(); loadTestimonials();
+}
+
+    window.editTestimonial = async (id) => {
+      const { data } = await db.from('testimonials').select('*').eq('id', id).single();
+      if (!data) return;
+      editingId = id;
+	  existingImageUrls = data.image_urls || [];
+      showFormMode();
+      document.getElementById('formTitle').textContent = 'Edit Review';
+      document.getElementById('customer_name').value = data.customer_name;
+      document.getElementById('review_date').value = data.review_date;
+      document.getElementById('review_type').value = data.review_type;
+      document.getElementById('rating').value = data.rating;
+	  document.getElementById('subject').value = data.subject;
+      document.getElementById('content').value = data.content;
+      
+      const gallery = document.getElementById('image-gallery');
+      gallery.innerHTML = data.image_urls.length ? data.image_urls.map(url => `<img src="${url}" class="gallery-img">`).join('') : '<p id="no-images-msg">No photos</p>';
+      toggleImageSection();
+    };
+
+    window.deleteTestimonial = async (id) => {
+      if (!confirm('Delete this testimonial?')) return;
+      await db.from('testimonials').delete().eq('id', id);
+      loadTestimonials();
+    };
+
+    window.resetForm = () => {
+      editingId = null;
+      existingImageUrls = []; // Clear the memory
+      selectedFiles = [];
+      document.getElementById('formTitle').textContent = 'Add Testimonial';
+      document.querySelectorAll('input, textarea, select').forEach(el => el.value = (el.id === 'rating') ? '5' : (el.id === 'review_type') ? 'standard' : '');
+      document.getElementById('image-gallery').innerHTML = '<p id="no-images-msg" style="color:#999; font-size:14px; grid-column: 1/-1;">No photos selected</p>'; document.getElementById('subject').value = '';
+      selectedFiles = [];
+    };
+
+    window.logout = async () => { if (db) await db.auth.signOut(); window.location.href = 'login.html'; };
+    checkSecurity();
+  </script>
+</body>
+</html>
