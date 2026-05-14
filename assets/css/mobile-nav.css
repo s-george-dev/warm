@@ -106,7 +106,7 @@
     overflow: hidden;
     transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
               opacity 1.3s ease;
-    background: rgba(0, 0, 0, 0.1); /* Optional: slight darkening for contrast */
+  
 }
 
 #mobile-nav-bar .mobile-dropdown-menu.open {

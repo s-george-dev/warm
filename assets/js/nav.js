@@ -213,13 +213,35 @@ window.initWarmRight = async function() {
   }
 
 
+// --- NEW HIGHLIGHT LOGIC IN NAV.JS ---
+function applyHighlights() {
+    const currentPath = window.location.pathname.toLowerCase();
+    const segments = currentPath.split('/').filter(Boolean);
+    
+    // Check if we are on GitHub or local (GitHub usually has the repo name as segment[0])
+    const isGitHub = window.location.hostname.includes("github.io");
+    const currentFolder = isGitHub ? segments[1] : segments[0];
 
+    document.querySelectorAll('#header a, .mobile-dropdown-button').forEach(el => {
+        el.classList.remove('active');
 
+        // 1. Highlight the specific page link
+        if (el.tagName === 'A' && el.pathname.toLowerCase() === currentPath && el.getAttribute('href') !== '#') {
+            el.classList.add('active');
+        }
 
+        // 2. Highlight the Parent Folder (Services/Support)
+        // This relies on your HTML having data-section="services" or "support"
+        if (currentFolder === 'services' || currentFolder === 'support') {
+            if (el.dataset.section === currentFolder) {
+                el.classList.add('active');
+            }
+        }
+    });
+}
 
-
-
-
+// Trigger it immediately when initWarmRight runs
+applyHighlights();
 
 
 
@@ -279,12 +301,3 @@ document.addEventListener("includesLoaded", () => {
     if (window.db) { window.initWarmRight(); clearInterval(checkDb); }
   }, 50);
 });
-
-// Ensure your toggle logic looks like this:
-/*
-menuToggle.onclick = (e) => {
-    e.stopPropagation();
-    mobileNav.classList.toggle('open'); // The CSS handles the movement
-    overlay.classList.toggle('open');
-};
-*/

@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const header = document.getElementById("header");
     if (header) {
       fixInjectedPaths(header, siteRoot);
-      highlightActivePage(header, isGitHub);
+      
       const headerEl = header.querySelector(".header");
       if (headerEl) headerEl.classList.add("loaded");
     }
@@ -51,22 +51,6 @@ function fixInjectedPaths(container, root) {
     if (val && !val.startsWith('http') && !val.startsWith('tel:') && !val.startsWith('mailto:') && !val.startsWith('#')) {
       const cleanVal = val.replace(/^(\.\.\/|\.\/|\/)+/, '');
       el.setAttribute(attr, root + cleanVal);
-    }
-  });
-}
-
-function highlightActivePage(container, isGitHub) {
-  const currentPath = window.location.pathname.toLowerCase();
-  const segments = currentPath.split('/').filter(Boolean);
-  const currentFolder = isGitHub ? segments[1] : segments[0];
-
-  container.querySelectorAll('a, .mobile-dropdown-button').forEach(el => {
-    el.classList.remove('active');
-    if (el.tagName === 'A' && el.pathname.toLowerCase() === currentPath && el.getAttribute('href') !== '#') {
-      el.classList.add('active');
-    }
-    if (currentFolder === 'services' || currentFolder === 'support') {
-      if (el.dataset.section === currentFolder) el.classList.add('active');
     }
   });
 }
