@@ -3,8 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin - Manage Rates | Warm Right Ltd</title>
+  <title>WarmHub - Manage Rates | Warm Right Ltd</title>
+  
+  <link rel="stylesheet" href="../assets/css/admin.css">
+  
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>window.adminPageTitle = "WarmHub - Manage Rates";</script>
+  <script src="../assets/js/admin-include.js"></script>
+  
   <style>
     :root {
       --primary-blue: #004a99;
@@ -12,61 +19,52 @@
       --light-gray: #f4f7f6;
       --white: #ffffff;
       --text-dark: #333;
+      --status-red: #ef4444;
+      --status-green: #22c55e;
     }
 
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: var(--light-gray); color: var(--text-dark); visibility: hidden; }
-
-    /* Navigation Bar */
-    nav {
-      background: var(--white);
-      padding: 10px 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
+    body { 
+      font-family: 'Segoe UI', sans-serif; 
+      background: var(--light-gray); 
+      margin: 0; 
+      padding: 40px; 
+      visibility: hidden; 
     }
 
-    .logo img { height: 50px; }
-
-    .nav-buttons { display: flex; gap: 10px; }
-
-    /* Buttons */
-    button { 
-      padding: 10px 18px; 
-      border-radius: 6px; 
-      border: none; 
-      font-weight: 600; 
-      cursor: pointer; 
-      transition: 0.2s;
+    #admin-header-container {
+      margin: -40px -40px 30px -40px; 
     }
-    .btn-primary { background: var(--primary-blue); color: white; }
-    .btn-primary:hover { background: #003a7a; }
-    .btn-accent { background: var(--accent-orange); color: white; }
-    .btn-accent:hover { background: #e67e00; }
-    .btn-outline { background: transparent; border: 1px solid #ccc; color: #666; }
-    .btn-outline:hover { background: #eee; }
-    .btn-danger { background: #ef4444; color: white; }
 
-    /* Layout Containers */
-    .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
     
     #table-view, #form-view { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     
     .hidden { display: none !important; }
 
-    /* Form Grid: Split Left/Right */
+    /* Form Grid */
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 30px;
     }
 
-    .form-left input, .form-left textarea {
-      width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px;
+    .form-left label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px; margin-top: 15px; }
+    .form-left input, .form-left textarea, .form-left select {
+      width: 100%; padding: 12px; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px;
     }
+
+    /* Status Toggles */
+    .status-toggle-box {
+      display: flex;
+      gap: 20px;
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #eee;
+      margin-bottom: 10px;
+    }
+    .status-toggle-box div { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .status-toggle-box input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; margin: 0; }
 
     .form-right {
       display: flex;
@@ -82,41 +80,53 @@
 
     .form-right img { max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
 
-    /* Professional Table */
+    /* Buttons */
+    button { padding: 10px 18px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-primary { background: var(--primary-blue); color: white; }
+    .btn-accent { background: var(--accent-orange); color: white; }
+    .btn-outline { background: transparent; border: 1px solid #ccc; color: #666; }
+    .btn-outline:hover { background: #eee; }
+
+    /* Table & Badges */
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     th { text-align: left; background: #f9f9f9; padding: 15px; color: var(--primary-blue); border-bottom: 2px solid #eee; }
     td { padding: 15px; border-bottom: 1px solid #eee; }
-    tr:hover { background: #fcfcfc; }
+    
+    .drag-handle { cursor: grab; color: #ccc; font-size: 20px; width: 30px; }
     .table-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
+    
+    .badge { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: white; }
+    .badge-active { background: var(--status-green); }
+    .badge-suspended { background: var(--accent-orange); }
+    .badge-hidden { background: #666; }
 
     .price-tag { font-weight: bold; color: var(--primary-blue); }
   </style>
 </head>
 <body>
 
-  <nav>
-    <div class="logo"><img src="../assets/images/logo.png" alt="Warm Right Ltd"></div>
-    <div class="nav-buttons">
-      <button id="add-btn" class="btn-accent" onclick="showFormMode()">+ Add New Rate</button>
-      <button class="btn-outline" onclick="location.href='admin-landed.html'">Hub</button>
-      <button class="btn-danger" onclick="logout()">Logout</button>
-    </div>
-  </nav>
+  <div id="admin-header-container"></div>
 
   <div class="container">
     
     <div id="table-view">
-      <h2 style="margin-top:0">Current Schedule of Rates</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin:0">Current Schedule of Rates</h2>
+        <button id="add-btn" class="btn-accent" onclick="showFormMode()">+ Add New Rate</button>
+      </div>
+
       <table id="ratesTable">
         <thead>
           <tr>
+            <th></th> 
             <th>Image</th>
             <th>Title</th>
+            <th>Status</th>
             <th>Price (Ex VAT)</th>
             <th style="text-align: right;">Actions</th>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody id="ratesBody"></tbody>
       </table>
     </div>
 
@@ -128,26 +138,61 @@
 
       <div class="form-grid">
         <div class="form-left">
+          <div class="status-toggle-box">
+             <div>
+               <input type="checkbox" id="is_suspended">
+               <label for="is_suspended">Suspend Product</label>
+             </div>
+             <div>
+               <input type="checkbox" id="is_hidden">
+               <label for="is_hidden">Hide from Website</label>
+             </div>
+          </div>
+
           <label>Title</label>
           <input id="title" placeholder="e.g. Boiler Service">
           
           <label>Description</label>
-          <textarea id="description" rows="4" placeholder="Detailed description..."></textarea>
+          <textarea id="description" rows="3" placeholder="Detailed description..."></textarea>
           
-          <label>Price Ex. VAT (£)</label>
-          <input id="price_ex_vat" type="number" step="0.01">
-          
-          <label>VAT Amount (£)</label>
-          <input id="vat_amount" type="number" step="0.01">
-          
-          <label>Total Inc. VAT (£)</label>
-          <input id="price_inc_vat" type="number" step="0.01">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+            <div>
+                <label>Price Ex. VAT (£)</label>
+                <input id="price_ex_vat" type="number" step="0.01">
+            </div>
+            <div>
+                <label>VAT (£)</label>
+                <input id="vat_amount" type="number" step="0.01">
+            </div>
+            <div>
+                <label>Total Inc. VAT (£)</label>
+                <input id="price_inc_vat" type="number" step="0.01">
+            </div>
+          </div>
 
-          <button id="saveBtn" class="btn-primary" style="width:100%; padding:15px; margin-top:10px;">Save Rate Information</button>
+          <hr style="margin: 25px 0; border: 0; border-top: 1px solid #eee;">
+
+          <label>Read More Action</label>
+          <select id="read_more_type" onchange="toggleReadMoreFields()">
+            <option value="modal">Open Info Popup (Modal)</option>
+            <option value="link">Link to Page</option>
+          </select>
+          
+          <div id="url_field" class="hidden">
+            <label>Link URL</label>
+            <input id="read_more_url" placeholder="e.g. /boiler-service.html">
+          </div>
+          
+          <div id="content_field">
+            <label>Additional Info (HTML allowed)</label>
+            <textarea id="read_more_content" rows="6" placeholder="Detailed specs, terms, or process..."></textarea>
+          </div>
+
+          <button id="saveBtn" class="btn-primary" style="width:100%; padding:15px; margin-top:20px;">Save Rate Information</button>
         </div>
 
         <div class="form-right">
-          <img id="imagePreview" src="assets/images/placeholder.jpg" alt="Preview">
+          <img id="imagePreview" src="../assets/images/placeholder.jpg" alt="Preview">
           <p style="color:#666; font-size: 14px;">Resolution looks best at 4:3 or 16:9 ratio</p>
           <input type="file" id="image" accept="image/*" style="display:none;">
           <button class="btn-accent" onclick="document.getElementById('image').click()">Change Picture</button>
@@ -158,65 +203,102 @@
   </div>
 
   <script>
-    let db;
     let editingId = null;
 
     async function checkSecurity() {
       const lib = window.supabase || window.Supabase;
       if (!lib) { setTimeout(checkSecurity, 50); return; }
-      db = lib.createClient('https://axampuprcnauxbbijmmt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ');
-      const { data: { session } } = await db.auth.getSession();
-      if (!session) { window.location.href = 'login.html'; } 
-      else { document.body.style.visibility = 'visible'; loadRates(); }
+      
+      window.db = lib.createClient(
+        'https://axampuprcnauxbbijmmt.supabase.co', 
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+      );
+
+      const { data: { session } } = await window.db.auth.getSession();
+      if (!session) { 
+        window.location.href = 'login.html'; 
+      } else { 
+        await window.loadAdminHeader(session);
+        document.body.style.visibility = 'visible'; 
+        loadRates(); 
+      }
     }
 
-    // Toggle logic
+    /* 1. DRAG & DROP LOGIC */
+    function initSortable() {
+      const el = document.getElementById('ratesBody');
+      Sortable.create(el, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: async function() {
+          const rows = Array.from(el.querySelectorAll('tr'));
+          const updates = rows.map((row, index) => ({
+            id: row.getAttribute('data-id'),
+            sort_order: index
+          }));
+
+          for (const item of updates) {
+            await window.db.from('rates').update({ sort_order: item.sort_order }).eq('id', item.id);
+          }
+        }
+      });
+    }
+
+    /* 2. NAVIGATION & FORMS */
     function showFormMode() {
       document.getElementById('table-view').classList.add('hidden');
-      document.getElementById('add-btn').classList.add('hidden');
       document.getElementById('form-view').classList.remove('hidden');
     }
 
     function showTableMode() {
       document.getElementById('form-view').classList.add('hidden');
       document.getElementById('table-view').classList.remove('hidden');
-      document.getElementById('add-btn').classList.remove('hidden');
       resetForm();
     }
 
-    window.logout = async () => { if (db) await db.auth.signOut(); window.location.href = 'login.html'; };
+    function toggleReadMoreFields() {
+      const type = document.getElementById('read_more_type').value;
+      document.getElementById('url_field').classList.toggle('hidden', type !== 'link');
+      document.getElementById('content_field').classList.toggle('hidden', type !== 'modal');
+    }
 
     window.resetForm = () => {
       editingId = null;
       document.getElementById('formTitle').textContent = 'Add New Rate';
-      document.getElementById('title').value = '';
-      document.getElementById('description').value = '';
-      document.getElementById('price_ex_vat').value = '';
-      document.getElementById('vat_amount').value = '';
-      document.getElementById('price_inc_vat').value = '';
-      document.getElementById('image').value = '';
-      document.getElementById('imagePreview').src = 'assets/images/placeholder.jpg';
-      document.getElementById('saveBtn').textContent = 'Save Rate Information';
+      document.querySelectorAll('input:not([type="checkbox"]), textarea').forEach(el => el.value = '');
+      document.getElementById('is_suspended').checked = false;
+      document.getElementById('is_hidden').checked = false;
+      document.getElementById('read_more_type').value = 'modal';
+      document.getElementById('imagePreview').src = '../assets/images/placeholder.jpg';
+      toggleReadMoreFields();
     };
 
+    /* 3. CRUD LOGIC */
     async function loadRates() {
-      const { data, error } = await db.from('rates').select('*').order('created_at', { ascending: false });
-      const tbody = document.querySelector('#ratesTable tbody');
+      const { data, error } = await window.db.from('rates').select('*').order('sort_order', { ascending: true });
+      const tbody = document.getElementById('ratesBody');
       tbody.innerHTML = data.map(rate => `
-        <tr>
-          <td><img src="${rate.image_url || 'assets/images/placeholder.jpg'}" class="table-img"></td>
+        <tr data-id="${rate.id}">
+          <td class="drag-handle">☰</td>
+          <td><img src="${rate.image_url || '../assets/images/placeholder.jpg'}" class="table-img"></td>
           <td><strong>${rate.title}</strong></td>
-          <td class="price-tag">£${rate.price_ex_vat}</td>
+          <td>
+            ${rate.is_hidden ? '<span class="badge badge-hidden">Hidden</span>' : ''}
+            ${rate.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : ''}
+            ${!rate.is_hidden && !rate.is_suspended ? '<span class="badge badge-active">Active</span>' : ''}
+          </td>
+          <td class="price-tag">£${parseFloat(rate.price_ex_vat || 0).toFixed(2)}</td>
           <td style="text-align: right;">
             <button class="btn-outline" onclick="editRate('${rate.id}')">Edit</button>
-            <button class="btn-outline" style="color:red; border-color:rgba(255,0,0,0.2)" onclick="deleteRate('${rate.id}')">Delete</button>
+            <button class="btn-outline" style="color:red; border-color:rgba(255,0,0,0.1); margin-left:5px;" onclick="deleteRate('${rate.id}')">Delete</button>
           </td>
         </tr>
       `).join('');
+      initSortable();
     }
 
     window.editRate = async (id) => {
-      const { data } = await db.from('rates').select('*').eq('id', id).single();
+      const { data } = await window.db.from('rates').select('*').eq('id', id).single();
       if (!data) return;
       editingId = id;
       showFormMode();
@@ -226,13 +308,18 @@
       document.getElementById('price_ex_vat').value = data.price_ex_vat;
       document.getElementById('vat_amount').value = data.vat_amount;
       document.getElementById('price_inc_vat').value = data.price_inc_vat;
-      document.getElementById('imagePreview').src = data.image_url || 'assets/images/placeholder.jpg';
-      document.getElementById('saveBtn').textContent = 'Update Rate Information';
+      document.getElementById('is_suspended').checked = data.is_suspended || false;
+      document.getElementById('is_hidden').checked = data.is_hidden || false;
+      document.getElementById('read_more_type').value = data.read_more_type || 'modal';
+      document.getElementById('read_more_url').value = data.read_more_url || '';
+      document.getElementById('read_more_content').value = data.read_more_content || '';
+      document.getElementById('imagePreview').src = data.image_url || '../assets/images/placeholder.jpg';
+      toggleReadMoreFields();
     };
 
     window.deleteRate = async (id) => {
       if (!confirm('Permanently delete this rate?')) return;
-      await db.from('rates').delete().eq('id', id);
+      await window.db.from('rates').delete().eq('id', id);
       loadRates();
     };
 
@@ -244,8 +331,8 @@
       let image_url = null;
       if (file) {
         const fileName = `${Date.now()}-${file.name}`;
-        await db.storage.from('rates-images').upload(fileName, file);
-        image_url = db.storage.from('rates-images').getPublicUrl(fileName).data.publicUrl;
+        await window.db.storage.from('rates-images').upload(fileName, file);
+        image_url = window.db.storage.from('rates-images').getPublicUrl(fileName).data.publicUrl;
       }
 
       const payload = { 
@@ -253,31 +340,39 @@
         description: document.getElementById('description').value,
         price_ex_vat: document.getElementById('price_ex_vat').value,
         vat_amount: document.getElementById('vat_amount').value,
-        price_inc_vat: document.getElementById('price_inc_vat').value
+        price_inc_vat: document.getElementById('price_inc_vat').value,
+        is_suspended: document.getElementById('is_suspended').checked,
+        is_hidden: document.getElementById('is_hidden').checked,
+        read_more_type: document.getElementById('read_more_type').value,
+        read_more_url: document.getElementById('read_more_url').value,
+        read_more_content: document.getElementById('read_more_content').value
       };
+      
       if (image_url) payload.image_url = image_url;
 
-      const { error } = editingId ? await db.from('rates').update(payload).eq('id', editingId) : await db.from('rates').insert([payload]);
+      const { error } = editingId 
+        ? await window.db.from('rates').update(payload).eq('id', editingId) 
+        : await window.db.from('rates').insert([payload]);
       
       if (error) alert(error.message);
-      else showTableMode(); loadRates();
+      else { showTableMode(); loadRates(); }
     }
 
-    // Bidirectional Calculator
-    const exVatInput = document.getElementById('price_ex_vat');
-    const incVatInput = document.getElementById('price_inc_vat');
-    const vatAmountInput = document.getElementById('vat_amount');
+    /* 4. VAT CALCULATOR */
+    const exVat = document.getElementById('price_ex_vat');
+    const incVat = document.getElementById('price_inc_vat');
+    const vatAmt = document.getElementById('vat_amount');
 
-    exVatInput.addEventListener('input', () => {
-      const val = parseFloat(exVatInput.value) || 0;
-      vatAmountInput.value = (val * 0.2).toFixed(2);
-      incVatInput.value = (val * 1.2).toFixed(2);
+    exVat.addEventListener('input', () => {
+      const val = parseFloat(exVat.value) || 0;
+      vatAmt.value = (val * 0.2).toFixed(2);
+      incVat.value = (val * 1.2).toFixed(2);
     });
 
-    incVatInput.addEventListener('input', () => {
-      const val = parseFloat(incVatInput.value) || 0;
-      exVatInput.value = (val / 1.2).toFixed(2);
-      vatAmountInput.value = (val - (val / 1.2)).toFixed(2);
+    incVat.addEventListener('input', () => {
+      const val = parseFloat(incVat.value) || 0;
+      exVat.value = (val / 1.2).toFixed(2);
+      vatAmt.value = (val - (val / 1.2)).toFixed(2);
     });
 
     document.getElementById('image').addEventListener('change', (e) => {

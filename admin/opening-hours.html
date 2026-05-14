@@ -4,7 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Opening Hours Admin | Warm Right Ltd</title>
+  
+  <link rel="stylesheet" href="../assets/css/admin.css">
+  
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script>window.adminPageTitle = "WarmHub - Opening Hours";</script>
+  <script src="../assets/js/admin-include.js"></script>
+  
   <style>
     :root { 
       --primary-blue: #004a99; 
@@ -14,27 +21,22 @@
       --error-red: #ef4444; 
     }
     
-    body { font-family: 'Segoe UI', sans-serif; background: var(--bg-gray); margin: 0; visibility: hidden; }
+    /* 1. Hide body until security check & header load is complete */
+    body { 
+      font-family: 'Segoe UI', sans-serif; 
+      background: var(--bg-gray); 
+      margin: 0; 
+      padding: 40px; 
+      visibility: hidden; 
+    }
 
-    /* Navigation Styling */
-    nav {
-      background: #fff;
-      padding: 10px 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    /* 2. Header Layout Fix: Counteracts the 40px body padding */
+    #admin-header-container {
+      margin: -40px -40px 30px -40px; 
     }
-    .nav-left, .nav-right { display: flex; align-items: center; gap: 20px; }
-    .logo img { height: 50px; }
-    .nav-user {
-      display: flex; align-items: center; gap: 12px; padding-right: 15px; border-right: 1px solid #eee;
-    }
-    .nav-avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #f0f0f0; }
-    .nav-name { font-size: 14px; font-weight: 600; color: #333; }
 
     /* Layout Containers */
-    .container { max-width: 1000px; margin: 40px auto; display: grid; grid-template-columns: 1fr 1fr; gap: 25px; padding: 0 20px; }
+    .container { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 25px; padding: 0 20px; }
     .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
     h2 { color: #333; margin-top: 0; font-size: 20px; border-bottom: 2px solid var(--primary-blue); padding-bottom: 10px; }
     
@@ -55,12 +57,7 @@
     .status-open { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
     .status-closed { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
     
-    /* Buttons */
-    .btn-primary { background: var(--primary-blue); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 15px; transition: 0.2s; }
-    .btn-primary:hover { opacity: 0.9; }
-    .btn-sync { background: #fff; color: var(--primary-blue); border: 1px solid var(--primary-blue); padding: 8px 12px; font-size: 12px; cursor: pointer; border-radius: 4px; font-weight: 600; }
-    .btn-outline { background: transparent; border: 1px solid #ccc; color: #666; cursor: pointer; padding: 8px 15px; border-radius: 6px; font-size: 13px; font-weight: 600; }
-    .btn-danger { background: transparent; border: 1px solid var(--error-red); color: var(--error-red); cursor: pointer; padding: 8px 15px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+   
 
     /* Modal Styling */
     .modal-overlay { 
@@ -78,22 +75,9 @@
 </head>
 <body>
 
-  <nav>
-    <div class="nav-left">
-      <div class="logo"><img src="../assets/images/logo.png" alt="Warm Right Ltd"></div>
-      <button class="btn-outline" onclick="location.href='admin-landed.html'">Hub</button>
-    </div>
-    <div class="nav-right">
-      <div class="nav-user">
-        <span class="nav-name" id="nav-display-name">Admin</span>
-        <img src="../assets/images/avatar-default.avif" class="nav-avatar" id="nav-avatar-img">
-      </div>
-      <button class="btn-danger" onclick="handleLogout()">Logout</button>
-    </div>
-  </nav>
+  <div id="admin-header-container"></div>
 
   <div class="container">
-    <!-- LEFT: Standard Week -->
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <h2>Standard Routine</h2>
@@ -114,7 +98,6 @@
       <p id="msg"></p>
     </div>
 
-    <!-- RIGHT: 4-Week Preview -->
     <div class="card">
       <h2>4-Week Preview</h2>
       <p style="font-size: 12px; color: #777; margin-bottom: 10px;">
@@ -128,7 +111,6 @@
     </div>
   </div>
 
-  <!-- OVERRIDE MODAL -->
   <div id="override-modal" class="modal-overlay">
     <div class="modal-content">
       <span class="close-modal" onclick="closeModal()">&times;</span>
@@ -160,21 +142,37 @@
   </div>
 
   <script>
-    const db = supabase.createClient('https://axampuprcnauxbbijmmt.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ');
+    /* 1. INITIALIZATION & SECURITY */
+    let db;
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     let routineData = [];
     let overrides = [];
     let activeModalDate = "";
 
     async function checkSecurity() {
-      const { data: { session } } = await db.auth.getSession();
-      if (!session) { window.location.href = 'login.html'; return; }
+      const lib = window.supabase || window.Supabase;
+      if (!lib) { setTimeout(checkSecurity, 50); return; }
+
+      // Assign to window.db so the admin-include.js logout function can see it
+      window.db = lib.createClient(
+        'https://axampuprcnauxbbijmmt.supabase.co', 
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+      );
+
+      const { data: { session } } = await window.db.auth.getSession();
       
-      const userMeta = session.user.user_metadata;
-      document.getElementById('nav-display-name').textContent = userMeta.display_name || "Admin";
-      document.getElementById('nav-avatar-img').src = userMeta.avatar_url || "../assets/images/avatar-default.avif";
+      if (!session) { 
+        window.location.href = 'login.html'; 
+        return; 
+      }
+      
+      // LOAD THE MODULAR HEADER
+      await window.loadAdminHeader(session);
+      
+      // REVEAL PAGE
       document.body.style.visibility = 'visible';
       
+      // RUN PAGE CONTENT INIT
       init();
     }
 
@@ -184,15 +182,18 @@
       renderCalendar();
     }
 
-    async function handleLogout() {
-      await db.auth.signOut();
+    // Required for the Logout button in the header
+    window.handleLogout = async () => {
+      await window.db.auth.signOut();
       window.location.href = 'login.html';
-    }
+    };
+
+    /* 2. HOURS LOGIC */
 
     async function loadData() {
-      const { data: routine } = await db.from('business_hours').select('*').order('day_index', { ascending: true });
-      const { data: special } = await db.from('special_dates').select('*').gte('date', new Date().toISOString().split('T')[0]);
-      const { data: meta } = await db.from('app_metadata').select('*').eq('key', 'last_holiday_sync').single();
+      const { data: routine } = await window.db.from('business_hours').select('*').order('day_index', { ascending: true });
+      const { data: special } = await window.db.from('special_dates').select('*').gte('date', new Date().toISOString().split('T')[0]);
+      const { data: meta } = await window.db.from('app_metadata').select('*').eq('key', 'last_holiday_sync').single();
       
       routineData = routine || [];
       overrides = special || [];
@@ -236,7 +237,7 @@
         close_time: document.getElementById(`close-${i}`).value,
         is_closed: document.getElementById(`closed-${i}`).checked
       }));
-      const { error } = await db.from('business_hours').upsert(updates);
+      const { error } = await window.db.from('business_hours').upsert(updates);
       if (error) alert(error.message); else location.reload();
     }
 
@@ -247,9 +248,9 @@
         const data = await response.json();
         const holidays = data['england-and-wales'].events;
         const holidayUpdates = holidays.map(h => ({ date: h.date, reason: h.title, is_closed: true }));
-        const { error } = await db.from('special_dates').upsert(holidayUpdates);
+        const { error } = await window.db.from('special_dates').upsert(holidayUpdates);
         if (error) throw error;
-        await db.from('app_metadata').upsert({ key: 'last_holiday_sync', value: new Date().toISOString() });
+        await window.db.from('app_metadata').upsert({ key: 'last_holiday_sync', value: new Date().toISOString() });
         alert("Holidays synced successfully!");
         location.reload();
       } catch (err) { alert("Sync failed: " + err.message); }
@@ -297,7 +298,7 @@
     }
 
     async function saveModalOverride() {
-      const { error } = await db.from('special_dates').upsert({
+      const { error } = await window.db.from('special_dates').upsert({
         date: activeModalDate,
         reason: document.getElementById('modal-reason').value || "Override",
         is_closed: document.getElementById('modal-closed').checked,
@@ -309,10 +310,11 @@
 
     async function deleteOverride() {
       if (!confirm("Remove this override? It will revert to your standard routine.")) return;
-      const { error } = await db.from('special_dates').delete().eq('date', activeModalDate);
+      const { error } = await window.db.from('special_dates').delete().eq('date', activeModalDate);
       if (error) alert(error.message); else { closeModal(); init(); }
     }
 
+    // RUN ON LOAD
     checkSecurity();
   </script>
 </body>

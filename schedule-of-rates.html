@@ -1,126 +1,412 @@
- <!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Warm Right Ltd — Home</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Schedule of Rates — Warm Right Ltd</title>
   <link rel="icon" href="assets/images/favicon.png">
+  
   <link rel="stylesheet" href="assets/css/variables.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/mobile-nav.css">
+  <link rel="stylesheet" href="assets/css/tiles.css">
+  <link rel="stylesheet" href="assets/css/forms.css">
+  <link rel="stylesheet" href="assets/css/footer.css">
+  <link rel="stylesheet" href="assets/css/header.css">
+  <link rel="stylesheet" href="assets/css/hero.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
 
-<link rel="stylesheet" href="assets/css/mobile-nav.css">
+  <style>
+    /* --- SCHEDULE OF RATES SPECIFIC FORMATTING --- */
+    
+    /* Forces the text container to grow and push prices to the bottom */
+    .tile-text {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      text-align: left;
+    }
 
-<link rel="stylesheet" href="assets/css/tiles.css">
-<link rel="stylesheet" href="assets/css/forms.css">
-<link rel="stylesheet" href="assets/css/footer.css">
-<link rel="stylesheet" href="assets/css/header.css">
-<link rel="stylesheet" href="assets/css/hero.css">
-<link rel="stylesheet" href="assets/css/responsive.css">
+    .price-container {
+      margin-top: auto; /* The "Spring" that pushes content down */
+      padding-top: 25px;
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .price-inc-bold {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--primary-blue);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .price-inc-bold small {
+      font-size: 0.7em;
+      font-weight: 400;
+      opacity: 0.8;
+    }
+
+    .price-ex-sub {
+      font-size: 0.95rem;
+      color: #666;
+      font-weight: 500;
+      display: block;
+    }
+
+    .btn-read-more {
+      display: inline-block;
+      margin-top: 15px;
+      padding: 10px 24px;
+      background: var(--primary-blue);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-read-more:hover {
+      background: var(--accent-orange);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* --- INFO MODAL STYLING --- */
+    .rate-info-modal {
+      display: none; 
+      position: fixed; 
+      top: 0; left: 0; 
+      width: 100%; height: 100%;
+      background: rgba(12, 22, 40, 0.7); 
+      z-index: 9999; 
+      justify-content: center; 
+      align-items: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .rate-modal-content {
+      background: white; 
+      padding: 40px; 
+      border-radius: 20pt; 
+      max-width: 600px; 
+      width: 90%;
+      position: relative; 
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: modalSlideUp 0.3s ease-out;
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .rate-modal-close {
+      position: absolute;
+      top: 20px; right: 20px;
+      background: none; border: none;
+      font-size: 1.5rem; cursor: pointer; color: #999;
+    }
+	/* --- CONTAINER & GRID --- */
+.dynamic-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+    margin-top: 30px;
+    align-items: stretch;
+}
+
+/* --- FEATURE TILE LAYOUT --- */
+.feature-tile {
+    display: flex;
+    background: var(--tile-background, #fff);
+    border-radius: 20pt;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    min-height: 350px;
+}
+
+.feature-tile:hover {
+    box-shadow: 0 15px 40px rgba(10, 44, 102, 0.1);
+}
+
+.feature-tile img {
+    flex: 1 1 45%;
+    max-width: 45%;
+    object-fit: cover;
+}
+
+/* --- TEXT & PRICE ALIGNMENT --- */
+.tile-text {
+    flex: 1 1 55%;
+    padding: 40px;
+    display: flex;
+    flex-direction: column; /* Allows the price-container to be pushed down */
+    text-align: left;
+}
+
+.tile-text h2 {
+    font-size: 1.8rem;
+    color: var(--primary-blue);
+    margin-bottom: 15px;
+}
+
+.tile-text p {
+    color: var(--text-secondary, #555);
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+/* The "Spring" that pushes the price to the bottom */
+.price-container {
+    margin-top: auto; 
+    padding-top: 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* --- PRICE HIERARCHY --- */
+.price-inc-bold {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--primary-blue);
+    display: block;
+}
+
+.price-inc-bold small {
+    font-size: 0.65em;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 5px;
+}
+
+.price-ex-sub {
+    font-size: 1rem;
+    color: #777;
+    font-weight: 500;
+    display: block;
+    margin-top: -2px;
+}
+
+/* --- BUTTONS --- */
+.btn-read-more {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 12px 28px;
+    background: var(--primary-blue);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-read-more:hover {
+    background: var(--accent-orange);
+    transform: scale(1.03);
+}
+
+/* --- INFO MODAL (POPUP) --- */
+.rate-info-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(12, 22, 40, 0.75);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(8px);
+}
+
+.rate-modal-content {
+    background: #fff;
+    padding: 45px;
+    border-radius: 25pt;
+    max-width: 650px;
+    width: 90%;
+    position: relative;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+    animation: modalFadeIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rate-modal-close {
+    position: absolute;
+    top: 25px; right: 25px;
+    background: #f0f3f7;
+    border: none;
+    width: 35px; height: 35px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- RESPONSIVE ADJUSTMENTS --- */
+@media (max-width: 992px) {
+    .feature-tile {
+        flex-direction: column !important; /* Stack vertically on tablets */
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    
+    .feature-tile img {
+        max-width: 100%;
+        height: 220px;
+    }
+    
+    .tile-text {
+        padding: 30px;
+    }
+}
+
+@media (max-width: 480px) {
+    .tile-text h2 { font-size: 1.4rem; }
+    .price-inc-bold { font-size: 1.4rem; }
+    .btn-read-more { width: 100%; text-align: center; }
+}
+  </style>
 </head>
+
 <header id="header"></header>
+
 <body>
 
-<!-- SLIDE SHOW -->
   <section class="hero">
-  <!-- Slide 1: Who We Are -->
-  <div class="slide active" style="background-image:url('assets/images/boiler-fault.gif');">
-  <a class="slide-content" href="schedule-of-rates.html#standard-call">
-    <h1>Boiler on the blink?</h1>
-    <p>With years of experience, there's not many faults we haven't seen before. See our fixed-price callout rate.</p>
-  </a>
-</div>
-
-  <!-- Slide 2: Book a Visit -->
- <div class="slide" style="background-image:url('/assets/images/book-visit.jpg');">
-  <a class="slide-content" href="schedule-of-rates.html#boiler-service">
-    <h1>Oil’s well that ends well</h1>
-    <p>Our engineers specialise in oil boilers. View our servicing rates and oil-specific options.</p>
-  </a>
-  </div>
-
-  <!-- Slide 3: Our Values -->
-  <div class="slide" style="background-image:url('assets/images/values.jpg');">
-  <a class="slide-content" href="schedule-of-rates.html#second-opinion">
-    <h1>Get it booked. Get it fixed.</h1>
-    <p>Booking is easy, just a click away. See our rates for second opinions and fault diagnosis.</p>
-  </a>
-</div>
-</section>
-
+    <div class="slide active" style="background-image:url('assets/images/boiler-fault.gif');">
+      <a class="slide-content" href="#rates-container">
+        <h1>Boiler on the blink?</h1>
+        <p>With years of experience, there's not many faults we haven't seen before. See our fixed-price callout rate.</p>
+      </a>
+    </div>
+    </section>
 
   <main class="container section">
-   <section class="section-heading">
-  <h2 class="section-heading card">Transparent Pricing & Professional Services</h2>
-  <p class="article-gap card">
-    We believe in clear, upfront pricing — no hidden fees, no surprises. Below you'll find our most requested services, each with a simple breakdown of costs. All prices are subject to 20% VAT.
-  </p>
+    <section class="section-heading">
+      <h2 class="section-heading card">Transparent Pricing & Professional Services</h2>
+      <p class="article-gap card">
+        We believe in clear, upfront pricing — no hidden fees, no surprises. Below you'll find our most requested services, each with a simple breakdown of costs. All prices are subject to 20% VAT.
+      </p>
 
-<div id="rates-container" class="dynamic-grid">
-  <p class="loading-text">Loading current rates...</p>
-</div>
-
-
-
-
-
- 
-
-</section>
+      <div id="rates-container" class="dynamic-grid">
+        <p class="loading-text">Loading current rates...</p>
+      </div>
+    </section>
   </main>
 
-  <footer id="footer"></footer>
-<!-- <button id="theme-toggle">Toggle Dark Mode</button>           TO BE ADDED LATER   -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  async function loadPublicRates() {
-  const lib = window.supabase || window.Supabase;
-  if (!lib) { setTimeout(loadPublicRates, 100); return; }
-
-  const db = lib.createClient(
-    'https://axampuprcnauxbbijmmt.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
-  );
-
-  const { data: rates, error } = await db
-    .from('rates')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  if (error) return console.error("Error loading rates:", error);
-
-  const container = document.getElementById('rates-container');
-  if (!container) return;
-
-  // Clear the "Loading..." message
-  container.innerHTML = '';
-
-  container.innerHTML = rates.map((rate, index) => {
-    const sideClass = (index % 2 === 0) ? 'split-left' : 'split-right';
-    
-    // We add 'visible' so the CSS actually shows them
-    // We add a style delay so they fade in one by one (optional but looks great)
-    const delay = index * 100; 
-
-    return `
-      <div class="feature-tile ${sideClass} card visible" 
-           style="transition-delay: ${delay}ms;" 
-           id="rate-${rate.id}">
-        <img src="${rate.image_url || 'assets/images/placeholder.jpg'}" alt="${rate.title}">
-        <div class="tile-text">
-          <h2>${rate.title}</h2>
-          <p>${rate.description || ''}</p>
-          <p>
-            <strong>£${parseFloat(rate.price_ex_vat || 0).toFixed(2)} + VAT</strong> 
-            (£${parseFloat(rate.price_inc_vat || 0).toFixed(2)} inc VAT)
-          </p>
+  <div id="rate-info-modal" class="rate-info-modal" onclick="if(event.target === this) closeRateModal()">
+    <div class="rate-modal-content">
+      <button class="rate-modal-close" onclick="closeRateModal()">&times;</button>
+      <h2 id="rate-modal-title" style="margin-top:0; color:var(--primary-blue);">Service Details</h2>
+      <div id="rate-modal-body" style="margin: 20px 0; line-height: 1.7; color: #444; font-size: 1.05rem;">
         </div>
-      </div>
-    `;
-  }).join('');
-}
-loadPublicRates();
-</script>
-  
+      <button class="btn-read-more" onclick="closeRateModal()" style="width:100%; margin-top:10px;">Close Window</button>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    async function loadPublicRates() {
+      const lib = window.supabase || window.Supabase;
+      if (!lib) { setTimeout(loadPublicRates, 100); return; }
+
+      const db = lib.createClient(
+        'https://axampuprcnauxbbijmmt.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+      );
+
+      const { data: rates, error } = await db
+        .from('rates')
+        .select('*')
+        .eq('is_hidden', false)
+        .order('sort_order', { ascending: true });
+
+      if (error) return console.error("Error loading rates:", error);
+
+      const container = document.getElementById('rates-container');
+      if (!container) return;
+
+      container.innerHTML = rates.map((rate, index) => {
+        const sideClass = (index % 2 === 0) ? 'split-left' : 'split-right';
+        const delay = index * 100;
+        
+        const suspendedLabel = rate.is_suspended 
+          ? `<div class="suspended-overlay"><div class="suspended-ribbon">Currently Unavailable</div></div>` 
+          : '';
+
+        // Format Price Strings
+        const incVAT = parseFloat(rate.price_inc_vat || 0).toFixed(2);
+        const exVAT = parseFloat(rate.price_ex_vat || 0).toFixed(2);
+
+        // Determine Button Action
+        const btnAction = rate.read_more_type === 'link' 
+          ? `href="${rate.read_more_url}"` 
+          : `onclick="openRateModal('${rate.id}')"`;
+
+        return `
+          <div class="feature-tile ${sideClass} ${rate.is_suspended ? 'is-suspended' : ''} card visible" 
+               style="transition-delay: ${delay}ms;" 
+               id="rate-${rate.id}">
+            
+            ${suspendedLabel}
+            
+            <img src="${rate.image_url || 'assets/images/placeholder.jpg'}" alt="${rate.title}">
+            
+            <div class="tile-text">
+              <h2>${rate.title}</h2>
+              <p>${rate.description || ''}</p>
+              
+              <div class="price-container">
+                <span class="price-inc-bold">£${incVAT} <small>inc VAT</small></span>
+                <span class="price-ex-sub">(£${exVAT} ex VAT)</span>
+                <a ${btnAction} class="btn-read-more">Read More</a>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Attach DB to window for modal function access
+      window.publicDb = db;
+    }
+
+    /* MODAL FUNCTIONS */
+    window.openRateModal = async (id) => {
+      const { data } = await window.publicDb.from('rates').select('*').eq('id', id).single();
+      if (!data) return;
+
+      document.getElementById('rate-modal-title').textContent = data.title;
+      document.getElementById('rate-modal-body').innerHTML = data.read_more_content || 'Additional information will be available soon.';
+      document.getElementById('rate-info-modal').style.display = 'flex';
+      document.body.style.overflow = 'hidden'; // Prevent background scroll
+    };
+
+    window.closeRateModal = () => {
+      document.getElementById('rate-info-modal').style.display = 'none';
+      document.body.style.overflow = ''; 
+    };
+
+    loadPublicRates();
+  </script>
   
   <script src="assets/js/include.js"></script>
   <script src="assets/js/nav.js"></script>
