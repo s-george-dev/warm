@@ -1,4 +1,4 @@
-/* 1. GLOBAL FIXES */
+/* --- GLOBAL BASE --- */
 html, body {
   max-width: 100%;
   overflow-x: hidden;
@@ -6,8 +6,8 @@ html, body {
   padding: 0;
 }
 
-/* 2. HEADER BASE */
-.header {
+/* --- DESKTOP HEADER CONTAINER --- */
+#main-nav-bar.header {
   position: absolute;
   top: 20px;
   left: 0;
@@ -21,38 +21,40 @@ html, body {
   transition: opacity 0.4s ease, transform 0.4s ease;
   opacity: 0;
   transform: translateY(-12px);
+  display: block; /* Shown by default */
 }
 
-.header.loaded {
+#main-nav-bar.header.loaded {
   opacity: 1;
   transform: none;
 }
 
-.header-inner {
+#main-nav-bar .header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 15px;
 }
 
-/* 3. BRANDING */
-.brand {
+/* --- DESKTOP BRANDING --- */
+#main-nav-bar .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   background: #fff;
   padding: 5px 12px;
   border-radius: 8px;
+  text-decoration: none;
 }
-.brand img { height: 35px; width: auto; }
-.brand .title { font-weight: 700; color: var(--nav-background); font-size: 1rem; }
-.brand .sub { font-size: 0.85rem; color: var(--nav-background); }
 
-#headbrand { text-decoration: none; }
+#main-nav-bar .brand img { height: 35px; width: auto; }
+#main-nav-bar .brand .title { font-weight: 700; color: var(--nav-background); font-size: 1rem; white-space: nowrap; }
+#main-nav-bar .brand .sub { font-size: 0.85rem; color: var(--nav-background); }
+#main-nav-bar .brand-separator { width: 1px; height: 20px; background: #eee; margin-left: 10px; }
 
-/* 4. NAVIGATION & HIGHLIGHTING */
-.nav { display: flex; gap: 15px; align-items: center; }
-.nav a { 
+/* --- DESKTOP NAV LINKS --- */
+#main-nav-bar .nav { display: flex; gap: 15px; align-items: center; }
+#main-nav-bar .nav a { 
   color: #fff; 
   text-decoration: none; 
   font-weight: 600; 
@@ -62,14 +64,15 @@ html, body {
   transition: all 0.3s ease;
 }
 
-.nav a:hover, .nav a.active {
+#main-nav-bar .nav a:hover, 
+#main-nav-bar .nav a.active {
   color: #ffd166;
   border-bottom: 2px solid #ffd166;
 }
 
-/* 5. DROPDOWN (Desktop) */
-.dropdown { position: relative; }
-.dropdown-menu {
+/* --- DESKTOP DROPDOWNS --- */
+#main-nav-bar .dropdown { position: relative; }
+#main-nav-bar .dropdown-menu {
   display: none;
   position: absolute;
   top: 100%;
@@ -81,9 +84,10 @@ html, body {
   padding: 10px 0;
   z-index: 1200;
 }
-.dropdown:hover .dropdown-menu { display: block; }
 
-.dropdown-menu a {
+#main-nav-bar .dropdown:hover .dropdown-menu { display: block; }
+
+#main-nav-bar .dropdown-menu a {
   display: block;
   padding: 10px 16px;
   color: #0a2c66 !important;
@@ -91,57 +95,12 @@ html, body {
   border-bottom: 2px solid transparent !important;
 }
 
-.dropdown-menu a:hover, .dropdown-menu a.active {
+#main-nav-bar .dropdown-menu a:hover {
   background: rgba(10, 44, 102, 0.05);
   color: #ffd166 !important;
-  border-bottom: 2px solid #ffd166 !important;
 }
 
-/* 6. MOBILE OVERRIDES */
-@media (max-width: 800px) {
-  .nav { display: none !important; }
-  .header { top: 10px; width: 92%; }
-  
-  .menu-toggle {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 5px;
-    display: flex;
-    align-items: center;
-  }
-
-  .hamburger-icon, .hamburger-icon::before, .hamburger-icon::after {
-    background: #fff;
-  }
-}
-
-/* --- Floating Book Us Button - */
-.floating-book-btn {
-  position: fixed;
-  bottom: 25px;
-  right: 25px;
-  background-color: var(--highlight-amber) !important; 
-  color: #fff !important;
-  padding: 12px 24px;
-  border-radius: 50px;
-  font-weight: 700;
-  text-decoration: none;
-  z-index: 2000;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-  transition: all 0.3s ease;
-  display: block;
-}
-
-
-.floating-book-btn.at-bottom {
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 120px; /* Increased this to move it up slightly from the bottom edge */
-  width: 85%;
-  text-align: center;
-  border-radius: 8px;
-  padding: 16px;
-  font-size: 1.2rem;
+/* HIDE ON MOBILE */
+@media (max-width: 1024px) {
+  #main-nav-bar { display: none !important; }
 }

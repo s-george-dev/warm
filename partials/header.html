@@ -1,5 +1,5 @@
 <!-- partials/header.html -->
-<div class="header">
+<div id="main-nav-bar" class="header">
   <div class="container header-inner">
     <a id="headbrand"  href="/index.html">
 	<div class="brand">
@@ -51,21 +51,34 @@
       <a href="/book-a-visit.html">Book A Visit</a>
 	  <a href="/contact.html">Contact Us</a>
     </nav>
-
-    <button class="menu-toggle" aria-label="Toggle menu">
-  <span class="hamburger-wrapper">
-    <span class="hamburger-icon"></span>
-  </span>
-</button>
   </div>
   
+</div>
+
 
 
 
   <!-- Mobile Nav -->
+  
+  
+  
+  <div id="mobile-nav-bar">
+  <div class="mobile-bar-contents">
+    <button class="menu-toggle" aria-label="Toggle menu">
+      <span class="hamburger-wrapper">
+        <span class="hamburger-icon"></span>
+      </span>
+    </button>
+
+    <div class="mobile-brand-wrapper">
+      <span>Warm Right Ltd</span>
+      <img src="assets/images/logo.png" alt="Warm Right Logo">
+    </div>
+  </div>
+
   <div class="nav-overlay"></div>
   <div class="mobile-nav">
-    <div class="mobile-item"><a href="/index.html">Home</a></div>
+  <div class="mobile-item"><a href="/index.html">Home</a></div>
     <div class="mobile-item"><a href="/about.html">About Us</a></div>
 
     <!-- Services Mobile Dropdown -->
@@ -106,9 +119,6 @@
        <button class="call-btn mobile-call-btn" id="mobile-call-btn">
           📞 Call Us
        </button>
-	   
-    </div>
-
-  </div>
+     </div>
 </div>
-
+  </div>

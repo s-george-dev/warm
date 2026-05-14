@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ================================
-      BACK TO TOP BUTTON
+      SCROLL ANIMATIONS
   ================================== */
   let backToTop = document.querySelector('.back-to-top');
   if (!backToTop) {
@@ -40,6 +40,15 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       backToTop.classList.remove('show');
     }
+	const mobileToggle = document.querySelector('.menu-toggle');
+  if (mobileToggle) {
+    
+    if (document.body.scrollTop > 60) {
+      mobileToggle.classList.add('scrolled');
+    } else {
+      mobileToggle.classList.remove('scrolled');
+    }
+  }
   });
 
   backToTop.addEventListener('click', (e) => {

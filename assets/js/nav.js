@@ -212,6 +212,22 @@ window.initWarmRight = async function() {
       : "../assets/images/office-closed.jpg";
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   // Hamburger / Nav logic unchanged
   const menuToggle = document.querySelector('.menu-toggle');
   const mobileNav  = document.querySelector('.mobile-nav');
@@ -228,11 +244,22 @@ window.initWarmRight = async function() {
     };
   }
   document.querySelectorAll('.mobile-dropdown-button').forEach(btn => {
-    btn.onclick = () => {
-      const menu = btn.nextElementSibling;
-      if (menu && menu.classList.contains('mobile-dropdown-menu')) menu.classList.toggle('open');
-    };
-  });
+  btn.onclick = () => {
+    const menu = btn.nextElementSibling;
+    const isAlreadyOpen = menu.classList.contains('open');
+
+    // 1. Close ALL other mobile menus first
+    document.querySelectorAll('.mobile-dropdown-menu').forEach(m => {
+      m.classList.remove('open');
+    });
+
+    // 2. Only open this one if it wasn't already open 
+    // (This allows the user to click to close it as well)
+    if (!isAlreadyOpen && menu && menu.classList.contains('mobile-dropdown-menu')) {
+      menu.classList.add('open');
+    }
+  };
+});
 
   const callbackForm = document.getElementById("footer-callback-form");
   if (callbackForm) {
@@ -252,3 +279,12 @@ document.addEventListener("includesLoaded", () => {
     if (window.db) { window.initWarmRight(); clearInterval(checkDb); }
   }, 50);
 });
+
+// Ensure your toggle logic looks like this:
+/*
+menuToggle.onclick = (e) => {
+    e.stopPropagation();
+    mobileNav.classList.toggle('open'); // The CSS handles the movement
+    overlay.classList.toggle('open');
+};
+*/
