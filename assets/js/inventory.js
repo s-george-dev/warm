@@ -8,7 +8,14 @@ let locationsAdmin = [];
 let adminLocationView = "hierarchy";
 let editingLocationId = null;
 let currentLocationAdmin = null;
+let globalCachedTags = [];
+let globalCachedCategories = [];
+let activeSelectedAddTags = [];
+let activeSelectedEditTags = [];
 
+let editingTagTargetId = null;
+let editingCategoryTargetId = null;
+let isSubModalContextCall = false;
 
 /* =========================================================
     SETTINGS
@@ -51,8 +58,10 @@ async function loadInventorySettings() {
 ========================================================= */    
 
 function initInventory() {
-    initStatusIndicator();
-    loadInventorySettings();
+   initStatusIndicator();
+     loadInventorySettings();
+     reloadGlobalFormCaches(); // Preloads dynamic tags & category options
+     loadLocationsAdmin();     // Preloads central folder hierarchy map cache
     loadRootLocations();
     loadLocationDropdown();
 }
@@ -70,13 +79,15 @@ function showPage(pageId) {
     if (page) page.classList.add("active");
 
     // Activate corresponding tab
-    const tabMap = { 'pageItems': 'tab-items', 'pageLocations': 'tab-locations', 'pageSettings': 'tab-settings' };
+    const tabMap = { 'pageItems': 'tab-items', 'pageLocations': 'tab-locations', 'pageSettings': 'tab-settings', 'pageTags': 'tab-tags', 'pageCategories': 'tab-categories' };
     const tab = document.getElementById(tabMap[pageId]);
     if (tab) tab.classList.add("active");
 
     // Load data based on page
-    if (pageId === "pageItems") loadRootLocations();
-    if (pageId === "pageLocations") loadLocationsAdmin();
+   if (pageId === "pageItems") loadRootLocations();
+if (pageId === "pageLocations") loadLocationsAdmin();
+if (pageId === "pageTags") loadTagsAdmin();
+if (pageId === "pageCategories") loadCategoriesAdmin();
 }
 
 /* =========================================================
@@ -85,60 +96,54 @@ function showPage(pageId) {
 async function loadRootLocations() {
     currentLocationId = null;
     locationHistory = [];
-    document.getElementById("locationBackBtn").style.display = "none";
-    document.getElementById("breadcrumb").innerText = "Items";
+    
+    const container = document.getElementById("breadcrumb");
+    if (container) container.innerHTML = '<span class="breadcrumb-link active">Items</span>';
 
     const { data: realLocations } = await withStatus(
         () => window.db.from("locations").select("*").is("parent_id", null),
         "Loading folders..."
     );
 
-    // Save globally so the table view can read both folders and items
     currentBrowserLocations = [...(realLocations || []), { id: "unallocated", name: "Unallocated Items" }];
     currentBrowserItems = [];
-    
     renderLocations(currentBrowserLocations);
     renderItems(currentBrowserItems);
 }
 
 async function loadLocation(id) {
-    document.getElementById("locationBackBtn").style.display = "inline-block";
     const { data: loc } = await window.db.from("locations").select("*").eq("id", id).single();
     if (loc) buildBreadcrumb(loc);
 
     const { data: children } = await window.db.from("locations").select("*").eq("parent_id", id);
     const { data: items } = await window.db.from("items").select("*, photos(file_path)").eq("location_id", id);
 
-    // Save globally so the table view can merge them
     currentBrowserLocations = children || [];
     currentBrowserItems = items || [];
     
     renderLocations(currentBrowserLocations);
     renderItems(currentBrowserItems);
 }
-
 function navigateToLocation(id) {
     if (id === "unallocated") { 
         currentLocationId = "unallocated"; 
         loadUnallocatedItems(); 
         return; 
     }
-    if (currentLocationId && currentLocationId !== "unallocated") locationHistory.push(currentLocationId);
     currentLocationId = id;
     loadLocation(id);
 }
 
-function goBack() {
-    if (locationHistory.length === 0) { loadRootLocations(); return; }
-    currentLocationId = locationHistory.pop();
-    loadLocation(currentLocationId);
-}
-
 async function loadUnallocatedItems() {
-    document.getElementById("locationBackBtn").style.display = "inline-block";
-    document.getElementById("breadcrumb").innerText = "Items > Unallocated";
+    const container = document.getElementById("breadcrumb");
+    if (container) {
+        container.innerHTML = `
+            <span class="breadcrumb-link" onclick="loadRootLocations()">Items</span>
+            <span class="breadcrumb-separator"> > </span>
+            <span class="breadcrumb-link active">Unallocated Items</span>
+        `;
+    }
     
-    // Unallocated view has no folders, only items
     currentBrowserLocations = [];
     const { data: items } = await window.db.from("items").select("*, photos(file_path)").is("location_id", null);
     currentBrowserItems = items || [];
@@ -155,7 +160,42 @@ async function buildBreadcrumb(location) {
         if (parent) { chain.unshift(parent); parentId = parent.parent_id; } 
         else break;
     }
-    document.getElementById("breadcrumb").innerText = "Items > " + chain.map(l => l.name).join(" > ");
+
+    // Recalculate historical back-steps implicitly based on the active path node
+    locationHistory = chain.slice(0, -1).map(l => l.id);
+
+    const container = document.getElementById("breadcrumb");
+    if (!container) return;
+    container.innerHTML = "";
+
+    // 1. Append Base Root Node
+    const rootLink = document.createElement("span");
+    rootLink.className = "breadcrumb-link";
+    rootLink.textContent = "Items";
+    rootLink.onclick = () => loadRootLocations();
+    container.appendChild(rootLink);
+
+    // 2. Map Dynamic Intermediary Chain Nodes
+    chain.forEach((l, idx) => {
+        const sep = document.createElement("span");
+        sep.className = "breadcrumb-separator";
+        sep.textContent = " > ";
+        container.appendChild(sep);
+
+        const link = document.createElement("span");
+        link.className = "breadcrumb-link";
+        link.textContent = l.name;
+
+        if (idx === chain.length - 1) {
+            link.classList.add("active");
+        } else {
+            link.onclick = () => {
+                currentLocationId = l.id;
+                loadLocation(l.id);
+            };
+        }
+        container.appendChild(link);
+    });
 }
 /* =========================================================
    MANAGEMENT LOGIC (ADMIN)
@@ -180,43 +220,69 @@ function refreshLocationAdmin() {
 
 function loadRootLocationsAdmin() {
     currentLocationAdmin = null;
-    document.getElementById("breadcrumbLocations").textContent = "Locations";
-    document.getElementById("locationBackBtnAdmin").style.display = "none";
+    const container = document.getElementById("breadcrumbLocations");
+    if (container) container.innerHTML = '<span class="breadcrumb-link active">Locations</span>';
     renderLocationTilesAdmin(locationsAdmin.filter(l => !l.parent));
 }
 
 function loadLocationAdmin(id) {
     currentLocationAdmin = id;
-    document.getElementById("breadcrumbLocations").textContent = buildLocationPath(id);
-    document.getElementById("locationBackBtnAdmin").style.display = "inline-block";
+    buildAdminBreadcrumb(id);
     renderLocationTilesAdmin(locationsAdmin.filter(l => l.parent === id));
-}
-
-function goBackLocationAdmin() {
-    if (!currentLocationAdmin) return loadRootLocationsAdmin();
-    const loc = locationsAdmin.find(l => l.id === currentLocationAdmin);
-    if (!loc || !loc.parent) return loadRootLocationsAdmin();
-    loadLocationAdmin(loc.parent);
 }
 
 function loadFlatLocationsAdmin() {
     currentLocationAdmin = null;
-    document.getElementById("breadcrumbLocations").textContent = "All Locations";
-    document.getElementById("locationBackBtnAdmin").style.display = "none";
+    const container = document.getElementById("breadcrumbLocations");
+    if (container) {
+        container.innerHTML = `
+            <span class="breadcrumb-link" onclick="loadRootLocationsAdmin()">Locations</span>
+            <span class="breadcrumb-separator"> > </span>
+            <span class="breadcrumb-link active">All Locations</span>
+        `;
+    }
     const list = locationsAdmin.map(l => ({ ...l, fullPath: buildLocationPath(l.id) })).sort((a, b) => a.fullPath.localeCompare(b.fullPath));
     renderLocationTilesAdmin(list);
 }
 
-function buildLocationPath(id) {
+function buildAdminBreadcrumb(id) {
+    const container = document.getElementById("breadcrumbLocations");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const rootLink = document.createElement("span");
+    rootLink.className = "breadcrumb-link";
+    rootLink.textContent = "Locations";
+    rootLink.onclick = () => loadRootLocationsAdmin();
+    container.appendChild(rootLink);
+
     let loc = locationsAdmin.find(l => l.id === id);
-    if (!loc) return "";
-    const parts = [loc.name];
+    if (!loc) return;
+
+    let chain = [loc];
     while (loc.parent) {
         loc = locationsAdmin.find(l => l.id === loc.parent);
         if (!loc) break;
-        parts.unshift(loc.name);
+        chain.unshift(loc);
     }
-    return parts.join(" > ");
+
+    chain.forEach((l, idx) => {
+        const sep = document.createElement("span");
+        sep.className = "breadcrumb-separator";
+        sep.textContent = " > ";
+        container.appendChild(sep);
+
+        const link = document.createElement("span");
+        link.className = "breadcrumb-link";
+        link.textContent = l.name;
+
+        if (idx === chain.length - 1) {
+            link.classList.add("active");
+        } else {
+            link.onclick = () => loadLocationAdmin(l.id);
+        }
+        container.appendChild(link);
+    });
 }
 
 /* =========================================================
@@ -376,27 +442,38 @@ function renderLocationTilesAdmin(list) {
 async function addItem() {
     const name = document.getElementById("itemName").value;
     const quantity = parseInt(document.getElementById("itemQuantity").value) || 0;
-    const selectEl = document.getElementById("itemLocationSelect");
-    
-    // Convert an empty selection "" into a proper database null
-    const location_id = selectEl.value === "" ? null : selectEl.value;
+    const location_id = document.getElementById("itemLocationSelect").value || null;
+    const description = document.getElementById("itemDescription").value;
+    const category = document.getElementById("itemCategorySelect").value || 'tools';
+    const photoFile = document.getElementById("addItemPhotoInput").files[0];
 
     if (!name) return alert("Please enter an item name");
 
-    const { error } = await withStatus(
-        () => window.db.from("items").insert([{ name, quantity, location_id }]),
+    // We add .select() here to get back the newly created item's ID row parameters
+    const { data, error } = await withStatus(
+        () => window.db.from("items").insert([{ 
+            name, quantity, location_id, description, category, tags: activeSelectedAddTags 
+        }]).select(),
         "Adding new item..."
     );
 
-    if (!error) {
-        closeAddItemModal();
-        
-        // Refresh the layout based on where the user currently is
-        if (currentLocationId) {
-            loadLocation(currentLocationId);
-        } else {
-            loadRootLocations();
+    if (!error && data && data.length > 0) {
+        const newItemId = data[0].id;
+
+        // Handle binary file upload to the storage bucket if selected
+        if (photoFile) {
+            const fileName = `item-${newItemId}-${Date.now()}`;
+            const { error: uploadError } = await window.db.storage.from("item-photos").upload(fileName, photoFile);
+            
+            if (!uploadError) {
+                // Link the successfully uploaded storage file into the relational database photos table
+                await window.db.from("photos").insert([{ item_id: newItemId, file_path: fileName }]);
+            }
         }
+
+        closeAddItemModal();
+        if (currentLocationId) loadLocation(currentLocationId);
+        else loadRootLocations();
     }
 }
 
@@ -493,8 +570,8 @@ async function switchToItemEdit() {
     document.getElementById("editItemCategory").value = item.category || "tools";
 
     // Turn array format parameters into a comma separated layout for input editing
-    if (Array.isArray(item.tags)) document.getElementById("editItemTags").value = item.tags.join(", ");
-    else document.getElementById("editItemTags").value = item.tags || "";
+ activeSelectedEditTags = Array.isArray(item.tags) ? [...item.tags] : (item.tags ? [item.tags] : []);
+renderActiveTagPills('edit');
 
     // Sync active location dropdown items list choice parameters
     const { data } = await window.db.from("locations").select("id, name");
@@ -551,7 +628,7 @@ async function saveItemEdits() {
         barcode: document.getElementById("editItemBarcode").value,
         nfc_tag: document.getElementById("editItemNFC").value,
         category: document.getElementById("editItemCategory").value,
-        tags: tagsArray
+        tags: activeSelectedEditTags
     };
 
     // 3. PERSIST ITEM TEXT ATTRIBUTES
@@ -598,20 +675,19 @@ function deleteItemPhoto() {
    MODAL CONTROLS
 ========================================================= */
 function openAddItemModal() { 
-    // 1. Reset text inputs so it's clean for the next item
     document.getElementById("itemName").value = "";
     document.getElementById("itemQuantity").value = "";
+    document.getElementById("itemDescription").value = "";
     
-    // 2. Automatically select the active folder location in the dropdown list
+    // Clear the picture file queues and reset back to the generic avatar asset
+    document.getElementById("addItemPhotoInput").value = "";
+    document.getElementById("addItemPreview").src = "../assets/images/no-image.jpg";
+    
+    activeSelectedAddTags = []; 
+    renderActiveTagPills('add');
+    
     const selectEl = document.getElementById("itemLocationSelect");
-    if (selectEl) {
-        if (currentLocationId && currentLocationId !== "unallocated") {
-            selectEl.value = currentLocationId;
-        } else {
-            selectEl.value = ""; // Default to "No Location" if at root or unallocated
-        }
-    }
-    
+    if (selectEl) selectEl.value = (currentLocationId && currentLocationId !== "unallocated") ? currentLocationId : "";
     document.getElementById("addItemModal").style.display = "flex"; 
 }
 
@@ -909,4 +985,433 @@ function initResizableColumns(table) {
             document.addEventListener("mouseup", onMouseUp);
         });
     });
+}
+/* =========================================================
+   DYNAMIC TAGS & CATEGORIES MANAGEMENT SYSTEM
+========================================================= */
+
+// 1. DYNAMIC DROPDOWNS POPULATOR CACHE
+async function reloadGlobalFormCaches() {
+    const { data: tData } = await window.db.from("tags").select("*").order("name");
+    const { data: cData } = await window.db.from("item_categories").select("*").order("name");
+    
+    globalCachedTags = tData || [];
+    globalCachedCategories = cData || [];
+
+    // Map targets to Add/Edit Select containers
+    const addCat = document.getElementById("itemCategorySelect");
+    const editCat = document.getElementById("editItemCategory");
+    const catHtml = globalCachedCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join("");
+    if (addCat) addCat.innerHTML = catHtml;
+    if (editCat) editCat.innerHTML = catHtml;
+
+    const addTagSel = document.getElementById("itemTagSelect");
+    const editTagSel = document.getElementById("editItemTagSelect");
+    const tagHtml = '<option value="" selected disabled>Select a tag...</option>' + 
+                    globalCachedTags.map(t => `<option value="${t.name}">${t.name}</option>`).join("");
+    if (addTagSel) addTagSel.innerHTML = tagHtml;
+    if (editTagSel) editTagSel.innerHTML = tagHtml;
+}
+
+// 2. PILL BADGE BADGES CONTROLLER UI EVENT
+function handleTagSelection(mode, tagName) {
+    if (!tagName) return;
+    const targetArray = mode === 'add' ? activeSelectedAddTags : activeSelectedEditTags;
+    
+    if (!targetArray.includes(tagName)) {
+        targetArray.push(tagName);
+        renderActiveTagPills(mode);
+    }
+    
+    // Clear selection row index
+    document.getElementById(mode === 'add' ? "itemTagSelect" : "editItemTagSelect").value = "";
+}
+
+function removeSelectedTagBadge(mode, tagName) {
+    if (mode === 'add') {
+        activeSelectedAddTags = activeSelectedAddTags.filter(t => t !== tagName);
+    } else {
+        activeSelectedEditTags = activeSelectedEditTags.filter(t => t !== tagName);
+    }
+    renderActiveTagPills(mode);
+}
+
+function renderActiveTagPills(mode) {
+    const container = document.getElementById(mode === 'add' ? "addItemTagsPillsRow" : "editItemTagsPillsRow");
+    const targetArray = mode === 'add' ? activeSelectedAddTags : activeSelectedEditTags;
+    container.innerHTML = "";
+
+    targetArray.forEach(tag => {
+        const pill = document.createElement("span");
+        pill.className = "tag-pill";
+        pill.style.cssText = "display:inline-flex; align-items:center; gap:6px; background:#e0f2fe; border-color:#bae6fd; color:#0369a1;";
+        pill.innerHTML = `${tag} <b style="cursor:pointer; color:#ef4444;">&times;</b>`;
+        pill.querySelector("b").onclick = () => removeSelectedTagBadge(mode, tag);
+        container.appendChild(pill);
+    });
+}
+
+// 3. CENTRAL TAG ACTIONS PANELS RENDERING
+async function loadTagsAdmin() {
+    const { data } = await window.db.from("tags").select("*").order("name");
+    const tbody = document.getElementById("centralTagsTableBody");
+    tbody.innerHTML = "";
+    
+    if(!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:#999; font-style:italic; padding:20px;">No tags in registry</td></tr>`;
+        return;
+    }
+    data.forEach(t => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td style="font-weight:600; color:#333;">${t.name}</td>
+            <td style="text-align:right; padding-right:15px;">
+                <button class="btn-outline" style="padding:4px 10px; font-size:12px; margin-right:6px;" onclick="openTagModal(false, '${t.id}', '${t.name}')">Edit</button>
+                <button class="btn-danger" style="padding:4px 10px; font-size:12px;" onclick="deleteCentralTag('${t.id}')">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function openTagModal(isSubCall = false, id = null, name = '') {
+    isSubModalContextCall = isSubCall;
+    editingTagTargetId = id;
+    document.getElementById("tagModalTitle").textContent = id ? "Modify Tag Name" : "Add New Tag Label";
+    document.getElementById("tagModalInput").value = name;
+    document.getElementById("centralTagModal").style.display = "flex";
+}
+
+async function saveCentralTag() {
+    const name = document.getElementById("tagModalInput").value.trim();
+    if (!name) return alert("Please enter a tag label designation.");
+
+    let response;
+    if (editingTagTargetId) {
+        response = await window.db.from("tags").update({ name }).eq("id", editingTagTargetId);
+    } else {
+        response = await window.db.from("tags").insert([{ name }]);
+    }
+
+    if (!response.error) {
+        closeModal('centralTagModal');
+        await reloadGlobalFormCaches();
+        if (isSubModalContextCall) {
+            // Automatically push directly into active item creation arrays if created inline
+            const currentActiveMode = document.getElementById("itemEditModal").style.display === 'flex' ? 'edit' : 'add';
+            handleTagSelection(currentActiveMode, name);
+        } else {
+            loadTagsAdmin();
+        }
+    } else {
+        alert("Action failed: Value identifier might already exist.");
+    }
+}
+
+async function deleteCentralTag(id) {
+    if (!confirm("Are you sure? Removing this tag will strip it from any item that uses it.")) return;
+    const { error } = await window.db.from("tags").delete().eq("id", id);
+    if (!error) { await reloadGlobalFormCaches(); loadTagsAdmin(); }
+}
+
+// 4. CENTRAL CATEGORY ACTIONS PANELS RENDERING
+async function loadCategoriesAdmin() {
+    const { data } = await window.db.from("item_categories").select("*").order("name");
+    const tbody = document.getElementById("centralCategoriesTableBody");
+    tbody.innerHTML = "";
+    
+    if(!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:#999; font-style:italic; padding:20px;">No categories in registry</td></tr>`;
+        return;
+    }
+    data.forEach(c => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td style="font-weight:600; color:#333;">${c.name}</td>
+            <td style="text-align:right; padding-right:15px;">
+                <button class="btn-outline" style="padding:4px 10px; font-size:12px; margin-right:6px;" onclick="openCategoryModal(false, '${c.id}', '${c.name}')">Edit</button>
+                <button class="btn-danger" style="padding:4px 10px; font-size:12px;" onclick="deleteCentralCategory('${c.id}')">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function openCategoryModal(isSubCall = false, id = null, name = '') {
+    isSubModalContextCall = isSubCall;
+    editingCategoryTargetId = id;
+    document.getElementById("categoryModalTitle").textContent = id ? "Modify Category Classification" : "Add New Item Category";
+    document.getElementById("categoryModalInput").value = name;
+    document.getElementById("centralCategoryModal").style.display = "flex";
+}
+
+async function saveCentralCategory() {
+    const name = document.getElementById("categoryModalInput").value.trim();
+    if (!name) return alert("Please specify classification name parameter.");
+
+    let response;
+    if (editingCategoryTargetId) {
+        response = await window.db.from("item_categories").update({ name }).eq("id", editingCategoryTargetId);
+    } else {
+        response = await window.db.from("item_categories").insert([{ name }]);
+    }
+
+    if (!response.error) {
+        closeModal('centralCategoryModal');
+        await reloadGlobalFormCaches();
+        if (isSubModalContextCall) {
+            const targetSelId = document.getElementById("itemEditModal").style.display === 'flex' ? "editItemCategory" : "itemCategorySelect";
+            document.getElementById(targetSelId).value = name;
+        } else {
+            loadCategoriesAdmin();
+        }
+    } else {
+        alert("Action failed: Classification value identifier matches existing record entry.");
+    }
+}
+
+async function deleteCentralCategory(id) {
+    if (!confirm("Are you sure you want to drop this classification option?")) return;
+    const { error } = await window.db.from("item_categories").delete().eq("id", id);
+    if (!error) { await reloadGlobalFormCaches(); loadCategoriesAdmin(); }
+}
+/* =========================================================
+   ADVANCED SEGMENTED SEARCH & HARDWARE SCAN INTERCEPTOR
+========================================================= */
+
+// 1. ADVANCED SEGMENTED MULTI-CRITERIA SEARCH ENGINE
+async function handleGlobalSearch(term) {
+    if (!term.trim()) { 
+        // If search bar empty, instantly reset back to active directory context
+        if (currentLocationId) loadLocation(currentLocationId);
+        else loadRootLocations();
+        return; 
+    }
+
+    const filterType = document.getElementById("searchTypeFilter")?.value || "all";
+    document.getElementById("breadcrumb").innerHTML = `Search Results for <span style="color:#ff8c00;">"${term}"</span>`;
+
+    // Fetch the items array with image references
+    const { data: items } = await window.db.from("items").select("*, photos(file_path)");
+    if (!items) return;
+
+    // Define the sectioned storage categories buckets
+    const sections = { name: [], location: [], tag: [], category: [] };
+    const lowerTerm = term.toLowerCase();
+
+    items.forEach(item => {
+        const nameMatches = item.name?.toLowerCase().includes(lowerTerm);
+        
+        // Resolve the parent directory path via our global locations list hierarchy cache
+        const locationPath = item.location_id ? buildLocationPath(item.location_id).toLowerCase() : "unallocated items";
+        const locationMatches = locationPath.includes(lowerTerm);
+
+        // Check JSONB Array tags references
+        let tagMatches = false;
+        if (Array.isArray(item.tags)) tagMatches = item.tags.some(t => t.toLowerCase().includes(lowerTerm));
+        else if (typeof item.tags === 'string') tagMatches = item.tags.toLowerCase().includes(lowerTerm);
+
+        const categoryMatches = item.category?.toLowerCase().includes(lowerTerm);
+        const barcodeMatches = item.barcode?.toLowerCase() === lowerTerm || item.barcode?.toLowerCase().includes(lowerTerm);
+
+        // Map data rows onto matching criteria buckets depending on active filter mode choices
+        if ((filterType === "all" || filterType === "name") && nameMatches) sections.name.push(item);
+        if ((filterType === "all" || filterType === "location") && locationMatches) sections.location.push(item);
+        if ((filterType === "all" || filterType === "tag") && tagMatches) sections.tag.push(item);
+        if ((filterType === "all" || filterType === "category") && categoryMatches) sections.category.push(item);
+        if (filterType === "barcode" && barcodeMatches) sections.name.push(item); // Fallback to name group for explicit codes
+    });
+
+    renderSectionedSearchResults(sections);
+}
+
+// 2. LAYOUT ADAPTIVE SEGMENTED RESULTS RENDERER
+function renderSectionedSearchResults(sections) {
+    const container = document.getElementById("itemTiles");
+    const tableContainer = document.getElementById("itemsTableWrapper");
+    const folderContainer = document.getElementById("locationTiles");
+    
+    if (folderContainer) folderContainer.innerHTML = ""; // Clear active navigation folders during searches
+    container.innerHTML = "";
+    tableContainer.innerHTML = "";
+
+    const isListView = userSettings.view === 'list';
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "width: 100%; text-align: left;";
+
+    const headersMap = {
+        name: "Items (by name)",
+        location: "Items (by location)",
+        tag: "Items (by tag)",
+        category: "Items (by category)"
+    };
+
+    Object.keys(sections).forEach(key => {
+        const matchingArray = sections[key];
+
+        // Section Title Label
+        const sectionHeader = document.createElement("h4");
+        sectionHeader.style.cssText = "margin: 25px 0 10px 0; color: #004a99; border-bottom: 2px solid #edf2f7; padding-bottom: 6px; font-size: 15px; font-weight: 700;";
+        sectionHeader.textContent = headersMap[key];
+        wrapper.appendChild(sectionHeader);
+
+        if (matchingArray.length === 0) {
+            const emptyLabel = document.createElement("div");
+            emptyLabel.style.cssText = "color: #999; font-style: italic; padding: 10px 0; font-size: 13px;";
+            emptyLabel.textContent = "No results!";
+            wrapper.appendChild(emptyLabel);
+        } else {
+            if (isListView) {
+                // Construct compact data rows list table layout for search results
+                const segmentTableWrap = document.createElement("div");
+                segmentTableWrap.className = "items-table-wrapper";
+                segmentTableWrap.style.cssText = "display: block; margin-top: 5px; margin-bottom: 15px;";
+                segmentTableWrap.innerHTML = `
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 45%;">Name</th>
+                                <th style="width: 15%;">Quantity</th>
+                                <th style="width: 20%;">Barcode</th>
+                                <th style="width: 20%;">NFC Tag</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                `;
+                const tbody = segmentTableWrap.querySelector("tbody");
+                matchingArray.forEach(item => {
+                    const tr = document.createElement("tr");
+                    tr.style.cursor = "pointer";
+                    tr.onclick = () => openItemDetails(item);
+                    tr.innerHTML = `
+                        <td style="font-weight:600;">🔹 ${item.name}</td>
+                        <td>${item.quantity}</td>
+                        <td>${item.barcode || '—'}</td>
+                        <td>${item.nfc_tag || '—'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                wrapper.appendChild(segmentTableWrap);
+            } else {
+                // Construct normal adaptive picture card grid layout blocks
+                const gridBlock = document.createElement("div");
+                gridBlock.className = "items-grid";
+                gridBlock.style.margin = "8px 0 20px 0";
+                
+                matchingArray.forEach(item => {
+                    const card = document.createElement("div");
+                    card.className = "item-card";
+                    let imgUrl = "../assets/images/avatar-default.avif";
+                    if (item.photos?.length) imgUrl = window.db.storage.from("item-photos").getPublicUrl(item.photos[0].file_path).data.publicUrl;
+                    card.innerHTML = `
+                        <div class="item-card-photo-wrapper"><img src="${imgUrl}"></div>
+                        <div class="item-card-qty-badge">Qty: ${item.quantity}</div>
+                        <div class="item-card-cog" onclick="openItemActions(event, '${item.id}')">⚙️</div>
+                        <div class="item-card-name">${item.name}</div>
+                    `;
+                    card.onclick = () => openItemDetails(item);
+                    gridBlock.appendChild(card);
+                });
+                wrapper.appendChild(gridBlock);
+            }
+        }
+    });
+
+    if (isListView) tableContainer.appendChild(wrapper);
+    else container.appendChild(wrapper);
+}
+
+// 3. HARDWARE SCANNER ROUTING ENGINE (AUTO REDIRECTION & LEAPING)
+async function executeDirectBarcodeLookup(scannedCodeString) {
+    if (!scannedCodeString || !scannedCodeString.trim()) return;
+    const cleanToken = scannedCodeString.trim();
+
+    // Query across all system items configurations mapping parameters
+    const { data: items } = await window.db.from("items").select("*, photos(file_path)");
+    if (!items) return;
+
+    // Cross reference by exact token against barcode and hardware tag columns
+    const match = items.find(item => 
+        (item.barcode && item.barcode.trim() === cleanToken) || 
+        (item.nfc_tag && item.nfc_tag.trim() === cleanToken)
+    );
+
+    if (!match) {
+        alert(`Hardware Lookup Link Failure: No items found matching signature [ ${cleanToken} ]`);
+        return;
+    }
+
+    // Direct automated leaping injection tree routing logic parameters
+    if (match.location_id) {
+        currentLocationId = match.location_id;
+        await loadLocation(match.location_id);
+    } else {
+        currentLocationId = "unallocated";
+        await loadUnallocatedItems();
+    }
+
+    // Pop open details preview presentation drawer instantly
+    openItemDetails(match);
+}
+
+// 4. HARDWARE CAMERA VIEWPORT HARDWARE PORTAL STREAM CONTROLS
+let cameraStreamReferenceObject = null;
+
+let html5QrcodeScannerInstance = null;
+let isProcessingScan = false; // State lock flag to stop alert looping
+
+function openBarcodeScannerModal() {
+    document.getElementById("simulatedBarcodeInput").value = "";
+    document.getElementById("barcodeScannerModal").style.display = "flex";
+    isProcessingScan = false; // Reset the state lock on launch
+
+    html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
+
+    const config = { 
+        fps: 15,
+        qrbox: { width: 260, height: 160 },
+        aspectRatio: 1.333333
+    };
+
+    html5QrcodeScannerInstance.start(
+        { facingMode: "environment" }, 
+        config,
+        (decodedText) => {
+            // 1. If a frame is already processing, ignore all other incoming frames
+            if (isProcessingScan) return;
+            isProcessingScan = true; // Engage lock immediately
+
+            document.getElementById("globalSearchInput").value = decodedText;
+            document.getElementById("searchTypeFilter").value = "barcode";
+            
+            closeBarcodeScannerModal();
+            executeDirectBarcodeLookup(decodedText); 
+        },
+        (errorMessage) => {
+            // Leave blank to keep console quiet during focus seeking
+        }
+    ).catch(err => {
+        console.warn("Hardware media source connection failure: ", err);
+        // Alert developer if mobile camera is being blocked by unsecure HTTP testing
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+            alert("Camera Blocked: Mobile browsers require an HTTPS secure connection to open device camera streams.");
+        }
+    });
+}
+
+function closeBarcodeScannerModal() {
+    document.getElementById("barcodeScannerModal").style.display = "none";
+    
+    if (html5QrcodeScannerInstance) {
+        html5QrcodeScannerInstance.stop().then(() => {
+            html5QrcodeScannerInstance = null;
+            document.getElementById("scannerReaderContainer").innerHTML = ""; // Wipe residue
+            isProcessingScan = false; // Release lock only after stream is dead
+        }).catch(err => {
+            console.warn("Forced device stream hardware release override: ", err);
+            html5QrcodeScannerInstance = null;
+            isProcessingScan = false;
+        });
+    }
 }
