@@ -233,6 +233,7 @@
                     </select>
                 </div>
                 <div class="search-box" style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                    <input type="text" id="globalSearchInput" placeholder="Type name, tag, or scan code to search..." oninput="handleGlobalSearch(this.value)" style="margin-bottom: 0; flex-grow: 1;">
     <select id="searchTypeFilter" onchange="handleGlobalSearch(document.getElementById('globalSearchInput').value)" style="width: auto; margin-bottom: 0; padding: 10px 14px; border-radius: 8px; font-weight: 600;">
         <option value="all" selected>Search All</option>
         <option value="name">Items (By Name)</option>
@@ -241,7 +242,7 @@
         <option value="barcode">Barcode ID</option>
     </select>
 
-    <input type="text" id="globalSearchInput" placeholder="Type name, tag, or scan code to search..." oninput="handleGlobalSearch(this.value)" style="margin-bottom: 0; flex-grow: 1;">
+    
     
     <button class="btn-outline" id="barcodeScanBtn" onclick="openBarcodeScannerModal()" style="height: 42px; padding: 0 16px; border-radius: 8px; display: flex; align-items: center; gap: 6px; font-weight: 600;">📷 Scan</button>
 </div>
@@ -294,16 +295,24 @@
         </div>
     </div>
 
-    <div id="addItemModal" class="modal">
+    <!--Add Item Modal -->
+
+   <div id="addItemModal" class="modal">
     <div class="modal-content" style="max-width: 500px;">
         <h3>Add New Item</h3>
-        <div class="item-edit-photo" style="text-align: center; margin-bottom: 15px;">
-    <img id="addItemPreview" src="../assets/images/no-image.jpg" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
-    <div style="margin-top: 8px;">
-        <input type="file" id="addItemPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'addItemPreview')">
-        <button class="btn-outline" style="font-size: 12px;" onclick="document.getElementById('addItemPhotoInput').click()">Change Picture</button>
-    </div>
-</div>
+        
+        <label>Item Photos</label>
+        <div id="addItemPreviewsRow" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 80px; align-items: center;">
+            <img src="../assets/images/no-image.jpg" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <input type="file" id="addItemPhotoInput" accept="image/*" multiple style="display: none;" onchange="handleMultipleFilesSelection(this, 'addItemPreviewsRow', 'add-item')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemPhotoInput').click()">📁 Upload Photos</button>
+            
+            <input type="file" id="addItemCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleMultipleFilesSelection(this, 'addItemPreviewsRow', 'add-item')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemCameraInput').click()">📷 Take Photo</button>
+        </div>
+
         <label>Item Name</label>
         <input id="itemName" placeholder="Name">
         
@@ -315,6 +324,17 @@
 
         <label>Description</label>
         <textarea id="itemDescription" placeholder="Enter custom item details..." rows="3"></textarea>
+
+        <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+            <div style="flex-grow: 1;">
+                <label>Barcode ID</label>
+                <input id="addItemBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openBarcodeScannerModal('addItemBarcode')">📷 Scan</button>
+        </div>
+
+        <label>NFC Identity Tag</label>
+        <input id="addItemNFC" type="text" placeholder="Scan NFC Tag String">
 
         <label>Category Group</label>
         <div style="display: flex; gap: 8px;">
@@ -335,6 +355,167 @@
         </div>
     </div>
 </div>
+
+<div id="itemEditModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <h3>Edit Item Details</h3>
+        
+        <label>Item Photos</label>
+        <div id="editItemPreviewsRow" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 80px; align-items: center;"></div>
+        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <input type="file" id="editItemPhotoInput" accept="image/*" multiple style="display: none;" onchange="handleMultipleFilesSelection(this, 'editItemPreviewsRow', 'edit-item')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editItemPhotoInput').click()">📁 Upload Photos</button>
+            
+            <input type="file" id="editItemCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleMultipleFilesSelection(this, 'editItemPreviewsRow', 'edit-item')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editItemCameraInput').click()">📷 Take Photo</button>
+        </div>
+
+        <label>Item Name</label>
+        <input id="editItemName" type="text">
+
+        <label>Quantity</label>
+        <input id="editItemQuantity" type="number">
+
+        <label>Location Placement Folder</label>
+        <select id="editItemLocationSelect"></select>
+
+        <label>Description</label>
+        <textarea id="editItemDescription" rows="3"></textarea>
+
+        <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+            <div style="flex-grow: 1;">
+                <label>Barcode</label>
+                <input id="editItemBarcode" type="text" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openBarcodeScannerModal('editItemBarcode')">📷 Scan</button>
+        </div>
+
+        <label>NFC Identity Tag</label>
+        <input id="editItemNFC" type="text">
+
+        <label>Category Group</label>
+        <div style="display: flex; gap: 8px;">
+            <select id="editItemCategory" style="margin-bottom: 0;"></select>
+            <button class="btn-outline" style="height: 42px; padding: 10px 14px;" onclick="openCategoryModal(true)">+</button>
+        </div>
+
+        <label style="margin-top: 15px;">Tags</label>
+        <div style="display: flex; gap: 8px;">
+            <select id="editItemTagSelect" style="margin-bottom: 0;" onchange="handleTagSelection('edit', this.value)"></select>
+            <button class="btn-outline" style="height: 42px; padding: 10px 14px;" onclick="openTagModal(true)">+</button>
+        </div>
+        <div id="editItemTagsPillsRow" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; margin-bottom: 10px;"></div>
+
+        <div class="modal-buttons" style="margin-top: 25px; justify-content: space-between;">
+            <button class="btn-danger" onclick="attemptDeleteItem()">Delete Item</button>
+            <div>
+                <button class="btn-outline" onclick="confirmCancel('itemEditModal')">Cancel</button>
+                <button class="btn-primary" onclick="saveItemEdits()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="addLocationModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <h3>Add Location Hierarchy</h3>
+        
+        <label>Location Photo</label>
+        <div id="addLocationPreviewsRow" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 80px; align-items: center;">
+            <img id="addLocationPreview" src="../assets/images/folder-icon.jpg" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <input type="file" id="addLocationPhotoInput" accept="image/*" multiple style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview', 'add')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationPhotoInput').click()">📁 Upload Photo</button>
+            
+            <input type="file" id="addLocationCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview', 'add')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationCameraInput').click()">📷 Take Photo</button>
+        </div>
+
+        <label>Location Name</label>
+        <input id="addLocationName" placeholder="Enter location name" type="text">
+        
+        <label>Description</label>
+        <textarea id="addLocationDescription" placeholder="Enter custom folder description..." rows="3"></textarea>
+
+        <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+            <div style="flex-grow: 1;">
+                <label>Barcode ID</label>
+                <input id="addLocationBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openBarcodeScannerModal('addLocationBarcode')">📷 Scan</button>
+        </div>
+
+        <label>NFC Identity Tag</label>
+        <input id="addLocationNFC" type="text" placeholder="Scan NFC Tag String">
+
+        <label>Category Group</label>
+        <select id="addLocationCategory">
+            <option value="storage">Storage</option>
+            <option value="vehicle">Vehicle</option>
+            <option value="site">Job Site</option>
+        </select>
+
+        <div class="modal-buttons" style="margin-top: 20px;">
+            <button class="btn-outline" onclick="confirmCancel('addLocationModal')">Cancel</button>
+            <button class="btn-primary" onclick="addLocation()">Create Folder</button>
+        </div>
+    </div>
+</div>
+
+<div id="locationActionsModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <h3>Location Settings</h3>
+        <div id="locationActionsName" style="font-weight: bold; margin-bottom: 15px; color: #004a99;"></div>
+
+        <label>Location Photo</label>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 80px; align-items: center;">
+            <img id="editLocationPreview" src="../assets/images/folder-icon.jpg" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <input type="file" id="editLocationPhotoInput" accept="image/*" multiple style="display: none;" onchange="previewLocationImage(this, 'editLocationPreview', 'edit')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editLocationPhotoInput').click()">📁 Change Photo</button>
+            
+            <input type="file" id="editLocationCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewLocationImage(this, 'editLocationPreview', 'edit')">
+            <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editLocationCameraInput').click()">📷 Take Photo</button>
+            <button class="btn-danger" style="font-size: 13px; padding: 5px 12px;" onclick="deleteLocationPhoto()">Remove</button>
+        </div>
+
+        <label>Location Name</label>
+        <input id="editLocationName" type="text">
+        
+        <label>Description</label>
+        <textarea id="editLocationDescription" rows="3"></textarea>
+
+        <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+            <div style="flex-grow: 1;">
+                <label>Barcode</label>
+                <input id="editLocationBarcode" type="text" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openBarcodeScannerModal('editLocationBarcode')">📷 Scan</button>
+        </div>
+
+        <label>NFC Tag</label>
+        <input id="editLocationNFC" type="text">
+
+        <label>Category</label>
+        <select id="editLocationCategory">
+            <option value="storage">Storage</option>
+            <option value="vehicle">Vehicle</option>
+            <option value="site">Job Site</option>
+        </select>
+
+        <div class="modal-buttons" style="margin-top: 20px; justify-content: space-between;">
+            <button class="btn-danger" onclick="attemptDeleteLocation()">Delete Location</button>
+            <div>
+                <button class="btn-outline" onclick="confirmCancel('locationActionsModal')">Cancel</button>
+                <button class="btn-primary" onclick="saveLocationEdits()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
     <div id="itemDetailsModal" class="modal">
     <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden; border-radius: 16px;">
         <div style="width: 100%; aspect-ratio: 16/10; background: #f0f2f5; position: relative;">
@@ -365,74 +546,18 @@
             </div>
 
             <div class="modal-buttons" style="margin-top: 25px;">
-                <button class="btn-outline" onclick="closeModal('itemDetailsModal')">Close</button>
+                
                 <button class="btn-primary" onclick="switchToItemEdit()">Edit Item</button>
+                <button class="btn-outline" onclick="closeModal('itemDetailsModal')">Close</button>
             </div>
         </div>
     </div>
 </div>
 
-<div id="itemEditModal" class="modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <h3>Edit Item Details</h3>
-        
-        <div class="location-edit-photo" style="text-align: center; margin-bottom: 15px;">
-            <img id="editItemPreview" src="../assets/images/avatar-default.avif" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
-            <div style="margin-top: 8px;">
-                <input type="file" id="editItemPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'editItemPreview')">
-                <button class="btn-outline" style="font-size: 12px;" onclick="document.getElementById('editItemPhotoInput').click()">Change Picture</button>
-                <button class="btn-danger" style="font-size: 12px; padding: 5px 10px;" onclick="deleteItemPhoto()">Remove</button>
-            </div>
-        </div>
+<!-- ------------------------------------------
+               Item Actions Modal
+ ------------------------------------------- -->
 
-        <label>Item Name</label>
-        <input id="editItemName" type="text" placeholder="Item name">
-
-        <label>Quantity</label>
-        <input id="editItemQuantity" type="number" placeholder="Quantity">
-
-        <label>Location Placement Folder</label>
-        <select id="editItemLocationSelect"></select>
-
-        <label>Description</label>
-        <textarea id="editItemDescription" placeholder="Enter custom item specs, details, or notes..." rows="3"></textarea>
-
-        <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-            <div style="flex-grow: 1;">
-                <label>Barcode</label>
-                <input id="editItemBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
-            </div>
-            <button class="btn-outline" style="padding: 10px; height: 42px;">📷</button>
-        </div>
-
-        <label>NFC Identity Tag</label>
-        <input id="editItemNFC" type="text" placeholder="Scan NFC Tag String">
-
-       <label>Category Group</label>
-<div style="display: flex; gap: 8px;">
-    <select id="editItemCategory" style="margin-bottom: 0;"></select>
-    <button class="btn-outline" style="height: 42px; padding: 10px 14px;" onclick="openCategoryModal(true)">+</button>
-</div>
-
-<label style="margin-top: 15px;">Tags</label>
-<div style="display: flex; gap: 8px;">
-    <select id="editItemTagSelect" style="margin-bottom: 0;" onchange="handleTagSelection('edit', this.value)"></select>
-    <button class="btn-outline" style="height: 42px; padding: 10px 14px;" onclick="openTagModal(true)">+</button>
-</div>
-<div id="editItemTagsPillsRow" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; margin-bottom: 10px;"></div>
-
-        <label>Tags (Separate with commas)</label>
-        <input id="editItemTags" type="text" placeholder="e.g. Plumbing, Boiler, Brass, 15mm">
-
-        <div class="modal-buttons" style="margin-top: 25px; justify-content: space-between;">
-            <button class="btn-danger" onclick="attemptDeleteItem()">Delete Item</button>
-            <div>
-                <button class="btn-outline" onclick="confirmCancel('itemEditModal')">Cancel</button>
-                <button class="btn-primary" onclick="saveItemEdits()">Save Changes</button>
-            </div>
-        </div>
-    </div>
-</div>
 
     <div id="itemActionsModal" class="modal">
         <div class="modal-content">
@@ -445,96 +570,11 @@
         </div>
     </div>
 
-    <div id="addLocationModal" class="modal">
-        <div class="modal-content">
-            <h3>Add Location Hierarchy</h3>
-            
-            <div class="location-edit-photo" style="text-align: center; margin-bottom: 15px;">
-                <img id="addLocationPreview" src="../assets/images/folder-icon.jpg" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
-                <div style="margin-top: 8px;">
-                    <input type="file" id="addLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview')">
-                    <button class="btn-outline" style="font-size: 12px;" onclick="document.getElementById('addLocationPhotoInput').click()">Change Picture</button>
-                </div>
-            </div>
+    <!-- ------------------------------------------
+               Central Tags & Categories
+------------------------------------------- -->
 
-            <label>Location Name</label>
-            <input id="addLocationName" placeholder="Enter location name" type="text">
-            
-            <label>Description</label>
-            <textarea id="addLocationDescription" placeholder="Enter custom folder description..." rows="3"></textarea>
 
-            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-                <div style="flex-grow: 1;">
-                    <label>Barcode ID</label>
-                    <input id="addLocationBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
-                </div>
-                <button class="btn-outline" style="padding: 10px; height: 42px;">📷</button>
-            </div>
-
-            <label>NFC Identity Tag</label>
-            <input id="addLocationNFC" type="text" placeholder="Scan NFC Tag String">
-
-            <label>Category Group</label>
-            <select id="addLocationCategory">
-                <option value="storage">Storage</option>
-                <option value="vehicle">Vehicle</option>
-                <option value="site">Job Site</option>
-            </select>
-
-            <div class="modal-buttons" style="margin-top: 20px;">
-                <button class="btn-outline" onclick="confirmCancel('addLocationModal')">Cancel</button>
-                <button class="btn-primary" onclick="addLocation()">Create Folder</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="locationActionsModal" class="modal">
-        <div class="modal-content">
-            <h3>Location Settings</h3>
-            <div id="locationActionsName" style="font-weight: bold; margin-bottom: 15px; color: #004a99;"></div>
-
-            <div class="location-edit-photo" style="text-align: center; margin-bottom: 15px;">
-                <img id="editLocationPreview" src="../assets/images/folder-icon.jpg" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
-                <div style="margin-top: 8px;">
-                    <input type="file" id="editLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'editLocationPreview')">
-                    <button class="btn-outline" style="font-size: 12px;" onclick="document.getElementById('editLocationPhotoInput').click()">Change Picture</button>
-                    <button class="btn-danger" style="font-size: 12px; padding: 5px 10px;" onclick="deleteLocationPhoto()">Remove</button>
-                </div>
-            </div>
-
-            <label>Location Name</label>
-            <input id="editLocationName" placeholder="Enter location name" type="text">
-            
-            <label>Description</label>
-            <textarea id="editLocationDescription" placeholder="Optional - Enter folder details..." rows="3"></textarea>
-
-            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-                <div style="flex-grow: 1;">
-                    <label>Barcode</label>
-                    <input id="editLocationBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
-                </div>
-                <button class="btn-outline" style="padding: 10px; height: 42px;">📷</button>
-            </div>
-
-            <label>NFC Tag</label>
-            <input id="editLocationNFC" type="text" placeholder="Scan NFC Tag">
-
-            <label>Category</label>
-            <select id="editLocationCategory">
-                <option value="storage">Storage</option>
-                <option value="vehicle">Vehicle</option>
-                <option value="site">Job Site</option>
-            </select>
-
-            <div class="modal-buttons" style="margin-top: 20px; justify-content: space-between;">
-                <button class="btn-danger" onclick="attemptDeleteLocation()">Delete Location</button>
-                <div>
-                    <button class="btn-outline" onclick="confirmCancel('locationActionsModal')">Cancel</button>
-                    <button class="btn-primary" onclick="saveLocationEdits()">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    </div>
     <div id="pageTags" class="inventory-page">
     <div class="items-toolbar">
         <div class="toolbar-left"><h3>Central Tag Registry</h3></div>
@@ -591,22 +631,24 @@
         </div>
     </div>
 </div>
+
+<!-- ------------------------------------------
+               Barcode Scanner Modal            
+------------------------------------------- -->
+
 <div id="barcodeScannerModal" class="modal" style="z-index: 10010;">
     <div class="modal-content" style="max-width: 440px; text-align: center;">
-        <h3>📷 Point & Shoot Scanner</h3>
+        <h3>🤳 Barcode Scanner</h3>
         <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Hold barcode steady inside the window boundaries...</p>
         
-        <div id="scannerReaderContainer" style="width: 100%; min-height:280px; background: #111; border-radius: 12px; overflow: hidden; margin-bottom: 15px;"></div>
-
-        <label>Simulate Scanner Scan Code Signal</label>
-        <input type="text" id="simulatedBarcodeInput" placeholder="Paste or type sample Barcode/NFC string here...">
-        
+        <div id="scannerReaderContainer" style="width: 100%; min-height:280px; background: #111; border-radius: 12px; overflow: hidden; margin-bottom: 15px;"></div>       
         <div class="modal-buttons" style="justify-content: space-between; margin-top: 20px;">
-          <button class="btn-outline" onclick="closeBarcodeScannerModal()">Turn Off Lens</button>
-          <button class="btn-primary" onclick="triggerSimulatedScan()">Submit Scan</button>
+          <button class="btn-outline" onclick="closeBarcodeScannerModal()">Close scanner</button>
+          
         </div>
     </div>
 </div>
+
     <script src="../assets/js/inventory.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script>
