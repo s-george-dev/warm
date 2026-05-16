@@ -1338,7 +1338,7 @@ async function executeDirectBarcodeLookup(scannedCodeString) {
     );
 
     if (!match) {
-        alert(`Hardware Lookup Link Failure: No items found matching signature [ ${cleanToken} ]`);
+        alert(`No items found matching that barcode! [ ${cleanToken} ]`);
         return;
     }
 
