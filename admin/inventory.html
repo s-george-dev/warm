@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory | Warm Right Ltd</title>
+    <link rel="stylesheet" href="../assets/css/variables.css">  
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="../assets/css/inventory-style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>window.adminPageTitle = "Inventory Management";</script>
+    <script src="../assets/js/admin-include.js"></script>
+
+    <style>
+        #inventoryContainer { 
+            max-width: 1300px; 
+            margin: 0 auto; 
+            padding: 30px; 
+        }
+        
+        .inventory-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 25px; 
+            border-bottom: 1px solid #eee; 
+            padding-bottom: 15px; 
+        }
+        
+        .inventory-tabs { 
+            display: flex; 
+            gap: 8px; 
+        }
+        
+        .tab-btn { 
+            padding: 10px 20px; 
+            background: white; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            cursor: pointer; 
+        }
+        
+        .tab-btn.active { 
+            background: #004a99; 
+            color: white; 
+            border-color: #004a99; 
+        }
+        
+        .inventory-page { 
+            display: none; 
+        }
+        
+        .inventory-page.active { 
+            display: block; 
+        }
+        
+        .items-toolbar { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            background: #fff; 
+            padding: 15px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+            margin-bottom: 20px; 
+        }
+        
+        .search-box { 
+            flex-grow: 1; 
+            margin-left: 20px; 
+        }
+        
+        .search-box input { 
+            width: 100%; 
+            padding: 10px 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 20px; 
+        }
+        
+        .items-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+            gap: 20px; 
+        }
+        
+        .item-card { 
+            background: #fff; 
+            padding: 15px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+            text-align: center; 
+            position: relative; 
+            cursor: pointer; 
+            transition: 0.2s; 
+        }
+        
+        .item-card:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
+        }
+        
+        .location-card { 
+            border: 2px solid #ff8c00; 
+            background: #fffcf9; 
+        }
+        
+        .item-card-photo-wrapper { 
+            aspect-ratio: 1/1; 
+            background: #f0f2f5; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            margin-bottom: 10px; 
+        }
+        
+        .item-card-photo-wrapper img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+        }
+        
+        .item-card-qty-badge { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            background: rgba(0,0,0,0.7); 
+            color: white; 
+            padding: 2px 8px; 
+            border-radius: 4px; 
+            font-size: 11px; 
+        }
+        
+        .item-card-cog, .cog { 
+            position: absolute; 
+            top: 8px; 
+            right: 8px; 
+            background: white; 
+            width: 28px; 
+            height: 28px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            z-index: 10;
+        }
+        
+        .modal { 
+            display: none; 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.5); 
+            backdrop-filter: blur(3px); 
+            z-index: 9999; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        
+        .modal-content { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 15px; 
+            width: 90%; 
+            max-width: 500px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            text-align: left;
+        }
+
+        .modal input, .modal select, .modal textarea { 
+            width: 100%; 
+            padding: 12px; 
+            margin-bottom: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+        }
+        
+        .status-indicator { 
+            position: fixed; 
+            bottom: 20px; 
+            right: 20px; 
+            padding: 6px 15px; 
+            border-radius: 20px; 
+            color: white; 
+            font-size: 11px; 
+            font-weight: 700; 
+            z-index: 3000; 
+        }
+        
+        .w-100 { width: 100%; } 
+        .mb-2 { margin-bottom: 10px; } 
+        .mt-3 { margin-top: 20px; }
+    </style>
+</head>
+<body style="visibility: hidden;">
+    <div id="admin-header-container"></div>
+    
+    <div class="container-fluid" id="inventoryContainer">
+        <div class="inventory-header">
+            <div class="inventory-tabs">
+                <button class="tab-btn active" id="tab-items" onclick="showPage('pageItems')">Items Browser</button>
+                <button class="tab-btn" id="tab-locations" onclick="showPage('pageLocations')">Manage Locations</button>
+                <button class="tab-btn" id="tab-settings" onclick="showPage('pageSettings')">Settings</button>
+            </div>
+            <div class="header-actions">
+                <button class="btn-primary" onclick="openAddItemModal()">+ Add New Item</button>
+            </div>
+        </div>
+
+        <div id="pageItems" class="inventory-page active items-view-medium">
+            <div class="items-toolbar">
+                <div class="toolbar-left">
+                    <label>View:</label>
+                    <select onchange="changeItemsView(this.value)">
+                        <option value="small">Small</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="large">Large</option>
+                        <option value="list">List/Details</option>
+                    </select>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="globalSearchInput" placeholder="Search items..." oninput="handleGlobalSearch(this.value)">
+                </div>
+            </div>
+            <div class="location-nav">
+                <button id="locationBackBtn" class="btn-outline" onclick="goBack()" style="display:none;">← Back</button>
+                <div id="breadcrumb">Items</div>
+            </div>
+            <div id="locationTiles" class="items-grid"></div>
+            <div id="itemTiles" class="items-grid" style="margin-top: 20px;"></div>
+            <div class="items-table-wrapper" id="itemsTableWrapper"></div>
+        </div>
+
+        <div id="pageLocations" class="inventory-page">
+            <div class="items-toolbar">
+                <div class="toolbar-left">
+                    <label>View:</label>
+                    <select onchange="changeLocationsView(this.value)">
+                        <option value="small">Small</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="large">Large</option>
+                        <option value="list">List</option>
+                    </select>
+                </div>
+                <div class="admin-controls">
+                    <label>Mode:</label>
+                    <select onchange="changeAdminLocationView(this.value)">
+                        <option value="hierarchy" selected>Hierarchy</option>
+                        <option value="flat">Flat List</option>
+                    </select>
+                    <button class="btn-primary" onclick="openAddLocationModal()" style="margin-left: 10px;">+ Add New Location</button>
+                </div>
+            </div>
+
+            <div class="location-nav">
+                <button id="locationBackBtnAdmin" class="btn-outline" onclick="goBackLocationAdmin()" style="display:none;">← Back</button>
+                <div id="breadcrumbLocations" style="font-weight: bold; font-size: 1.1em;">Locations</div>
+            </div>
+
+            <div id="locationTilesAdmin" class="items-grid"></div>
+            <div class="items-table-wrapper" id="locationsTableWrapper"></div>
+        </div>
+
+        <div id="pageSettings" class="inventory-page">
+            <div class="card">
+                <h3>System Settings</h3>
+                <p>Database: <strong>Warm Right Production</strong></p>
+                <button class="btn-outline">Export to CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addItemModal" class="modal">
+        <div class="modal-content">
+            <h3>Add Item</h3>
+            <input id="itemName" placeholder="Name">
+            <input id="itemQuantity" placeholder="Quantity" type="number">
+            <select id="itemLocationSelect"></select>
+            <div class="modal-buttons">
+                <button class="btn-outline" onclick="closeAddItemModal()">Cancel</button>
+                <button class="btn-primary" onclick="addItem()">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="itemDetailsModal" class="modal">
+    <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden; border-radius: 16px;">
+        <div style="width: 100%; aspect-ratio: 16/10; background: #f0f2f5; position: relative;">
+            <img id="detailItemImage" src="../assets/images/avatar-default.avif" style="width: 100%; height: 100%; object-fit: cover;">
+            <div id="detailItemQtyBadge" class="item-card-qty-badge" style="top: 15px; left: 15px; font-size: 13px; padding: 4px 12px; border-radius: 6px;">Qty: 0</div>
+        </div>
+        
+        <div style="padding: 25px;">
+            <h2 id="detailItemName" style="margin: 0 0 5px 0; color: #004a99; font-size: 24px; font-weight: 700;">Item Name</h2>
+            <div id="detailItemLocation" style="font-size: 14px; color: #ff8c00; font-weight: 600; margin-bottom: 15px;">📍 Location Path</div>
+            
+            <label style="margin-top: 15px;">Description</label>
+            <p id="detailItemDescription" style="margin: 4px 0 15px 0; font-size: 15px; color: #333; line-height: 1.5; white-space: pre-wrap;">No description provided.</p>
+            
+            <label>Tags</label>
+            <div id="detailItemTagsContainer" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; margin-bottom: 15px;">
+                </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <div style="flex: 1;">
+                    <label>Barcode</label>
+                    <div id="detailItemBarcode" style="padding: 10px; background: #f8f9fa; border: 1px solid #eee; border-radius: 6px; font-size: 14px; font-family: monospace;">—</div>
+                </div>
+                <div style="flex: 1;">
+                    <label>NFC Tag</label>
+                    <div id="detailItemNFC" style="padding: 10px; background: #f8f9fa; border: 1px solid #eee; border-radius: 6px; font-size: 14px; font-family: monospace;">—</div>
+                </div>
+            </div>
+
+            <div class="modal-buttons" style="margin-top: 25px;">
+                <button class="btn-outline" onclick="closeModal('itemDetailsModal')">Close</button>
+                <button class="btn-primary" onclick="switchToItemEdit()">Edit Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="itemEditModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <h3>Edit Item Details</h3>
+        
+        <div class="location-edit-photo" style="text-align: center; margin-bottom: 15px;">
+            <img id="editItemPreview" src="../assets/images/avatar-default.avif" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+            <div style="margin-top: 8px;">
+                <input type="file" id="editItemPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'editItemPreview')">
+                <button class="btn-outline" style="font-size: 12px;" onclick="document.getElementById('editItemPhotoInput').click()">Change Picture</button>
+                <button class="btn-danger" style="font-size: 12px; padding: 5px 10px;" onclick="deleteItemPhoto()">Remove</button>
+            </div>
+        </div>
+
+        <label>Item Name</label>
+        <input id="editItemName" type="text" placeholder="Item name">
+
+        <label>Quantity</label>
+        <input id="editItemQuantity" type="number" placeholder="Quantity">
+
+        <label>Location Placement Folder</label>
+        <select id="editItemLocationSelect"></select>
+
+        <label>Description</label>
+        <textarea id="editItemDescription" placeholder="Enter custom item specs, details, or notes..." rows="3"></textarea>
+
+        <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+            <div style="flex-grow: 1;">
+                <label>Barcode</label>
+                <input id="editItemBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-outline" style="padding: 10px; height: 42px;">📷</button>
+        </div>
+
+        <label>NFC Identity Tag</label>
+        <input id="editItemNFC" type="text" placeholder="Scan NFC Tag String">
+
+        <label>Category Group</label>
+        <select id="editItemCategory">
+            <option value="tools">Tools</option>
+            <option value="materials">Materials</option>
+            <option value="equipment">Equipment</option>
+            <option value="van-stock">Van Stock</option>
+        </select>
+
+        <label>Tags (Separate with commas)</label>
+        <input id="editItemTags" type="text" placeholder="e.g. Plumbing, Boiler, Brass, 15mm">
+
+        <div class="modal-buttons" style="margin-top: 25px; justify-content: space-between;">
+            <button class="btn-danger" onclick="attemptDeleteItem()">Delete Item</button>
+            <div>
+                <button class="btn-outline" onclick="confirmCancel('itemEditModal')">Cancel</button>
+                <button class="btn-primary" onclick="saveItemEdits()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <div id="itemActionsModal" class="modal">
+        <div class="modal-content">
+            <h3>Item Actions</h3>
+            <button class="btn-outline w-100 mb-2" onclick="alert('Coming soon')">Edit</button>
+            <button class="btn-danger w-100" onclick="actionDeleteItem()">Delete</button>
+            <div class="modal-buttons mt-3">
+                <button class="btn-outline" onclick="closeItemActionsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addLocationModal" class="modal">
+        <div class="modal-content">
+            <h3>Add Location Hierarchy</h3>
+            
+            <div class="location-edit-photo" style="text-align: center; margin-bottom: 15px;">
+                <img id="addLocationPreview" src="../assets/images/folder-icon.jpg" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+                <div style="margin-top: 8px;">
+                    <input type="file" id="addLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview')">
+                    <button class="btn-outline" style="font-size: 12px;" onclick="document.getElementById('addLocationPhotoInput').click()">Change Picture</button>
+                </div>
+            </div>
+
+            <label>Location Name</label>
+            <input id="addLocationName" placeholder="Enter location name" type="text">
+            
+            <label>Description</label>
+            <textarea id="addLocationDescription" placeholder="Enter custom folder description..." rows="3"></textarea>
+
+            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+                <div style="flex-grow: 1;">
+                    <label>Barcode ID</label>
+                    <input id="addLocationBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
+                </div>
+                <button class="btn-outline" style="padding: 10px; height: 42px;">📷</button>
+            </div>
+
+            <label>NFC Identity Tag</label>
+            <input id="addLocationNFC" type="text" placeholder="Scan NFC Tag String">
+
+            <label>Category Group</label>
+            <select id="addLocationCategory">
+                <option value="storage">Storage</option>
+                <option value="vehicle">Vehicle</option>
+                <option value="site">Job Site</option>
+            </select>
+
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button class="btn-outline" onclick="confirmCancel('addLocationModal')">Cancel</button>
+                <button class="btn-primary" onclick="addLocation()">Create Folder</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="locationActionsModal" class="modal">
+        <div class="modal-content">
+            <h3>Location Settings</h3>
+            <div id="locationActionsName" style="font-weight: bold; margin-bottom: 15px; color: #004a99;"></div>
+
+            <div class="location-edit-photo" style="text-align: center; margin-bottom: 15px;">
+                <img id="editLocationPreview" src="../assets/images/folder-icon.jpg" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;">
+                <div style="margin-top: 8px;">
+                    <input type="file" id="editLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'editLocationPreview')">
+                    <button class="btn-outline" style="font-size: 12px;" onclick="document.getElementById('editLocationPhotoInput').click()">Change Picture</button>
+                    <button class="btn-danger" style="font-size: 12px; padding: 5px 10px;" onclick="deleteLocationPhoto()">Remove</button>
+                </div>
+            </div>
+
+            <label>Location Name</label>
+            <input id="editLocationName" placeholder="Enter location name" type="text">
+            
+            <label>Description</label>
+            <textarea id="editLocationDescription" placeholder="Optional - Enter folder details..." rows="3"></textarea>
+
+            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+                <div style="flex-grow: 1;">
+                    <label>Barcode</label>
+                    <input id="editLocationBarcode" type="text" placeholder="Scan or enter barcode" style="margin-bottom: 0;">
+                </div>
+                <button class="btn-outline" style="padding: 10px; height: 42px;">📷</button>
+            </div>
+
+            <label>NFC Tag</label>
+            <input id="editLocationNFC" type="text" placeholder="Scan NFC Tag">
+
+            <label>Category</label>
+            <select id="editLocationCategory">
+                <option value="storage">Storage</option>
+                <option value="vehicle">Vehicle</option>
+                <option value="site">Job Site</option>
+            </select>
+
+            <div class="modal-buttons" style="margin-top: 20px; justify-content: space-between;">
+                <button class="btn-danger" onclick="attemptDeleteLocation()">Delete Location</button>
+                <div>
+                    <button class="btn-outline" onclick="confirmCancel('locationActionsModal')">Cancel</button>
+                    <button class="btn-primary" onclick="saveLocationEdits()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/js/inventory.js"></script>
+    <script>
+        async function checkSecurity() {
+            const lib = window.supabase || window.Supabase;
+            if (!lib) { setTimeout(checkSecurity, 50); return; }
+            
+            window.db = lib.createClient(
+                'https://axampuprcnauxbbijmmt.supabase.co', 
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YW1wdXByY25hdXhiYmlqbW10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDgyNjUsImV4cCI6MjA5MzMyNDI2NX0.Er1hMQbaXnR4hzHfR2my0SmtwUcUs49HaCVqYwMBHuQ'
+            );
+            
+            const { data: { session } } = await window.db.auth.getSession();
+            if (!session) { window.location.href = 'login.html'; return; } 
+            
+            await window.loadAdminHeader(session);
+            document.body.style.visibility = 'visible';
+            initInventory();
+        }
+        checkSecurity();
+    </script>
+</body>
+</html>

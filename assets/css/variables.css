@@ -29,7 +29,7 @@
   --frame-neutral: #333333;
   --tile-background: #FFFFFF;
   --nav-text: Black;
-  nav-background: rgba(10, 44, 102, 0.95) ;
+  --nav-background: rgba(10, 44, 102, 0.95) ;
   --text-banner-primary:;
   --text-banner-secondary:;
 }
