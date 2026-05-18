@@ -1,4 +1,5 @@
 // assets/js/admin-include.js
+
 window.loadAdminHeader = async function(session) {
     const container = document.getElementById('admin-header-container');
     if (!container) return;
@@ -45,5 +46,19 @@ window.loadAdminHeader = async function(session) {
         }
     } catch (err) {
         console.error("Critical Nav Error:", err);
+    }
+};
+
+// --- NEW: Load Admin Footer ---
+window.loadAdminFooter = async function() {
+    const container = document.getElementById('admin-footer-container');
+    if (!container) return; // Fail silently if the page doesn't have a footer container
+
+    try {
+        const response = await fetch('../partials/admin-footer.html');
+        const html = await response.text();
+        container.innerHTML = html;
+    } catch (err) {
+        console.error("Critical Footer Error:", err);
     }
 };
