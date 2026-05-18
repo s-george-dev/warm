@@ -828,7 +828,7 @@
         }
        
 
-       let lastActivePageId = null;
+      let lastActivePageId = null;
 
         // Control Mobile FAB visibility
         function updateMobileFabs() {
@@ -841,6 +841,7 @@
             const quickStack = document.getElementById('quickActionsStack');
             
             if (window.innerWidth <= 768 && fabContainer) {
+                // Keep container visible across all tabs so the ⚡ quick menu is always accessible
                 fabContainer.style.display = "flex";
                 
                 // ONLY close the quick actions menu if the user actually switched tabs!
@@ -851,12 +852,14 @@
 
                 if (pageId === "pageItems") {
                     if (fabItem) fabItem.style.display = "flex";
-                    if (fabLoc) fabLoc.style.display = "flex";
+                    if (fabLoc) fabLoc.style.display = "none";  // Hidden on Items Browser
                 } else if (pageId === "pageLocations") {
                     if (fabItem) fabItem.style.display = "none";
-                    if (fabLoc) fabLoc.style.display = "flex";
+                    if (fabLoc) fabLoc.style.display = "flex";  // ONLY visible here
                 } else {
-                    fabContainer.style.display = "none";
+                    // Hidden on Tags, Categories, Assignees (Assigned Log), and Settings
+                    if (fabItem) fabItem.style.display = "none";
+                    if (fabLoc) fabLoc.style.display = "none";  
                 }
             } else if (fabContainer) {
                 fabContainer.style.display = "none"; // Hide completely on Desktop

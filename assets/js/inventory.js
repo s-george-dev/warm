@@ -720,22 +720,24 @@ function showPage(pageId) {
     if (pageId === "pageSettings") loadAuditLogs(); 
     
     // Control Mobile FAB visibility
-    const fabItem = document.getElementById("fabItemBtn"); const fabLoc = document.getElementById("fabLocationBtn");
-    const fabAdjust = document.getElementById("fabAdjustBtn"); const fabContainer = document.getElementById("mobileFabContainer");
+    // Control Mobile FAB visibility
+    const fabItem = document.getElementById("fabItemBtn"); 
+    const fabLoc = document.getElementById("fabLocationBtn");
+    const fabContainer = document.getElementById("mobileFabContainer");
     
     if (window.innerWidth <= 768 && fabContainer) {
+        // Keep container active so the ⚡ quick actions button stays operational across tabs
+        fabContainer.style.display = "flex";
+        
         if (pageId === "pageItems") {
-            fabContainer.style.display = "flex";
             if (fabItem) fabItem.style.display = "flex";
-            if (fabLoc) fabLoc.style.display = "flex";
-            if (fabAdjust) fabAdjust.style.display = "flex";
+            if (fabLoc) fabLoc.style.display = "none";  // Hidden on Items Browser
         } else if (pageId === "pageLocations") {
-            fabContainer.style.display = "flex";
             if (fabItem) fabItem.style.display = "none";
-            if (fabLoc) fabLoc.style.display = "flex";
-            if (fabAdjust) fabAdjust.style.display = "none";
+            if (fabLoc) fabLoc.style.display = "flex";  // Only show on Locations tab
         } else {
-            fabContainer.style.display = "none";
+            if (fabItem) fabItem.style.display = "none";
+            if (fabLoc) fabLoc.style.display = "none";  // Hidden on all utility tabs
         }
     }
 }
