@@ -208,6 +208,98 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
 .modal input, .modal select, .modal textarea { margin-bottom: 15px; width: 100%; box-sizing: border-box; }
 .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
+/* =========================================================
+   SCANNER SUCCESS SPLASH ANIMATION
+========================================================= */
+.qa-splash-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(248, 250, 252, 0.95);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    opacity: 0;
+    pointer-events: none; /* Lets clicks pass through when hidden */
+    transition: opacity 0.2s ease;
+}
+
+/* Active state locks the screen and shows animation */
+.qa-splash-overlay.active {
+    opacity: 1;
+    pointer-events: auto; /* Blocks clicks while animating */
+}
+
+/* Draws a fake barcode using pure CSS gradients! */
+.barcode-anim-container {
+    width: 90px;
+    height: 60px;
+    position: relative;
+    background: repeating-linear-gradient(
+        to right,
+        #334155,
+        #334155 4px,
+        transparent 4px,
+        transparent 8px,
+        #334155 8px,
+        #334155 10px,
+        transparent 10px,
+        transparent 14px
+    );
+    margin-bottom: 15px;
+}
+
+/* The Glowing Red Laser */
+.laser-line {
+    width: 120%;
+    height: 3px;
+    background: #ef4444;
+    box-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444;
+    position: absolute;
+    left: -10%;
+    top: 0;
+    animation: scanLaser 0.5s infinite alternate ease-in-out;
+}
+
+@keyframes scanLaser {
+    0% { top: 0; }
+    100% { top: 100%; }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* =========================================================
    8. UNIFIED MOBILE RESPONSIVENESS (MAX-WIDTH: 768px)
@@ -259,7 +351,6 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
     .modal div[style*="display: flex; gap: 8px; align-items: flex-end;"] > button, .modal div[style*="display: flex; gap: 10px; align-items: flex-end;"] > button { flex: 1; }
 
     /* Floating Action Buttons */
-    .status-indicator { left: 20px !important; right: auto !important; }
     .fab-container { display: flex; position: fixed; bottom: 30px; right: 20px; gap: 15px; z-index: 1000; align-items: center; transition: opacity 0.8s ease-in-out !important; }
     .fab-btn { display: flex; width: 54px; height: 54px; border-radius: 50%; color: white; font-size: 28px; font-weight: 300; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; align-items: center; justify-content: center; transition: transform 0.2s; position: relative; }
     .fab-item { background: #ff8c00; }
@@ -371,6 +462,117 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
         grid-template-columns: 1fr !important; 
     }
 
+/* =========================================================
+   FAB MENU - LEFT ALIGNED, HALF-SCREEN OVERLAY
+========================================================= */
+
+/* The half-screen dark background */
+.fab-half-screen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 70vw; 
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5); /* Slightly darker backdrop */
+    backdrop-filter: blur(2px); /* Optional: Adds a premium blur effect */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: -1; /* Keeps it behind the buttons */
+    border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Show the dark background */
+.fab-half-screen-overlay.open {
+    opacity: 1;
+    pointer-events: auto; /* Clicking the background will close the menu */
+}
+
+/* Ensure the stack keeps elements perfectly aligned vertically */
+.fab-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Perfect vertical alignment */
+    margin-bottom: 15px;
+    pointer-events: none; 
+}
+
+/* The wrapper holding the Button and Pill */
+/* 1. Force the wrapper to ONLY be the width of the button */
+.quick-action-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 12px;
+    width: 45px; /* Locks the width so the text can't push it */
+    
+    /* Start state for the animation */
+    opacity: 0;
+    transform: translateX(-50px) scale(0.8);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.quick-action-wrapper .fab-mini {
+    margin: 0 !important; /* Strips any default browser margins */
+    z-index: 2; /* Keeps button clickable above the label */
+}
+
+/* 2. Float the label to the right of the button using absolute positioning */
+.fab-label {
+    position: absolute;
+    left: 55px; /* Pushes the pill perfectly to the right of the button */
+    top: 50%;
+    transform: translateY(-50%); /* Keeps it vertically centered with the button */
+    
+    background: #ffffff;
+    color: #334155;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    white-space: nowrap;
+    border: 1px solid #e2e8f0;
+    z-index: 1;
+}
+
+/* When opened, whip them into view */
+.fab-stack.open .quick-action-wrapper {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    pointer-events: auto;
+}
+
+/* Staggered delays (Bottom whips in first, Top whips in last) */
+/* Update Staggered delays for 4 buttons (Bottom whips in first, Top whips in last) */
+.fab-stack.open .quick-action-wrapper:nth-child(4) { transition-delay: 0.05s; }
+.fab-stack.open .quick-action-wrapper:nth-child(3) { transition-delay: 0.1s; }
+.fab-stack.open .quick-action-wrapper:nth-child(2) { transition-delay: 0.15s; }
+.fab-stack.open .quick-action-wrapper:nth-child(1) { transition-delay: 0.2s; }
+
+/* Styles for the Assignee Quick-Select Buttons */
+.qa-assignee-btn {
+    background: #ffffff;
+    border: 2px solid #cbd5e1;
+    padding: 12px 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.qa-assignee-btn:hover {
+    background: #e0f2fe;
+    border-color: #38bdf8;
+    color: #0284c7;
+    transform: translateY(-2px);
+}
+
+
 
 
 }
+

@@ -73,7 +73,9 @@ function clearSearch() {
 function customAlert(message, title = "Notice") {
     return new Promise((resolve) => {
         document.getElementById("dialogTitle").textContent = title;
-        document.getElementById("dialogMessage").textContent = message;
+        // CHANGE THIS LINE to use innerHTML instead of textContent
+        document.getElementById("dialogMessage").innerHTML = message; 
+        
         const btnContainer = document.getElementById("dialogButtons");
         btnContainer.innerHTML = `<button class="btn-primary" id="dialogOkBtn" style="min-width: 120px;">OK</button>`;
         document.getElementById("customDialogModal").style.display = "flex";
@@ -1603,25 +1605,42 @@ function handleAssignBarcodeLookup(scannedText) {
 }
 
 async function executeFastReturnLookup(scannedCodeString) {
-    if (!window.isAppOnline) return await customAlert("You must be connected to the internet for Fast Return.", "Offline Mode");
     if (!scannedCodeString || !scannedCodeString.trim()) return;
     const lowerToken = scannedCodeString.trim().toLowerCase();
+    
+    // Read directly from the offline hard drive for instant speed
     const items = await localDB.items.toArray(); 
     if (!items) return;
 
     const match = items.find(item => (item.barcode && item.barcode.trim().toLowerCase() === lowerToken) || (item.nfc_tag && item.nfc_tag.trim().toLowerCase() === lowerToken));
+    
     if (!match) return await customAlert(`No items found matching that tag!`, "Scan Failed");
-    if (!match.assigned_to) return await customAlert(`Item [${match.name}] is already in the warehouse (Not checked out).`, "Already In Stock");
+    if (!match.assigned_to) return await customAlert(`Item <b>[${match.name}]</b> is already in the warehouse (Not checked out).`, "Already In Stock");
 
-    const { error } = await withStatus(() => window.db.from("items").update({ assigned_to: null }).eq("id", match.id), "Processing rapid return...");
-    if (!error) {
-        await customAlert(`Success! [${match.name}] has been checked back in.`, "Item Returned");
+    // Use the Universal Offline Writer!
+    const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: null }, match.id);
+    
+    if (response.success) {
+        // Find the human-readable path for where this item belongs
+        const locPath = match.location_id ? buildLocationPath(match.location_id) : "Unallocated Items";
+        
+        // Assemble the success message with the Party Popper and Bold instructions!
+        const successMsg = `🎉 Success! <b>[${match.name}]</b> has been checked back in.<br><br><b>📍 PLEASE RETURN TO:</b><br><span style="color: #004a99; font-weight: bold; font-size: 16px;">${locPath}</span>`;
+        
+        await customAlert(successMsg, "Item Returned");
+        
         lastMovedItemId = match.id; 
         logAction("RETURN", "Item", match.name, "Fast-Return via Scanner");
-        await syncAfterWrite();
+        
+        // Instantly update UI and trigger background sync
+        await refreshAllDataFromLocal();
+        window.processSyncQueue(); 
+        
+        // Refresh the current view
         if (currentTempLocationId) loadTempLocationDetails(currentTempLocationId);
         else if (currentLocationId) loadLocation(currentLocationId);
         else loadRootLocations();
+        
         setTimeout(() => { lastMovedItemId = null; }, 6000);
     }
 }
@@ -1994,4 +2013,227 @@ function initFabScrollFade() {
         if (scrollPosition >= bottomPosition - 30) fabContainer.classList.add('fab-faded');
         else fabContainer.classList.remove('fab-faded');
     }, { passive: true });
+}
+/* =========================================================
+   QUICK ASSIGN: MULTI-STEP SMART SCANNER (BARCODE & NFC)
+========================================================= */
+let qaScannerInstance = null;
+let qaCurrentStep = 1; // 1 = Scanning Item, 2 = Scanning/Selecting Assignee
+let qaSelectedItem = null;
+let qaIsProcessing = false;
+let qaNfcAbortController = null;
+
+async function openQuickAssignModal() {
+    // Hide the FAB menu
+    document.getElementById('quickActionsStack').classList.remove('open');
+    document.getElementById('fabOverlay').classList.remove('open');
+
+    document.getElementById("quickAssignModal").style.display = "flex";
+    
+    // Reset state and fire up hardware
+    resetQuickAssignUI();
+    startQuickAssignScanner();
+    startQuickAssignNFC();
+}
+
+function resetQuickAssignUI() {
+    qaCurrentStep = 1;
+    qaSelectedItem = null;
+    qaIsProcessing = false;
+
+    // Reset UI to Step 1
+    document.getElementById("qaTitle").textContent = "Quick Assign: Step 1";
+    document.getElementById("qaInstruction").innerHTML = "Scan <b>Item</b> Barcode or Tap NFC";
+
+    document.getElementById("qaMainContent").style.display = "block";
+    document.getElementById("qaAssigneesList").style.display = "none";
+    document.getElementById("qaSuccessContent").style.display = "none";
+    document.getElementById("qaCancelContainer").style.display = "block";
+}
+
+function closeQuickAssignModal() {
+    document.getElementById("quickAssignModal").style.display = "none";
+    stopQuickAssignScanner();
+    stopQuickAssignNFC();
+    qaIsProcessing = false;
+}
+
+// --- HARDWARE CONTROLLERS ---
+function startQuickAssignScanner() {
+    if (qaScannerInstance) return; 
+    qaScannerInstance = new Html5Qrcode("qaScannerReader");
+    qaScannerInstance.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => { handleQuickAssignScan(decodedText); },
+        (err) => { /* Ignore background scanning noise */ }
+    ).catch(err => console.warn("Camera init error:", err));
+}
+
+function stopQuickAssignScanner() {
+    if (qaScannerInstance) {
+        qaScannerInstance.stop().then(() => {
+            qaScannerInstance.clear();
+            qaScannerInstance = null;
+        }).catch(e => { qaScannerInstance = null; });
+    }
+}
+
+async function startQuickAssignNFC() {
+    if (!('NDEFReader' in window)) return; 
+    try {
+        qaNfcAbortController = new AbortController();
+        const ndef = new NDEFReader();
+        await ndef.scan({ signal: qaNfcAbortController.signal });
+        ndef.onreading = event => {
+            const decoder = new TextDecoder();
+            for (const record of event.message.records) {
+                if (record.recordType === "text") {
+                    handleQuickAssignScan(decoder.decode(record.data));
+                }
+            }
+        };
+    } catch (error) { console.log("NFC Init Error:", error); }
+}
+
+function stopQuickAssignNFC() {
+    if (qaNfcAbortController) {
+        qaNfcAbortController.abort();
+        qaNfcAbortController = null;
+    }
+}
+
+// --- THE MASTER SCAN HANDLER ---
+// --- THE MASTER SCAN HANDLER ---
+async function handleQuickAssignScan(text) {
+    // If we are processing, OR if we hit Step 3 (Success Screen), absolutely ignore any camera input!
+    if (qaIsProcessing || qaCurrentStep === 3 || !text) return;
+    
+    qaIsProcessing = true;
+    const token = text.trim().toLowerCase();
+
+    try {
+        if (qaCurrentStep === 1) {
+            // STEP 1: Process Item Scan
+            const items = await localDB.items.toArray();
+            const itemMatch = items.find(i => (i.barcode && i.barcode.trim().toLowerCase() === token) || (i.nfc_tag && i.nfc_tag.trim().toLowerCase() === token));
+
+            if (!itemMatch) {
+                await customAlert("No item found matching that code.", "Not Found");
+                qaIsProcessing = false;
+                return;
+            }
+
+            // --- Show the laser animation for 1 second ---
+            await triggerScanSplash("Item Captured!");
+
+            // Move to Step 2
+            qaSelectedItem = itemMatch;
+            qaCurrentStep = 2;
+
+            // Update the UI
+            document.getElementById("qaTitle").textContent = "Quick Assign: Step 2";
+            document.getElementById("qaInstruction").innerHTML = `Target: <b style='color:#004a99;'>${itemMatch.name}</b><br><span style='font-size:13px; color:#64748b;'>Scan Assignee ID or Select Below</span>`;
+            document.getElementById("qaAssigneesList").style.display = "block";
+            
+            await renderQuickAssignees();
+            qaIsProcessing = false; // Unlock camera for assignee scan
+
+        } else if (qaCurrentStep === 2) {
+            // STEP 2: Process Assignee Scan
+            const assignees = await localDB.temp_locations.toArray();
+            const assigneeMatch = assignees.find(a => (a.barcode && a.barcode.trim().toLowerCase() === token) || (a.nfc_tag && a.nfc_tag.trim().toLowerCase() === token));
+
+            if (!assigneeMatch) {
+                await customAlert("No assignee found matching that code.", "Not Found");
+                qaIsProcessing = false;
+                return;
+            }
+
+            // --- Show the laser animation for 0.8 seconds ---
+            await triggerScanSplash("ID Verified!", 800);
+
+            // Execute the assignment
+            executeQuickAssignment(assigneeMatch.id, assigneeMatch.name);
+        }
+    } catch (e) {
+        console.error(e);
+        qaIsProcessing = false;
+    }
+}
+
+// Finalize the update and show Success Screen
+async function executeQuickAssignment(assigneeId, assigneeName) {
+    if (!qaSelectedItem || !assigneeId) return;
+    qaIsProcessing = true;
+    
+    // STEP 3: Lock the entire workflow so background scans are ignored
+    qaCurrentStep = 3; 
+
+    // KILL THE CAMERA immediately to save battery and prevent loop bugs
+    stopQuickAssignScanner();
+
+    // Use Universal Offline Engine
+    const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: assigneeId }, qaSelectedItem.id);
+
+    if (response.success) {
+        // Hide Camera area, Show Success Party
+        document.getElementById("qaMainContent").style.display = "none";
+        document.getElementById("qaCancelContainer").style.display = "none";
+        document.getElementById("qaSuccessContent").style.display = "block";
+
+        document.getElementById("qaSuccessMessage").innerHTML = `<b>${qaSelectedItem.name}</b> has been successfully assigned to <b>${assigneeName}</b>.`;
+
+        // Update Background state
+        lastMovedItemId = qaSelectedItem.id;
+        logAction("CHECKOUT", "Item", qaSelectedItem.name, `Quick-Assigned to ${assigneeName}`);
+        
+        await refreshAllDataFromLocal();
+        window.processSyncQueue();
+        
+        if (currentTempLocationId) loadTempLocationDetails(currentTempLocationId);
+        setTimeout(() => { lastMovedItemId = null; }, 6000);
+    } else {
+        await customAlert("Failed to complete the assignment.", "Error");
+    }
+    qaIsProcessing = false;
+}
+
+// --- NEW HELPER FUNCTIONS ---
+
+// Triggers the CSS laser animation and pauses Javascript for the duration
+function triggerScanSplash(text, durationMs = 1000) {
+    return new Promise(resolve => {
+        document.getElementById("qaSplashText").textContent = text;
+        const splash = document.getElementById("qaSplashOverlay");
+        splash.classList.add("active");
+        
+        setTimeout(() => {
+            splash.classList.remove("active");
+            resolve();
+        }, durationMs);
+    });
+}
+
+// Safely resets the UI and re-boots the camera for the next item
+function restartQuickAssignProcess() {
+    resetQuickAssignUI();
+    startQuickAssignScanner();
+    startQuickAssignNFC();
+}
+
+// Render the grid of buttons for manual selection
+async function renderQuickAssignees() {
+    const assignees = await localDB.temp_locations.toArray();
+    const grid = document.getElementById("qaAssigneesGrid");
+    grid.innerHTML = "";
+
+    assignees.forEach(a => {
+        const btn = document.createElement("button");
+        btn.className = "qa-assignee-btn";
+        btn.textContent = a.name;
+        // If a button is clicked, it behaves exactly like a successful scan
+        btn.onclick = () => executeQuickAssignment(a.id, a.name);
+        grid.appendChild(btn);
+    });
 }

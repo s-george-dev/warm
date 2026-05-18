@@ -677,6 +677,47 @@
         </div>
     </div>
 
+    <div id="quickAssignModal" class="modal" style="z-index: 3000;">
+        <div class="modal-content" style="max-width: 500px; text-align: center; padding: 25px;">
+            <h2 id="qaTitle" style="color: #004a99; margin-bottom: 5px;">Quick Assign</h2>
+            <p id="qaInstruction" style="margin-bottom: 20px; color: #475569; font-size: 15px;">Scan Item Barcode or Tap NFC</p>
+
+            <div id="qaMainContent" style="position: relative;">
+                
+                <div id="qaSplashOverlay" class="qa-splash-overlay">
+                    <div class="barcode-anim-container">
+                        <div class="laser-line"></div>
+                    </div>
+                    <h3 id="qaSplashText" style="color: #004a99; margin: 0; font-size: 20px;">Scan Captured!</h3>
+                </div>
+
+                <div id="qaScannerReader" style="width: 100%; max-width: 400px; min-height: 250px; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background: #000; display: flex; align-items: center; justify-content: center;"></div>
+
+                <div id="qaAssigneesList" style="display: none; margin-top: 20px; text-align: left; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <h4 style="margin: 0 0 10px 0; color: #334155;">Or Select Manually:</h4>
+                    <div id="qaAssigneesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px;">
+                        </div>
+                </div>
+            </div>
+
+            <div id="qaSuccessContent" style="display: none; padding: 20px 0;">
+                <div style="font-size: 60px; margin-bottom: 10px;">🎉</div>
+                <h3 style="color: #10b981; margin-bottom: 10px; font-size: 22px;">Assigned Successfully!</h3>
+                <div id="qaSuccessMessage" style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 25px; color: #334155; font-size: 16px;"></div>
+                
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button class="btn-secondary" onclick="closeQuickAssignModal()">Close</button>
+                    <button class="btn-primary" onclick="restartQuickAssignProcess()">Assign Another</button>
+                </div>
+            </div>
+
+            <div id="qaCancelContainer" style="margin-top: 25px;">
+                <button class="btn-secondary" onclick="closeQuickAssignModal()" style="width: 100%;">Cancel Process</button>
+            </div>
+        </div>
+    </div>
+
+
     <div id="review-lightbox" class="lightbox-overlay">
         <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
         <button class="lightbox-nav prev" onclick="changeLightboxImage(-1)">&#10094;</button>
@@ -707,20 +748,47 @@
         </div>
     </div>
 
-    <div class="fab-container" id="mobileFabContainer">
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
-            <div id="quickActionsStack" class="fab-stack">
-                <button class="fab-btn fab-mini" onclick="openNfcScannerModal('FAST_RETURN')" title="NFC Fast Return">📥📡</button>
-                <button class="fab-btn fab-mini" onclick="openBarcodeScannerModal('FAST_RETURN')" title="Barcode Fast Return">📥📷</button>
-                <button class="fab-btn fab-mini" onclick="openQuantityAdjusterModal()" title="Fast Adjust Quantity">🔢</button>
-            </div>
-            <button class="fab-btn fab-quick" id="fabQuickBtn" onclick="document.getElementById('quickActionsStack').classList.toggle('open')">⚡</button>
-        </div>
-        
-        <button class="fab-btn fab-location" id="fabLocationBtn" onclick="openAddLocationModal()">📦<span style="position:absolute; top:4px; right:6px; font-size:16px; font-weight:bold;">+</span></button>
-        <button class="fab-btn fab-item" id="fabItemBtn" onclick="openAddItemModal()">+</button>
-    </div>
+    <div class="fab-container left-side" id="mobileFabContainer" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000;">
+    
+    <div class="fab-half-screen-overlay" id="fabOverlay" onclick="toggleFab()"></div>
 
+    <div style="position: relative; display: flex; flex-direction: column; align-items: flex-start;">
+        <div id="quickActionsStack" class="fab-stack">
+            
+            <div class="quick-action-wrapper">
+                <button class="fab-btn fab-mini" onclick="openQuickAssignModal()" title="Quick Assign Item">👤📱</button>
+                <span class="fab-label">Quick Assign</span>
+            </div>
+
+            <div class="quick-action-wrapper">
+                <button class="fab-btn fab-mini" onclick="openNfcScannerModal('FAST_RETURN')" title="NFC Fast Return">📥📡</button>
+                <span class="fab-label">Quick Return (NFC)</span>
+            </div>
+
+            <div class="quick-action-wrapper">
+                <button class="fab-btn fab-mini" onclick="openBarcodeScannerModal('FAST_RETURN')" title="Barcode Fast Return">📥📷</button>
+                <span class="fab-label">Quick Return (BC)</span>
+            </div>
+
+            <div class="quick-action-wrapper">
+                <button class="fab-btn fab-mini" onclick="openQuantityAdjusterModal()" title="Fast Adjust Quantity">🔢</button>
+                <span class="fab-label">Quick Adjust (Q)</span>
+            </div>
+            
+        </div>
+        <button class="fab-btn fab-quick" id="fabQuickBtn" onclick="toggleFab()">⚡</button>
+    </div>
+    
+    <button class="fab-btn fab-location" id="fabLocationBtn" onclick="openAddLocationModal()">📦<span style="position:absolute; top:4px; right:6px; font-size:16px; font-weight:bold;">+</span></button>
+    <button class="fab-btn fab-item" id="fabItemBtn" onclick="openAddItemModal()">+</button>
+</div>
+
+<script>
+    function toggleFab() {
+        document.getElementById('quickActionsStack').classList.toggle('open');
+        document.getElementById('fabOverlay').classList.toggle('open');
+    }
+</script>
 
     <script src="../assets/js/inventory.js"></script>
     <script>
