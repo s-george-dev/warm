@@ -807,6 +807,8 @@ async function buildBreadcrumb(location) {
     });
 }
 
+
+
 /* =========================================================
     TEMP LOCATIONS / ASSIGNEES LOGIC (DEXIE)
 ========================================================= */
@@ -942,10 +944,28 @@ function renderLocations(locations) {
     const container = document.getElementById("locationTiles"); container.innerHTML = "";
     let sortedLocs = [...locations];
     if (currentSortMode.includes('desc')) sortedLocs.sort((a,b) => b.name.localeCompare(a.name)); else sortedLocs.sort((a,b) => a.name.localeCompare(b.name));
+    
     sortedLocs.forEach(loc => {
         const tile = document.createElement("div"); tile.className = "item-card location-card"; 
-        tile.innerHTML = `<div class="item-card-photo-wrapper"><img src="../assets/images/folder-icon.jpg"></div><div class="item-card-qty-badge" style="background:#ff8c00;">Folder</div><div class="item-card-name">${loc.name}</div>`;
-        tile.onclick = () => navigateToLocation(loc.id); container.appendChild(tile);
+        
+        // Check for custom photos and safely handle missing/null properties
+        let imgSrc = "../assets/images/folder-icon.jpg";
+        const photoKey = loc.photo_path || loc.photo;
+        
+        if (photoKey && photoKey !== "null" && photoKey !== "undefined") {
+            imgSrc = window.db.storage.from("location-photos").getPublicUrl(photoKey).data.publicUrl;
+        }
+        
+        tile.innerHTML = `
+            <div class="item-card-photo-wrapper">
+                <img src="${imgSrc}" onerror="this.onerror=null; this.src='../assets/images/folder-icon.jpg';">
+            </div>
+            <div class="item-card-qty-badge" style="background:#ff8c00;">Folder</div>
+            <div class="item-card-name">${loc.name}</div>
+        `;
+        
+        tile.onclick = () => navigateToLocation(loc.id); 
+        container.appendChild(tile);
     });
 }
 
