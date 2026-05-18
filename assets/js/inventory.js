@@ -46,7 +46,9 @@ let userSettings = {
     view: 'medium',
     locationsView: 'medium',
     columns: { name: true, quantity: true, barcode: true, nfc: true, category: true, tags: true },
-    widths: { name: '30%', quantity: '10%', barcode: '15%', nfc: '15%', category: '15%', tags: '15%' }
+    widths: { name: '25%', quantity: '10%', barcode: '15%', nfc: '15%', category: '15%', tags: '20%' },
+    defaultCameraId: 'AUTO_REAR',
+    defaultZoom: 1.5
 };
 
 function buildLocationPath(id) {
@@ -718,6 +720,9 @@ function showPage(pageId) {
     if (pageId === "pageTags") loadTagsAdmin();
     if (pageId === "pageCategories") loadCategoriesAdmin();
     if (pageId === "pageSettings") loadAuditLogs(); 
+    if (pageId === "pageSettings") {
+        populateHardwareSettingsDropdowns();
+    }
     
     // Control Mobile FAB visibility
     // Control Mobile FAB visibility
@@ -2031,48 +2036,139 @@ let qaIsProcessing = false, qmIsProcessing = false, qrIsProcessing = false;
 let qaBatchMode = false, qmBatchMode = false, qrBatchMode = false;
 let qaQueue = [], qmQueue = [], qrQueue = []; 
 
-// --- NEW: MULTI-LENS CAMERA TRACKING REGISTRY ---
 let globalCamerasList = [];
 let currentCameraIndex = 0;
 
+// --- UPGRADED: INTELLIGENT HARDWARE LENS INITIALIZATION & SELECTION REGISTRY ---
 async function getOrFetchCameras() {
-    if (globalCamerasList.length > 0) return globalCamerasList;
     try {
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length > 0) {
-            globalCamerasList = devices;
+            // Sort cameras array so that primary 1x main rear cameras sit at index 0
+            // Skips front/selfie/facetime cameras and avoids wide .6x lens bus orders
+            globalCamerasList = [...devices].sort((a, b) => {
+                const labelA = a.label.toLowerCase();
+                const labelB = b.label.toLowerCase();
+                
+                const isBackA = labelA.includes('back') || labelA.includes('rear') || labelA.includes('environment');
+                const isBackB = labelB.includes('back') || labelB.includes('rear') || labelB.includes('environment');
+                
+                // Prioritise back over front cameras
+                if (isBackA && !isBackB) return -1;
+                if (!isBackA && isBackB) return 1;
+                
+                // Secondary check: Avoid wide/ultra-wide macro failure modules if standard labels match
+                if (labelA.includes('wide') && !labelA.includes('ultra') && !labelB.includes('wide')) return -1;
+                if (labelB.includes('wide') && !labelB.includes('ultra') && !labelA.includes('wide')) return 1;
+                
+                return 0;
+            });
         }
-    } catch (e) { console.log("Camera list initialization error:", e); }
+    } catch (e) { console.log("Camera list compilation fault:", e); }
     return globalCamerasList;
 }
 
-// Global Camera Switch Handler
-window.switchScannerCamera = async function(modalPrefix) {
-    try {
-        const devices = await Html5Qrcode.getCameras();
-        if (!devices || devices.length <= 1) {
-            alert("⚠️ Only one camera lens detected on this device configuration."); return;
+// Global Hardware Preferences Save Routine
+window.saveHardwarePreferences = async function() {
+    const camId = document.getElementById("settingsDefaultCamera").value;
+    const zoomVal = parseFloat(document.getElementById("settingsDefaultZoom").value) || 1.5;
+    
+    userSettings.defaultCameraId = camId;
+    userSettings.defaultZoom = zoomVal;
+    
+    // Save configuration directly to offline IndexedDB system layout configurations mapping tracking tables
+    if (typeof saveInventorySettings === "function") {
+        await saveInventorySettings();
+    } else if (typeof localDB !== "undefined" && localDB.settings) {
+        await localDB.settings.put({ id: "user_preferences", value: userSettings });
+    }
+};
+
+// Populate selection choices within Settings Panel UI layout grids
+window.populateHardwareSettingsDropdowns = async function() {
+    const dropdown = document.getElementById("settingsDefaultCamera");
+    const slider = document.getElementById("settingsDefaultZoom");
+    const display = document.getElementById("settingsZoomValDisplay");
+    if (!dropdown) return;
+    
+    // Mount loaded preferences states values
+    slider.value = userSettings.defaultZoom || 1.5;
+    display.textContent = (userSettings.defaultZoom || 1.5) + "x";
+    
+    const cameras = await getOrFetchCameras();
+    dropdown.innerHTML = `<option value="AUTO_REAR" ${userSettings.defaultCameraId === 'AUTO_REAR' ? 'selected' : ''}>🎯 Auto-Select Main Rear Lens</option>`;
+    
+    cameras.forEach(cam => {
+        const option = document.createElement("option");
+        option.value = cam.id;
+        option.textContent = cam.label || `Camera Node Map [${cam.id.substring(0, 6)}]`;
+        if (String(userSettings.defaultCameraId) === String(cam.id)) {
+            option.selected = true;
         }
-        globalCamerasList = devices;
-        currentCameraIndex = (currentCameraIndex + 1) % globalCamerasList.length;
-        
-        // Restart whichever device context loop is actively drawing
-        if (modalPrefix === 'qa') {
-            stopQuickAssignScanner(); startQuickAssignScanner();
-        } else if (modalPrefix === 'qm') {
-            stopQuickMoveScanner(); startQuickMoveScanner();
-        } else if (modalPrefix === 'qr') {
-            stopQuickReturnScanner(); startQuickReturnScanner();
-        } else if (modalPrefix === 'main') {
-            // Main search camera fallback lookup trigger
-            if (typeof closeBarcodeScannerModal === 'function' && typeof openBarcodeScannerModal === 'function') {
-                const activeTarget = window.currentBarcodeTargetField || null;
-                closeBarcodeScannerModal();
-                setTimeout(() => { openBarcodeScannerModal(activeTarget); }, 250);
+        dropdown.appendChild(option);
+    });
+};
+
+// NEW: Hardware constraints optical macro zoom modifier injector engine
+function applyHardwareZoomToContainer(containerId) {
+    setTimeout(() => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const videoEl = container.querySelector("video");
+        if (videoEl && videoEl.srcObject) {
+            const track = videoEl.srcObject.getVideoTracks()[0];
+            if (track && typeof track.getCapabilities === "function") {
+                const capabilities = track.getCapabilities();
+                if ("zoom" in capabilities) {
+                    let targetZoomMultiplier = parseFloat(userSettings.defaultZoom) || 1.5;
+                    // Clamp bounds constraints properties to prevent browser crash parameter faults
+                    if (targetZoomMultiplier < capabilities.zoom.min) targetZoomMultiplier = capabilities.zoom.min;
+                    if (targetZoomMultiplier > capabilities.zoom.max) targetZoomMultiplier = capabilities.zoom.max;
+                    
+                    track.applyConstraints({
+                        advanced: [{ zoom: targetZoomMultiplier }]
+                    }).catch(e => console.log("Optical Zoom hardware constraint fault:", e));
+                }
             }
         }
-    } catch (err) { console.warn("Camera hot-swap context issue:", err); }
+    }, 450); // Small procedural delay forces track parsing execution threads to load safely
+}
+
+// Core Runtime Context Camera Switch Logic
+window.switchScannerCamera = async function(modalPrefix) {
+    try {
+        const devices = await getOrFetchCameras();
+        if (!devices || devices.length <= 1) {
+            alert("⚠️ Only one rear hardware lens element detected on this platform."); return;
+        }
+        currentCameraIndex = (currentCameraIndex + 1) % devices.length;
+        userSettings.defaultCameraId = devices[currentCameraIndex].id;
+        
+        if (modalPrefix === 'qa') { stopQuickAssignScanner(); startQuickAssignScanner(); }
+        else if (modalPrefix === 'qm') { stopQuickMoveScanner(); startQuickMoveScanner(); }
+        else if (modalPrefix === 'qr') { stopQuickReturnScanner(); startQuickReturnScanner(); }
+        else if (modalPrefix === 'main') {
+            if (typeof closeBarcodeScannerModal === 'function' && typeof openBarcodeScannerModal === 'function') {
+                const targetField = window.currentBarcodeTargetField || null;
+                closeBarcodeScannerModal();
+                setTimeout(() => { openBarcodeScannerModal(targetField); }, 250);
+            }
+        }
+    } catch (err) { console.warn(err); }
 };
+
+// Helper: Calculate Target Lens configuration on initialization
+async function determineActiveTargetLens() {
+    const devices = await getOrFetchCameras();
+    if (!devices || devices.length === 0) return { facingMode: "environment" };
+    
+    if (userSettings.defaultCameraId && userSettings.defaultCameraId !== "AUTO_REAR") {
+        const savedMatch = devices.find(d => String(d.id) === String(userSettings.defaultCameraId));
+        if (savedMatch) return savedMatch.id;
+    }
+    // Fallback to sorted index 0 (Guaranteed primary rear 1x lens via our sorting algorithm)
+    return devices[0].id;
+}
 
 // --- GLOBAL ATOMIC SHARED QUANTITY HANDLERS ---
 function adjustInlineQty(prefix, amount) {
@@ -2172,20 +2268,16 @@ function proceedQaToStep2() {
     renderQuickAssignees();
 }
 
-// Updated with Lens ID Selection Support
 async function startQuickAssignScanner() {
     if (qaScannerInstance) return;
     qaScannerInstance = new Html5Qrcode("qaScannerReader");
-    
-    const cameras = await getOrFetchCameras();
-    let targetLens = { facingMode: "environment" };
-    if (cameras && cameras.length > currentCameraIndex) {
-        targetLens = cameras[currentCameraIndex].id;
-    }
+    const lensIdConfig = await determineActiveTargetLens();
 
-    qaScannerInstance.start(targetLens, { fps: 10, qrbox: { width: 250, height: 160 } },
+    qaScannerInstance.start(lensIdConfig, { fps: 10, qrbox: { width: 250, height: 160 } },
         (txt) => { handleQuickAssignScan(txt); }, (err) => {}
-    ).catch(e => console.warn(e));
+    ).then(() => {
+        applyHardwareZoomToContainer("qaScannerReader");
+    }).catch(e => console.warn(e));
 }
 function stopQuickAssignScanner() { if (qaScannerInstance) { qaScannerInstance.stop().then(() => { qaScannerInstance.clear(); qaScannerInstance = null; }).catch(() => qaScannerInstance = null); } }
 
@@ -2390,20 +2482,16 @@ function proceedQmToStep2() {
     document.getElementById("qmBatchQueueContainer").style.display = "none";
 }
 
-// Updated with Lens ID Selection Support
 async function startQuickMoveScanner() {
     if (qmScannerInstance) return;
     qmScannerInstance = new Html5Qrcode("qmScannerReader");
-    
-    const cameras = await getOrFetchCameras();
-    let targetLens = { facingMode: "environment" };
-    if (cameras && cameras.length > currentCameraIndex) {
-        targetLens = cameras[currentCameraIndex].id;
-    }
+    const lensIdConfig = await determineActiveTargetLens();
 
-    qmScannerInstance.start(targetLens, { fps: 10, qrbox: { width: 250, height: 160 } },
+    qmScannerInstance.start(lensIdConfig, { fps: 10, qrbox: { width: 250, height: 160 } },
         (txt) => { handleQuickMoveScan(txt); }, (err) => {}
-    ).catch(e => console.warn(e));
+    ).then(() => {
+        applyHardwareZoomToContainer("qmScannerReader");
+    }).catch(e => console.warn(e));
 }
 function stopQuickMoveScanner() { if (qmScannerInstance) { qmScannerInstance.stop().then(() => { qmScannerInstance.clear(); qmScannerInstance = null; }).catch(() => qmScannerInstance = null); } }
 
@@ -2560,20 +2648,16 @@ function renderQrQueueUI() {
     document.getElementById("qrProceedBatchBtn").disabled = (qrQueue.length === 0);
 }
 
-// Updated with Lens ID Selection Support
 async function startQuickReturnScanner() {
     if (qrScannerInstance) return;
     qrScannerInstance = new Html5Qrcode("qrScannerReader");
-    
-    const cameras = await getOrFetchCameras();
-    let targetLens = { facingMode: "environment" };
-    if (cameras && cameras.length > currentCameraIndex) {
-        targetLens = cameras[currentCameraIndex].id;
-    }
+    const lensIdConfig = await determineActiveTargetLens();
 
-    qrScannerInstance.start(targetLens, { fps: 10, qrbox: { width: 250, height: 160 } },
+    qrScannerInstance.start(lensIdConfig, { fps: 10, qrbox: { width: 250, height: 160 } },
         (txt) => { handleQuickReturnScan(txt); }, (err) => {}
-    ).catch(e => console.warn(e));
+    ).then(() => {
+        applyHardwareZoomToContainer("qrScannerReader");
+    }).catch(e => console.warn(e));
 }
 function stopQuickReturnScanner() { if (qrScannerInstance) { qrScannerInstance.stop().then(() => { qrScannerInstance.clear(); qrScannerInstance = null; }).catch(() => qrScannerInstance = null); } }
 
@@ -2735,6 +2819,12 @@ async function executeBatchReturn() {
     }
     qrIsProcessing = false;
 }
+
+
+
+
+
+
 
 /* =========================================================
    ASSIGNEE STOCK CONSUMPTION & DEPLOYMENT MANAGEMENT ENGINE
