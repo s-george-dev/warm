@@ -571,9 +571,10 @@ body:has(.modal[style*="display:block"]) {
 
 /* Staggered delays (Bottom whips in first, Top whips in last) */
 /* Update Staggered delays for 4 buttons (Bottom whips in first, Top whips in last) */
-.fab-stack.open .quick-action-wrapper:nth-child(3) { transition-delay: 0.1s; }
-.fab-stack.open .quick-action-wrapper:nth-child(2) { transition-delay: 0.15s; }
-.fab-stack.open .quick-action-wrapper:nth-child(1) { transition-delay: 0.2s; }
+.fab-stack.open .quick-action-wrapper:nth-child(4) { transition-delay: 0.1s; }
+.fab-stack.open .quick-action-wrapper:nth-child(3) { transition-delay: 0.15s; }
+.fab-stack.open .quick-action-wrapper:nth-child(2) { transition-delay: 0.2s; }
+.fab-stack.open .quick-action-wrapper:nth-child(1) { transition-delay: 0.25s; }
 
 /* Styles for the Assignee Quick-Select Buttons */
 .qa-assignee-btn {
