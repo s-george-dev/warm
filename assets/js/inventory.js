@@ -283,12 +283,21 @@ async function exportFullSystemZip() {
             await customAlert("You are currently offline. The archive will be generated with data only (no images).", "Offline Notice");
         }
 
-        // 3. Assemble and save inventory.json
-        const backupData = { timestamp: new Date().toISOString(), items: exportItems, locations: exportLocs, temp_locations: exportTemps, tags: tags, categories: categories };
+        // 3. Assemble and save the data files
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            items: exportItems,
+            locations: exportLocs,
+            temp_locations: exportTemps,
+            tags: tags,
+            categories: categories
+        };
+        
         zip.file("inventory.json", JSON.stringify(backupData, null, 2));
+        zip.file("data.js", `const WARM_RIGHT_DATA = ${JSON.stringify(backupData)};`);
 
-        // 4. Inject EXACT provided viewer.html, using CSS for the image placeholders
-        const htmlContent = String.raw`<!DOCTYPE html>
+        // 4. Inject the Viewer HTML (Standard backticks, fixed HTML syntax)
+        const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -297,22 +306,21 @@ async function exportFullSystemZip() {
     <style>
         :root { --primary: #004a99; --accent: #10b981; --bg: #f8fafc; --card-bg: #ffffff; --text: #334155; }
         body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        .extraction-warning-banner { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 13px; margin-bottom: 15px; text-align: center; border: 1px solid #fca5a5; display: none; }
         .header { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; text-align: center; }
         .file-upload { display: inline-block; background: var(--primary); color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px; transition: opacity 0.2s; font-size: 13px; }
         .file-upload:hover { opacity: 0.9; }
         input[type="file"] { display: none; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap; }
         .tab { padding: 10px 20px; background: var(--card-bg); border: 2px solid transparent; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .tab.active { border-color: var(--primary); color: var(--primary); }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
         .card { background: var(--card-bg); border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; min-height: 260px; box-sizing: border-box; }
         .image-container { position: relative; width: 100%; height: 150px; background: #f1f5f9; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
         .card-img { width: 100%; height: 100%; object-fit: cover; }
         .no-image-box { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #94a3b8; font-weight: bold; font-size: 14px; text-align: center; padding: 10px; box-sizing: border-box;}
         .card h3 { margin: 0 0 5px 0; font-size: 16px; color: var(--primary); text-align: center; }
         .card p { margin: 0; font-size: 13px; color: #64748b; text-align: center; }
-        .badge { display: inline-block; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin: 10px auto 0 auto; width: max-content; }
+        .badge { display: inline-block; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin: 10px 4px 0 4px; }
         .multi-icon { position: absolute; bottom: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); color: white; padding: 5px 6px 3px 6px; border-radius: 6px; pointer-events: none; backdrop-filter: blur(2px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; }
         .footer a { color: var(--primary); text-decoration: none; font-weight: bold; }
@@ -330,12 +338,10 @@ async function exportFullSystemZip() {
     </div>
 
     <div id="mainViewerContent">
-        <div id="reminderBanner" class="extraction-warning-banner">⚠️ Ensure your inventory file has been extracted! Otherwise local images will not render.</div>
-
         <div class="header">
             <h1 style="margin: 0 0 5px 0;">📦 Offline Inventory Browser</h1>
-            <p id="statusMsg" style="margin: 0 0 15px 0; color: #64748b;">Attempting to auto-load local file profile...</p>
-            <label class="file-upload"><input type="file" id="jsonLoader" accept=".json">📂 Load alternative inventory.json</label>
+            <p id="statusMsg" style="margin: 0 0 15px 0; color: #64748b;">Attempting to auto-load local archive data...</p>
+            <label class="file-upload" id="fallbackUpload" style="display:none;"><input type="file" id="jsonLoader" accept=".json">📂 Load alternative inventory.json</label>
         </div>
 
         <div id="contentArea" style="display:none;">
@@ -343,10 +349,14 @@ async function exportFullSystemZip() {
                 <div class="tab active" onclick="switchTab('items')">📝 Items (<span id="itemCount">0</span>)</div>
                 <div class="tab" onclick="switchTab('locations')">📦 Locations (<span id="locCount">0</span>)</div>
                 <div class="tab" onclick="switchTab('assignees')">👤 Assignees (<span id="assigneeCount">0</span>)</div>
+                <div class="tab" onclick="switchTab('tags')">🏷️ Tags (<span id="tagCount">0</span>)</div>
+                <div class="tab" onclick="switchTab('categories')">📁 Categories (<span id="catCount">0</span>)</div>
             </div>
             <div id="itemsGrid" class="grid"></div>
             <div id="locationsGrid" class="grid" style="display: none;"></div>
             <div id="assigneesGrid" class="grid" style="display: none;"></div>
+            <div id="tagsGrid" class="grid" style="display: none;"></div>
+            <div id="categoriesGrid" class="grid" style="display: none;"></div>
         </div>
 
         <div class="footer">
@@ -356,8 +366,15 @@ async function exportFullSystemZip() {
         </div>
     </div>
 
+    <script src="data.js"><\/script>
+
     <script>
-        let db = {};
+        let db = typeof WARM_RIGHT_DATA !== 'undefined' ? WARM_RIGHT_DATA : null;
+
+        // Image error handler replaces broken/missing images with a clean placeholder box
+        function handleImageError(imgEl) {
+            imgEl.outerHTML = "<div class='no-image-box'>No Image Available</div>";
+        }
 
         (function checkArchiveEnvironment() {
             const url = window.location.href.toLowerCase();
@@ -372,25 +389,19 @@ async function exportFullSystemZip() {
 
         window.onload = function() {
             if(document.getElementById('zipBlocker').style.display === 'block') return;
-            document.getElementById('reminderBanner').style.display = 'block';
 
-            fetch('./inventory.json')
-                .then(response => {
-                    if (!response.ok) throw new Error();
-                    return response.json();
-                })
-                .then(data => {
-                    db = data;
-                    document.getElementById('statusMsg').innerText = "Inventory profile detected and auto-loaded completely.";
-                    document.getElementById('statusMsg').style.color = "#10b981";
-                    renderAll();
-                    document.getElementById('contentArea').style.display = 'block';
-                })
-                .catch(error => {
-                    document.getElementById('statusMsg').innerText = "Notice: Automatic folder scan was blocked by browser security. Please click below to select your file manually.";
-                });
+            if (db && db.items) {
+                document.getElementById('statusMsg').innerText = "Data loaded successfully from local archive.";
+                document.getElementById('statusMsg').style.color = "#10b981";
+                renderAll();
+                document.getElementById('contentArea').style.display = 'block';
+            } else {
+                document.getElementById('statusMsg').innerText = "Notice: data.js file not found. Please upload your inventory.json manually.";
+                document.getElementById('fallbackUpload').style.display = 'inline-block';
+            }
         };
 
+        // Fallback uploader
         document.getElementById('jsonLoader').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -402,7 +413,7 @@ async function exportFullSystemZip() {
                     document.getElementById('statusMsg').innerText = "Viewing imported collection file: " + file.name;
                     document.getElementById('statusMsg').style.color = "#475569";
                     document.getElementById('contentArea').style.display = 'block';
-                } catch (err) { alert("Error parsing JSON file objects."); }
+                } catch (err) { alert("Error parsing JSON file."); }
             };
             reader.readAsText(file);
         });
@@ -411,52 +422,58 @@ async function exportFullSystemZip() {
             document.getElementById('itemCount').innerText = db.items?.length || 0;
             document.getElementById('locCount').innerText = db.locations?.length || 0;
             document.getElementById('assigneeCount').innerText = db.temp_locations?.length || 0;
+            document.getElementById('tagCount').innerText = db.tags?.length || 0;
+            document.getElementById('catCount').innerText = db.categories?.length || 0;
 
             // Render Items
             document.getElementById('itemsGrid').innerHTML = (db.items || []).map(function(item) {
                 let validPhotos = [];
                 if (item.photos && Array.isArray(item.photos)) {
-                    validPhotos = item.photos.map(function(p) {
-                        if (!p) return '';
-                        return p.file_path ? p.file_path : (typeof p === 'string' ? p : '');
-                    }).filter(function(p) { return p !== ''; });
+                    validPhotos = item.photos.map(function(p) { return p ? (p.file_path || (typeof p === 'string' ? p : '')) : ''; }).filter(function(p) { return p !== ''; });
                 }
                 
-                let imageHtml = "";
+                let imageHtml = "<div class='no-image-box'>No Image Available</div>";
                 let multiBadge = "";
                 
                 if (validPhotos.length > 0) {
                     if (validPhotos.length > 1) {
                         let safeArr = JSON.stringify(validPhotos).replace(/'/g, "&#39;");
                         multiBadge = "<div class='multi-icon'><svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='14' height='14' rx='2' ry='2'></rect><path d='M21 7v14a2 2 0 0 1-2 2H7'></path></svg></div>";
-                        imageHtml = "<img class='card-img' src='" + validPhotos[0] + "' data-photos='" + safeArr + "' data-index='0' onclick='cycleImage(this)' style='cursor: pointer;'>";
+                        imageHtml = "<img class='card-img' src='" + validPhotos[0] + "' onerror='handleImageError(this)' data-photos='" + safeArr + "' data-index='0' onclick='cycleImage(this)' style='cursor: pointer;'>";
                     } else {
-                        imageHtml = "<img class='card-img' src='" + validPhotos[0] + "'>";
+                        imageHtml = "<img class='card-img' src='" + validPhotos[0] + "' onerror='handleImageError(this)'>";
                     }
-                } else {
-                    imageHtml = "<div class='no-image-box'>No Image Available</div>";
                 }
                 
+                // Categories and Tags Badges
+                let catBadge = item.category ? "<div class='badge' style='background:#e0f2fe; color:#0369a1;'>" + item.category + "</div>" : "";
+                let tagsHtml = "";
+                let tagArr = Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' && item.tags.trim() ? item.tags.split(',') : []);
+                if(tagArr.length > 0) {
+                    tagsHtml = "<div style='margin-top:5px;'>" + tagArr.map(t => "<span class='badge' style='font-weight:normal;'>" + t.trim() + "</span>").join('') + "</div>";
+                }
+
                 return "<div class='card'>" +
                     "<div>" +
                         "<div class='image-container'>" + imageHtml + multiBadge + "</div>" +
                         "<h3>" + (item.name || 'Unnamed Item') + "</h3>" +
                         "<p>Barcode: " + (item.barcode || 'N/A') + "</p>" +
+                        "<div>" + catBadge + tagsHtml + "</div>" +
                     "</div>" +
-                    "<div class='badge'>Qty: " + (item.quantity || 0) + "</div>" +
+                    "<div class='badge' style='background:#f1f5f9;'>Qty: " + (item.quantity || 0) + "</div>" +
                 "</div>";
             }).join('');
 
             // Render Locations
             document.getElementById('locationsGrid').innerHTML = (db.locations || []).map(function(loc) {
-                let imageHtml = loc.photo_path 
-                    ? "<img class='card-img' src='" + loc.photo_path + "'>" 
-                    : "<div class='no-image-box'>No Image Available</div>";
+                let imageHtml = loc.photo_path ? "<img class='card-img' src='" + loc.photo_path + "' onerror='handleImageError(this)'>" : "<div class='no-image-box'>No Image Available</div>";
+                let catBadge = loc.category ? "<div class='badge' style='background:#e0f2fe; color:#0369a1;'>" + loc.category + "</div>" : "";
                     
                 return "<div class='card'>" +
                     "<div>" +
                         "<div class='image-container'>" + imageHtml + "</div>" +
                         "<h3 style='color: #10b981;'>" + (loc.name || 'Unnamed Location') + "</h3>" +
+                        "<div>" + catBadge + "</div>" +
                     "</div>" +
                     "<p>" + (loc.location_description || 'Folder') + "</p>" +
                 "</div>";
@@ -464,9 +481,7 @@ async function exportFullSystemZip() {
 
             // Render Assignees
             document.getElementById('assigneesGrid').innerHTML = (db.temp_locations || []).map(function(assign) {
-                let imageHtml = assign.photo_path 
-                    ? "<img class='card-img' src='" + assign.photo_path + "'>" 
-                    : "<div class='no-image-box'>No Image Available</div>";
+                let imageHtml = assign.photo_path ? "<img class='card-img' src='" + assign.photo_path + "' onerror='handleImageError(this)'>" : "<div class='no-image-box'>No Image Available</div>";
                     
                 return "<div class='card'>" +
                     "<div>" +
@@ -476,15 +491,24 @@ async function exportFullSystemZip() {
                     "<p>" + (assign.description || 'Assignee') + "</p>" +
                 "</div>";
             }).join('');
+            
+            // Render Tags
+            document.getElementById('tagsGrid').innerHTML = (db.tags || []).map(function(tag) {
+                return "<div class='card' style='min-height:auto; justify-content:center;'><h3 style='margin:0;'>🏷️ " + tag.name + "</h3></div>";
+            }).join('');
+
+            // Render Categories
+            document.getElementById('categoriesGrid').innerHTML = (db.categories || []).map(function(cat) {
+                return "<div class='card' style='min-height:auto; justify-content:center;'><h3 style='margin:0; color:#ff8c00;'>📁 " + cat.name + "</h3></div>";
+            }).join('');
         }
 
         function switchTab(tabName) {
             document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
             document.querySelectorAll('.grid').forEach(function(g) { g.style.display = 'none'; });
             event.target.classList.add('active');
-            if(tabName === 'items') document.getElementById('itemsGrid').style.display = 'grid';
-            if(tabName === 'locations') document.getElementById('locationsGrid').style.display = 'grid';
-            if(tabName === 'assignees') document.getElementById('assigneesGrid').style.display = 'grid';
+            
+            document.getElementById(tabName + 'Grid').style.display = 'grid';
         }
 
         function cycleImage(imgEl) {
@@ -496,7 +520,7 @@ async function exportFullSystemZip() {
                 imgEl.setAttribute('data-index', nextIndex);
             } catch (e) {}
         }
-    </script>
+    <\/script>
 </body>
 </html>`;
 
@@ -523,7 +547,6 @@ async function exportFullSystemZip() {
         await customAlert("Failed to generate the ZIP archive. Please check the console.", "Export Error");
     }
 }
-
 /* =========================================================
     GLOBAL BARCODE/NFC UNIQUENESS VALIDATOR (OFFLINE SAFE)
 ========================================================= */
