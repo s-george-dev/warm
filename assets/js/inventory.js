@@ -2018,22 +2018,17 @@ function initFabScrollFade() {
    QUICK ASSIGN: MULTI-STEP SMART SCANNER (BARCODE & NFC)
 ========================================================= */
 let qaScannerInstance = null;
-let qaCurrentStep = 1; // 1 = Scanning Item, 2 = Scanning/Selecting Assignee
+let qaCurrentStep = 1; // 1 = Scanning Item, 2 = Scanning/Selecting Assignee, 3 = Completed Success
 let qaSelectedItem = null;
 let qaIsProcessing = false;
 let qaNfcAbortController = null;
 
 async function openQuickAssignModal() {
-    // Hide the FAB menu
     document.getElementById('quickActionsStack').classList.remove('open');
     document.getElementById('fabOverlay').classList.remove('open');
-
     document.getElementById("quickAssignModal").style.display = "flex";
     
-    // Reset state and fire up hardware
-    resetQuickAssignUI();
-    startQuickAssignScanner();
-    startQuickAssignNFC();
+    restartQuickAssignProcess();
 }
 
 function resetQuickAssignUI() {
@@ -2041,10 +2036,8 @@ function resetQuickAssignUI() {
     qaSelectedItem = null;
     qaIsProcessing = false;
 
-    // Reset UI to Step 1
     document.getElementById("qaTitle").textContent = "Quick Assign: Step 1";
     document.getElementById("qaInstruction").innerHTML = "Scan <b>Item</b> Barcode or Tap NFC";
-
     document.getElementById("qaMainContent").style.display = "block";
     document.getElementById("qaAssigneesList").style.display = "none";
     document.getElementById("qaSuccessContent").style.display = "none";
@@ -2055,19 +2048,20 @@ function closeQuickAssignModal() {
     document.getElementById("quickAssignModal").style.display = "none";
     stopQuickAssignScanner();
     stopQuickAssignNFC();
+    qaCurrentStep = 1;
     qaIsProcessing = false;
 }
 
-// --- HARDWARE CONTROLLERS ---
+// --- HARDWARE RUNTIME CONTROLLERS ---
 function startQuickAssignScanner() {
     if (qaScannerInstance) return; 
     qaScannerInstance = new Html5Qrcode("qaScannerReader");
     qaScannerInstance.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { fps: 10, qrbox: { width: 250, height: 180 } },
         (decodedText) => { handleQuickAssignScan(decodedText); },
-        (err) => { /* Ignore background scanning noise */ }
-    ).catch(err => console.warn("Camera init error:", err));
+        (err) => { /* Bypass background noise */ }
+    ).catch(err => console.warn("Camera initialization fault:", err));
 }
 
 function stopQuickAssignScanner() {
@@ -2086,14 +2080,12 @@ async function startQuickAssignNFC() {
         const ndef = new NDEFReader();
         await ndef.scan({ signal: qaNfcAbortController.signal });
         ndef.onreading = event => {
-            const decoder = new TextDecoder();
-            for (const record of event.message.records) {
-                if (record.recordType === "text") {
-                    handleQuickAssignScan(decoder.decode(record.data));
-                }
+            // FIX: Read hardware serial tokens directly, exactly matching main reader
+            if (event.serialNumber && qaCurrentStep !== 3 && !qaIsProcessing) {
+                handleQuickAssignScan(event.serialNumber);
             }
         };
-    } catch (error) { console.log("NFC Init Error:", error); }
+    } catch (error) { console.log("NFC Quick Assign Init Fault:", error); }
 }
 
 function stopQuickAssignNFC() {
@@ -2103,57 +2095,68 @@ function stopQuickAssignNFC() {
     }
 }
 
-// --- THE MASTER SCAN HANDLER ---
-// --- THE MASTER SCAN HANDLER ---
+// --- TRANSITIONAL ANIMATION SPLASH HELPER ---
+function triggerScanSplash(labelText, durationMs = 1000) {
+    return new Promise(resolve => {
+        document.getElementById("qaSplashText").textContent = labelText;
+        const overlay = document.getElementById("qaSplashOverlay");
+        overlay.classList.add("active");
+        
+        setTimeout(() => {
+            overlay.classList.remove("active");
+            resolve();
+        }, durationMs);
+    });
+}
+
+// --- THE MASTER SMART SCAN HANDLER ---
 async function handleQuickAssignScan(text) {
-    // If we are processing, OR if we hit Step 3 (Success Screen), absolutely ignore any camera input!
+    // Hard Lock: Immediately ignore reads if processing or viewing success page
     if (qaIsProcessing || qaCurrentStep === 3 || !text) return;
-    
     qaIsProcessing = true;
     const token = text.trim().toLowerCase();
 
     try {
         if (qaCurrentStep === 1) {
-            // STEP 1: Process Item Scan
+            // STEP 1: Process Item Validation
             const items = await localDB.items.toArray();
             const itemMatch = items.find(i => (i.barcode && i.barcode.trim().toLowerCase() === token) || (i.nfc_tag && i.nfc_tag.trim().toLowerCase() === token));
 
             if (!itemMatch) {
-                await customAlert("No item found matching that code.", "Not Found");
+                await customAlert("No item found matching that asset token.", "Not Found");
                 qaIsProcessing = false;
                 return;
             }
 
-            // --- Show the laser animation for 1 second ---
+            // Play Laser splash confirmation and freeze inputs for 1 second
             await triggerScanSplash("Item Captured!");
 
-            // Move to Step 2
             qaSelectedItem = itemMatch;
             qaCurrentStep = 2;
 
-            // Update the UI
+            // Advance the Step Interface
             document.getElementById("qaTitle").textContent = "Quick Assign: Step 2";
             document.getElementById("qaInstruction").innerHTML = `Target: <b style='color:#004a99;'>${itemMatch.name}</b><br><span style='font-size:13px; color:#64748b;'>Scan Assignee ID or Select Below</span>`;
             document.getElementById("qaAssigneesList").style.display = "block";
             
             await renderQuickAssignees();
-            qaIsProcessing = false; // Unlock camera for assignee scan
+            qaIsProcessing = false; // Open scanner back up for person scan
 
         } else if (qaCurrentStep === 2) {
-            // STEP 2: Process Assignee Scan
+            // STEP 2: Process Assignee Validation
             const assignees = await localDB.temp_locations.toArray();
             const assigneeMatch = assignees.find(a => (a.barcode && a.barcode.trim().toLowerCase() === token) || (a.nfc_tag && a.nfc_tag.trim().toLowerCase() === token));
 
             if (!assigneeMatch) {
-                await customAlert("No assignee found matching that code.", "Not Found");
+                await customAlert("No assignee profile found matching that code.", "Not Found");
                 qaIsProcessing = false;
                 return;
             }
 
-            // --- Show the laser animation for 0.8 seconds ---
+            // Play validation splash for 800ms
             await triggerScanSplash("ID Verified!", 800);
 
-            // Execute the assignment
+            // Forward execution to final writer
             executeQuickAssignment(assigneeMatch.id, assigneeMatch.name);
         }
     } catch (e) {
@@ -2162,29 +2165,43 @@ async function handleQuickAssignScan(text) {
     }
 }
 
-// Finalize the update and show Success Screen
+async function renderQuickAssignees() {
+    const assignees = await localDB.temp_locations.toArray();
+    const grid = document.getElementById("qaAssigneesGrid");
+    grid.innerHTML = "";
+
+    assignees.forEach(a => {
+        const btn = document.createElement("button");
+        btn.className = "qa-assignee-btn";
+        btn.textContent = a.name;
+        btn.onclick = () => {
+            if(qaCurrentStep === 2 && !qaIsProcessing) {
+                executeQuickAssignment(a.id, a.name);
+            }
+        };
+        grid.appendChild(btn);
+    });
+}
+
+// --- FINALIZE REGISTRATION WRITER ---
 async function executeQuickAssignment(assigneeId, assigneeName) {
-    if (!qaSelectedItem || !assigneeId) return;
+    if (!qaSelectedItem || !assigneeId || qaCurrentStep === 3) return;
     qaIsProcessing = true;
-    
-    // STEP 3: Lock the entire workflow so background scans are ignored
-    qaCurrentStep = 3; 
+    qaCurrentStep = 3; // Block execution window immediately
 
-    // KILL THE CAMERA immediately to save battery and prevent loop bugs
+    // FIX: SHUT OFF ALL PERIPHERALS INSTANTLY. Prevents background cameras from looping data!
     stopQuickAssignScanner();
+    stopQuickAssignNFC();
 
-    // Use Universal Offline Engine
     const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: assigneeId }, qaSelectedItem.id);
 
     if (response.success) {
-        // Hide Camera area, Show Success Party
         document.getElementById("qaMainContent").style.display = "none";
         document.getElementById("qaCancelContainer").style.display = "none";
         document.getElementById("qaSuccessContent").style.display = "block";
 
         document.getElementById("qaSuccessMessage").innerHTML = `<b>${qaSelectedItem.name}</b> has been successfully assigned to <b>${assigneeName}</b>.`;
 
-        // Update Background state
         lastMovedItemId = qaSelectedItem.id;
         logAction("CHECKOUT", "Item", qaSelectedItem.name, `Quick-Assigned to ${assigneeName}`);
         
@@ -2194,28 +2211,13 @@ async function executeQuickAssignment(assigneeId, assigneeName) {
         if (currentTempLocationId) loadTempLocationDetails(currentTempLocationId);
         setTimeout(() => { lastMovedItemId = null; }, 6000);
     } else {
-        await customAlert("Failed to complete the assignment.", "Error");
+        await customAlert("Failed to compile assignment update parameters.", "Transaction Error");
+        qaCurrentStep = 2; // Rollback step if write crashed
     }
     qaIsProcessing = false;
 }
 
-// --- NEW HELPER FUNCTIONS ---
-
-// Triggers the CSS laser animation and pauses Javascript for the duration
-function triggerScanSplash(text, durationMs = 1000) {
-    return new Promise(resolve => {
-        document.getElementById("qaSplashText").textContent = text;
-        const splash = document.getElementById("qaSplashOverlay");
-        splash.classList.add("active");
-        
-        setTimeout(() => {
-            splash.classList.remove("active");
-            resolve();
-        }, durationMs);
-    });
-}
-
-// Safely resets the UI and re-boots the camera for the next item
+// Clear state and safely restart hardware context loops
 function restartQuickAssignProcess() {
     resetQuickAssignUI();
     startQuickAssignScanner();

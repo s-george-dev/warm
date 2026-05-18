@@ -209,61 +209,61 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
 .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
 /* =========================================================
-   SCANNER SUCCESS SPLASH ANIMATION
+   QUICK ASSIGN: TRANSITIONAL LASER SPLASH OVERLAY
 ========================================================= */
 .qa-splash-overlay {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(248, 250, 252, 0.95);
-    z-index: 20;
+    background: rgba(251, 252, 253, 0.96);
+    z-index: 50;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     border-radius: 12px;
     opacity: 0;
-    pointer-events: none; /* Lets clicks pass through when hidden */
+    pointer-events: none;
     transition: opacity 0.2s ease;
 }
 
-/* Active state locks the screen and shows animation */
+/* Active class locks UI clicks and triggers visibility */
 .qa-splash-overlay.active {
     opacity: 1;
-    pointer-events: auto; /* Blocks clicks while animating */
+    pointer-events: auto;
 }
 
-/* Draws a fake barcode using pure CSS gradients! */
+/* Pure CSS Barcode representation vector */
 .barcode-anim-container {
-    width: 90px;
-    height: 60px;
+    width: 100px;
+    height: 65px;
     position: relative;
     background: repeating-linear-gradient(
         to right,
-        #334155,
-        #334155 4px,
+        #1e293b,
+        #1e293b 4px,
         transparent 4px,
         transparent 8px,
-        #334155 8px,
-        #334155 10px,
-        transparent 10px,
-        transparent 14px
+        #1e293b 8px,
+        #1e293b 11px,
+        transparent 11px,
+        transparent 15px
     );
     margin-bottom: 15px;
 }
 
-/* The Glowing Red Laser */
+/* Glowing Target Laser */
 .laser-line {
     width: 120%;
     height: 3px;
     background: #ef4444;
-    box-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444;
+    box-shadow: 0 0 12px #ef4444, 0 0 24px #ef4444;
     position: absolute;
     left: -10%;
     top: 0;
-    animation: scanLaser 0.5s infinite alternate ease-in-out;
+    animation: scanLaserLine 0.5s infinite alternate ease-in-out;
 }
 
-@keyframes scanLaser {
+@keyframes scanLaserLine {
     0% { top: 0; }
     100% { top: 100%; }
 }
