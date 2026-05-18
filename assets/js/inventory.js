@@ -109,12 +109,18 @@ async function logAction(actionType, targetEntity, targetName, details = "") {
 }
 
 async function loadAuditLogs() {
-    if (!window.isAppOnline) {
-        document.getElementById("auditLogTableBody").innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 20px;">Audit logs are only available while online.</td></tr>`;
-        return;
+    try {
+        // Read directly from the blazing-fast local database
+        const logs = await localDB.audit_logs.toArray();
+        
+        // Sort them newest-first
+        allAuditLogs = logs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        filterAuditLogs();
+    } catch (e) {
+        console.warn("Could not load audit logs:", e);
+        document.getElementById("auditLogTableBody").innerHTML = `<tr><td colspan="5" style="text-align: center; color: #999; padding: 20px;">No logs available.</td></tr>`;
     }
-    const { data, error } = await withStatus(() => window.db.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(200), "Loading audit trail...");
-    if (!error) { allAuditLogs = data || []; filterAuditLogs(); }
 }
 
 function filterAuditLogs() {
@@ -217,6 +223,306 @@ async function exportItemsPDF() {
     window.setStatus("connected", "PDF Generated");
 }
 
+async function exportFullSystemZip() {
+    if (!window.JSZip) return await customAlert("ZIP Engine is currently loading. Please wait a moment...", "Loading Engine");
+    
+    if (!(await customConfirm("Generate a fully self-contained offline archive? This may take a moment to download all images.", "Master Archive"))) return;
+
+    window.setStatus("syncing", "Assembling Master Archive...");
+
+    try {
+        const zip = new JSZip();
+        const imgFolder = zip.folder("images");
+
+        // 1. Gather all data from the local Dexie DB
+        let exportItems = JSON.parse(JSON.stringify(await localDB.items.toArray()));
+        let exportLocs = JSON.parse(JSON.stringify(await localDB.locations.toArray()));
+        let exportTemps = JSON.parse(JSON.stringify(await localDB.temp_locations.toArray()));
+        const tags = await localDB.tags.toArray();
+        const categories = await localDB.item_categories.toArray();
+
+        // 2. Download Images to the Archive
+        if (window.isAppOnline) {
+            window.setStatus("syncing", "Downloading images to archive...");
+
+            async function fetchAndZipImage(bucket, fileName) {
+                if (!fileName) return null;
+                try {
+                    const { data, error } = await window.db.storage.from(bucket).download(fileName);
+                    if (data) {
+                        imgFolder.file(fileName, data);
+                        return `./images/${fileName}`; 
+                    }
+                } catch (e) { console.warn("Failed to download image:", fileName); }
+                return null;
+            }
+
+            for (let item of exportItems) {
+                if (item.photos && Array.isArray(item.photos)) {
+                    for (let photo of item.photos) {
+                        const localPath = await fetchAndZipImage("item-photos", photo.file_path);
+                        if (localPath) photo.file_path = localPath;
+                    }
+                }
+            }
+
+            for (let loc of exportLocs) {
+                if (loc.photo_path) {
+                    const localPath = await fetchAndZipImage("location-photos", loc.photo_path);
+                    if (localPath) loc.photo_path = localPath;
+                }
+            }
+
+            for (let temp of exportTemps) {
+                if (temp.photo_path) {
+                    const localPath = await fetchAndZipImage("location-photos", temp.photo_path);
+                    if (localPath) temp.photo_path = localPath;
+                }
+            }
+        } else {
+            await customAlert("You are currently offline. The archive will be generated with data only (no images).", "Offline Notice");
+        }
+
+        // 3. Assemble and save inventory.json
+        const backupData = { timestamp: new Date().toISOString(), items: exportItems, locations: exportLocs, temp_locations: exportTemps, tags: tags, categories: categories };
+        zip.file("inventory.json", JSON.stringify(backupData, null, 2));
+
+        // 4. Inject EXACT provided viewer.html, using CSS for the image placeholders
+        const htmlContent = String.raw`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Inventory Viewer</title>
+    <style>
+        :root { --primary: #004a99; --accent: #10b981; --bg: #f8fafc; --card-bg: #ffffff; --text: #334155; }
+        body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .extraction-warning-banner { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 13px; margin-bottom: 15px; text-align: center; border: 1px solid #fca5a5; display: none; }
+        .header { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; text-align: center; }
+        .file-upload { display: inline-block; background: var(--primary); color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px; transition: opacity 0.2s; font-size: 13px; }
+        .file-upload:hover { opacity: 0.9; }
+        input[type="file"] { display: none; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        .tab { padding: 10px 20px; background: var(--card-bg); border: 2px solid transparent; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .tab.active { border-color: var(--primary); color: var(--primary); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; min-height: 260px; box-sizing: border-box; }
+        .image-container { position: relative; width: 100%; height: 150px; background: #f1f5f9; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+        .card-img { width: 100%; height: 100%; object-fit: cover; }
+        .no-image-box { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #94a3b8; font-weight: bold; font-size: 14px; text-align: center; padding: 10px; box-sizing: border-box;}
+        .card h3 { margin: 0 0 5px 0; font-size: 16px; color: var(--primary); text-align: center; }
+        .card p { margin: 0; font-size: 13px; color: #64748b; text-align: center; }
+        .badge { display: inline-block; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin: 10px auto 0 auto; width: max-content; }
+        .multi-icon { position: absolute; bottom: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); color: white; padding: 5px 6px 3px 6px; border-radius: 6px; pointer-events: none; backdrop-filter: blur(2px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; }
+        .footer a { color: var(--primary); text-decoration: none; font-weight: bold; }
+        .footer a:hover { text-decoration: underline; }
+        .zip-blocker-screen { display: none; max-width: 500px; margin: 100px auto; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; border: 2px solid #ef4444; }
+    </style>
+</head>
+<body>
+
+    <div id="zipBlocker" class="zip-blocker-screen">
+        <span style="font-size: 50px;">📁</span>
+        <h2 style="color: #dc2626; margin-top: 15px;">Please extract the folder first!</h2>
+        <p style="color: #4b5563; line-height: 1.6; font-size: 15px;">You are currently viewing this file from inside the compressed zip archive container. The application cannot load local resource directories until it is expanded.</p>
+        <p style="font-weight: bold; margin-top: 20px; color: #1f2937;">Close this window, right-click the ZIP archive file, choose "Extract All", then reload this browser file from the extracted folder.</p>
+    </div>
+
+    <div id="mainViewerContent">
+        <div id="reminderBanner" class="extraction-warning-banner">⚠️ Ensure your inventory file has been extracted! Otherwise local images will not render.</div>
+
+        <div class="header">
+            <h1 style="margin: 0 0 5px 0;">📦 Offline Inventory Browser</h1>
+            <p id="statusMsg" style="margin: 0 0 15px 0; color: #64748b;">Attempting to auto-load local file profile...</p>
+            <label class="file-upload"><input type="file" id="jsonLoader" accept=".json">📂 Load alternative inventory.json</label>
+        </div>
+
+        <div id="contentArea" style="display:none;">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('items')">📝 Items (<span id="itemCount">0</span>)</div>
+                <div class="tab" onclick="switchTab('locations')">📦 Locations (<span id="locCount">0</span>)</div>
+                <div class="tab" onclick="switchTab('assignees')">👤 Assignees (<span id="assigneeCount">0</span>)</div>
+            </div>
+            <div id="itemsGrid" class="grid"></div>
+            <div id="locationsGrid" class="grid" style="display: none;"></div>
+            <div id="assigneesGrid" class="grid" style="display: none;"></div>
+        </div>
+
+        <div class="footer">
+            Created by s-george-dev (Stephan George) | 
+            <a href="https://github.com/s-george-dev" target="_blank">GitHub</a> | 
+            <a href="https://www.linkedin.com/in/steph-v-george/" target="_blank">LinkedIn</a>
+        </div>
+    </div>
+
+    <script>
+        let db = {};
+
+        (function checkArchiveEnvironment() {
+            const url = window.location.href.toLowerCase();
+            const isZipProtocol = url.indexOf('zip://') > -1 || url.indexOf('.zip/') > -1;
+            const isTempPath = url.indexOf('/appdata/local/temp/') > -1 || url.indexOf('/var/folders/') > -1 || url.indexOf('/tmp/') > -1;
+            
+            if (isZipProtocol || isTempPath) {
+                document.getElementById('mainViewerContent').style.display = 'none';
+                document.getElementById('zipBlocker').style.display = 'block';
+            }
+        })();
+
+        window.onload = function() {
+            if(document.getElementById('zipBlocker').style.display === 'block') return;
+            document.getElementById('reminderBanner').style.display = 'block';
+
+            fetch('./inventory.json')
+                .then(response => {
+                    if (!response.ok) throw new Error();
+                    return response.json();
+                })
+                .then(data => {
+                    db = data;
+                    document.getElementById('statusMsg').innerText = "Inventory profile detected and auto-loaded completely.";
+                    document.getElementById('statusMsg').style.color = "#10b981";
+                    renderAll();
+                    document.getElementById('contentArea').style.display = 'block';
+                })
+                .catch(error => {
+                    document.getElementById('statusMsg').innerText = "Notice: Automatic folder scan was blocked by browser security. Please click below to select your file manually.";
+                });
+        };
+
+        document.getElementById('jsonLoader').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    db = JSON.parse(event.target.result);
+                    renderAll();
+                    document.getElementById('statusMsg').innerText = "Viewing imported collection file: " + file.name;
+                    document.getElementById('statusMsg').style.color = "#475569";
+                    document.getElementById('contentArea').style.display = 'block';
+                } catch (err) { alert("Error parsing JSON file objects."); }
+            };
+            reader.readAsText(file);
+        });
+
+        function renderAll() {
+            document.getElementById('itemCount').innerText = db.items?.length || 0;
+            document.getElementById('locCount').innerText = db.locations?.length || 0;
+            document.getElementById('assigneeCount').innerText = db.temp_locations?.length || 0;
+
+            // Render Items
+            document.getElementById('itemsGrid').innerHTML = (db.items || []).map(function(item) {
+                let validPhotos = [];
+                if (item.photos && Array.isArray(item.photos)) {
+                    validPhotos = item.photos.map(function(p) {
+                        if (!p) return '';
+                        return p.file_path ? p.file_path : (typeof p === 'string' ? p : '');
+                    }).filter(function(p) { return p !== ''; });
+                }
+                
+                let imageHtml = "";
+                let multiBadge = "";
+                
+                if (validPhotos.length > 0) {
+                    if (validPhotos.length > 1) {
+                        let safeArr = JSON.stringify(validPhotos).replace(/'/g, "&#39;");
+                        multiBadge = "<div class='multi-icon'><svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='14' height='14' rx='2' ry='2'></rect><path d='M21 7v14a2 2 0 0 1-2 2H7'></path></svg></div>";
+                        imageHtml = "<img class='card-img' src='" + validPhotos[0] + "' data-photos='" + safeArr + "' data-index='0' onclick='cycleImage(this)' style='cursor: pointer;'>";
+                    } else {
+                        imageHtml = "<img class='card-img' src='" + validPhotos[0] + "'>";
+                    }
+                } else {
+                    imageHtml = "<div class='no-image-box'>No Image Available</div>";
+                }
+                
+                return "<div class='card'>" +
+                    "<div>" +
+                        "<div class='image-container'>" + imageHtml + multiBadge + "</div>" +
+                        "<h3>" + (item.name || 'Unnamed Item') + "</h3>" +
+                        "<p>Barcode: " + (item.barcode || 'N/A') + "</p>" +
+                    "</div>" +
+                    "<div class='badge'>Qty: " + (item.quantity || 0) + "</div>" +
+                "</div>";
+            }).join('');
+
+            // Render Locations
+            document.getElementById('locationsGrid').innerHTML = (db.locations || []).map(function(loc) {
+                let imageHtml = loc.photo_path 
+                    ? "<img class='card-img' src='" + loc.photo_path + "'>" 
+                    : "<div class='no-image-box'>No Image Available</div>";
+                    
+                return "<div class='card'>" +
+                    "<div>" +
+                        "<div class='image-container'>" + imageHtml + "</div>" +
+                        "<h3 style='color: #10b981;'>" + (loc.name || 'Unnamed Location') + "</h3>" +
+                    "</div>" +
+                    "<p>" + (loc.location_description || 'Folder') + "</p>" +
+                "</div>";
+            }).join('');
+
+            // Render Assignees
+            document.getElementById('assigneesGrid').innerHTML = (db.temp_locations || []).map(function(assign) {
+                let imageHtml = assign.photo_path 
+                    ? "<img class='card-img' src='" + assign.photo_path + "'>" 
+                    : "<div class='no-image-box'>No Image Available</div>";
+                    
+                return "<div class='card'>" +
+                    "<div>" +
+                        "<div class='image-container'>" + imageHtml + "</div>" +
+                        "<h3 style='color: #ff8c00;'>" + (assign.name || 'Unnamed') + "</h3>" +
+                    "</div>" +
+                    "<p>" + (assign.description || 'Assignee') + "</p>" +
+                "</div>";
+            }).join('');
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.grid').forEach(function(g) { g.style.display = 'none'; });
+            event.target.classList.add('active');
+            if(tabName === 'items') document.getElementById('itemsGrid').style.display = 'grid';
+            if(tabName === 'locations') document.getElementById('locationsGrid').style.display = 'grid';
+            if(tabName === 'assignees') document.getElementById('assigneesGrid').style.display = 'grid';
+        }
+
+        function cycleImage(imgEl) {
+            try {
+                let photos = JSON.parse(imgEl.getAttribute('data-photos').replace(/&#39;/g, "'"));
+                let currentIndex = parseInt(imgEl.getAttribute('data-index'));
+                let nextIndex = (currentIndex + 1) % photos.length;
+                imgEl.src = photos[nextIndex];
+                imgEl.setAttribute('data-index', nextIndex);
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>`;
+
+        zip.file("viewer.html", htmlContent);
+
+        // 5. Generate and Download
+        window.setStatus("syncing", "Compressing Archive...");
+        const content = await zip.generateAsync({ type: "blob" });
+        
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(content);
+        link.download = `WarmRight_Master_Archive_${new Date().toISOString().split('T')[0]}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        logAction("CREATE", "System", "ZIP Archive", "Exported Offline Viewer");
+        window.setStatus("connected", "Archive Downloaded");
+
+    } catch (error) {
+        console.error("ZIP Generation Failed:", error);
+        window.setStatus("error", "ZIP Failed");
+        await customAlert("Failed to generate the ZIP archive. Please check the console.", "Export Error");
+    }
+}
 
 /* =========================================================
     GLOBAL BARCODE/NFC UNIQUENESS VALIDATOR (OFFLINE SAFE)
@@ -532,7 +838,20 @@ function refreshLocationAdmin() {
 }
 
 async function loadLocationsAdmin() {
-    locationsAdmin = await localDB.locations.toArray();
+    const lData = await localDB.locations.toArray();
+    
+    // Safely map the database columns to the UI's memory variables
+    locationsAdmin = lData.map(l => ({ 
+        id: l.id, 
+        name: l.name, 
+        parent: l.parent_id, // <--- This was the missing link!
+        barcode: l.barcode, 
+        nfc: l.nfc_tag, 
+        photo: l.photo_path, 
+        location_description: l.location_description, 
+        category: l.category 
+    }));
+    
     refreshLocationAdmin();
     loadLocationDropdown();
 }
@@ -840,6 +1159,50 @@ async function addItem() {
             window.processSyncQueue(); // Tell the engine to try uploading if we have a signal
         }
     } finally { window.isProcessingTransaction = false; }
+}
+async function switchToItemEdit() {
+    if (!currentItemForActions) return;
+    closeModal('itemDetailsModal');
+    const item = currentItemForActions;
+
+    try {
+        // 1. Safely populate standard text fields
+        if (document.getElementById("editItemName")) document.getElementById("editItemName").value = item.name || "";
+        if (document.getElementById("editItemQuantity")) document.getElementById("editItemQuantity").value = item.quantity || 0;
+        if (document.getElementById("editItemDescription")) document.getElementById("editItemDescription").value = item.description || "";
+        if (document.getElementById("editItemBarcode")) document.getElementById("editItemBarcode").value = item.barcode || "";
+        if (document.getElementById("editItemNFC")) document.getElementById("editItemNFC").value = item.nfc_tag || "";
+        if (document.getElementById("editItemCategory")) document.getElementById("editItemCategory").value = item.category || "tools";
+        if (document.getElementById("editItemLocationSelect")) document.getElementById("editItemLocationSelect").value = item.location_id || "";
+
+        // 2. Safely parse tags (handles both arrays and comma-separated strings)
+        let parsedTags = [];
+        if (Array.isArray(item.tags)) {
+            parsedTags = [...item.tags];
+        } else if (typeof item.tags === 'string' && item.tags.trim()) {
+            parsedTags = item.tags.split(',').map(t => t.trim());
+        }
+        activeSelectedEditTags = parsedTags;
+        renderActiveTagPills('edit');
+
+        // 3. Safely handle photos (removed strict syntax for maximum Android compatibility)
+        currentEditItemFiles = []; 
+        existingItemPhotosToDelete = []; 
+        primaryPhotoIdentifier = null;
+        
+        const photos = item.photos || [];
+        const existingPrimary = photos.find(p => p.is_primary);
+        primaryPhotoIdentifier = existingPrimary ? existingPrimary.file_path : (photos.length > 0 ? photos[0].file_path : null);
+        
+        renderMultipleFilesPreviews('editItemPreviewsRow', currentEditItemFiles, 'edit-item', photos);
+
+        // 4. Show the modal
+        document.getElementById("itemEditModal").style.display = "flex";
+        
+    } catch (error) {
+        console.error("Critical Error opening edit modal:", error);
+        alert("An error occurred trying to load the editor. Please refresh the app.");
+    }
 }
 
 async function attemptDeleteItem() {
@@ -1276,6 +1639,35 @@ async function handleGlobalSearch(term) {
         } else if (filterType === "name" && nameMatches) sections.name.push(item); else if (filterType === "location" && locationMatches) sections.location.push(item); else if (filterType === "barcode" && barcodeMatches) sections.name.push(item); else if (filterType === "tag" && tagPillsMatch && textTagMatch) sections.tag.push(item); else if (filterType === "category" && catPillMatch && textCatMatch) sections.category.push(item);
     });
     renderSectionedSearchResults(sections, filterType);
+}
+
+function renderSectionedSearchResults(sections, filterType) {
+    let combinedResults = [];
+    
+    // 1. Gather the results based on the active filter
+    if (filterType === "all") {
+        combinedResults = [...sections.name, ...sections.location, ...sections.tag, ...sections.category];
+    } else if (filterType === "name" || filterType === "barcode") {
+        combinedResults = [...sections.name];
+    } else if (filterType === "location") {
+        combinedResults = [...sections.location];
+    } else if (filterType === "tag") {
+        combinedResults = [...sections.tag];
+    } else if (filterType === "category") {
+        combinedResults = [...sections.category];
+    }
+
+    // 2. Remove duplicates (An item might match multiple criteria)
+    const uniqueResults = Array.from(new Set(combinedResults.map(i => i.id)))
+        .map(id => combinedResults.find(i => i.id === id));
+
+    // 3. Update the global state so sorting/views work on the search results
+    currentBrowserLocations = []; 
+    currentBrowserItems = uniqueResults;
+    
+    // 4. Render the results to the screen
+    renderLocations([]); 
+    renderItems(uniqueResults);
 }
 
 function handleLocationBarcodeLookup(scannedText) {

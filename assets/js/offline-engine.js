@@ -4,11 +4,10 @@
 ========================================================= */
 
 // 1. Initialize the Local Database
-// We define the tables and the data columns we want to index (search by)
 const localDB = new Dexie("WarmRightOfflineDB");
 
-// Version 2: Added sync_photos_queue for offline image support
-localDB.version(2).stores({
+// Version 3: Added audit_logs for offline settings page
+localDB.version(3).stores({
     items: 'id, name, location_id, assigned_to, category, barcode, nfc_tag', 
     locations: 'id, parent_id, barcode, nfc_tag',
     temp_locations: 'id, barcode, nfc_tag',
@@ -16,7 +15,8 @@ localDB.version(2).stores({
     item_categories: 'id, name',
     jobs: 'id, status, engineer_id, scheduled_date',
     sync_queue: '++id, action, table, payload, created_at, status',
-    sync_photos_queue: '++id, record_id, record_type, bucket, file_name, base64_data, is_primary, status'
+    sync_photos_queue: '++id, record_id, record_type, bucket, file_name, base64_data, is_primary, status',
+    audit_logs: 'id, created_at, action_type' // <--- NEW LINE
 });
 
 // Global state tracker
@@ -142,6 +142,15 @@ window.syncDatabaseToLocal = async function() {
             await localDB.item_categories.bulkPut(catData);
             console.log(`📥 Synced ${catData.length} Categories`);
         } else { console.warn("⚠️ Categories sync failed:", catErr); }
+
+        // 6. Sync Audit Logs (Limit to 200 so we don't overload the phone)
+        const { data: auditData, error: auditErr } = await window.db.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200);
+        if (!auditErr && auditData) {
+            await localDB.audit_logs.clear();
+            await localDB.audit_logs.bulkPut(auditData);
+            console.log(`📥 Synced ${auditData.length} Audit Logs`);
+        } else { console.warn("⚠️ Audit Logs sync failed:", auditErr); }
+
 
         console.log("✅ Offline Database fully synced with Supabase!");
         window.setStatus("connected", "Online - Synced");

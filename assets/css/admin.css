@@ -87,7 +87,7 @@ nav {
         font-size: 13px !important; 
     }
     .nav-user { 
-        order: 2 !important; 
+        order: 1 !important; 
         border-right: none !important; 
         padding-right: 0 !important; 
     }

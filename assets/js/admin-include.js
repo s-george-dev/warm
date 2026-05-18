@@ -34,10 +34,16 @@ window.loadAdminHeader = async function(session) {
             document.addEventListener('click', () => menu.style.display = 'none');
         }
 
-        // 4. LOGOUT BUTTON
+             // 4. LOGOUT BUTTON
         const logoutBtn = document.getElementById('nav-logout-btn');
         if (logoutBtn) {
             logoutBtn.onclick = async () => {
+                // Protect offline users from locking themselves out!
+                if (typeof window.isAppOnline !== 'undefined' && !window.isAppOnline) {
+                    alert("⚠️ You cannot log out while in Offline Mode. Please reconnect to the internet first.");
+                    return;
+                }
+
                 if (window.db) {
                     await window.db.auth.signOut();
                     window.location.href = 'login.html';
