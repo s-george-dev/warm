@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory | Warm Right Ltd</title>
+    <link rel="icon" href="../assets/images/favicon.png">
     <link rel="manifest" href="../manifest.json">
     <link rel="stylesheet" href="../assets/css/variables.css">  
     <link rel="stylesheet" href="../assets/css/admin.css">
@@ -682,16 +683,16 @@
             <h2 id="qaTitle" style="color: #004a99; margin-bottom: 5px;">Quick Assign</h2>
             <p id="qaInstruction" style="margin-bottom: 20px; color: #475569; font-size: 15px;">Scan Item Barcode or Tap NFC</p>
 
-            <div id="qaMainContent" style="position: relative;">
+           <div id="qaMainContent" style="position: relative;">
                 
                 <div id="qaSplashOverlay" class="qa-splash-overlay">
                     <div class="barcode-anim-container">
                         <div class="laser-line"></div>
                     </div>
-                    <h3 id="qaSplashText" style="color: #004a99; margin: 0; font-size: 20px;">Scan Captured!</h3>
+                    <h3 id="qaSplashText" style="color: #004a99; margin: 0; font-size: 18px; font-weight: bold;">Processing Scan...</h3>
                 </div>
 
-                <div id="qaScannerReader" style="width: 100%; max-width: 400px; min-height: 250px; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background: #000; display: flex; align-items: center; justify-content: center;"></div>
+                <div id="qaScannerReader" style="width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background: #000;"></div>
 
                 <div id="qaAssigneesList" style="display: none; margin-top: 20px; text-align: left; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
                     <h4 style="margin: 0 0 10px 0; color: #334155;">Or Select Manually:</h4>
@@ -756,23 +757,18 @@
         <div id="quickActionsStack" class="fab-stack">
             
             <div class="quick-action-wrapper">
-                <button class="fab-btn fab-mini" onclick="openQuickAssignModal()" title="Quick Assign Item">👤📱</button>
+                <button class="fab-btn fab-mini" onclick="openQuickAssignModal()" title="Quick Assign Item">👤</button>
                 <span class="fab-label">Quick Assign</span>
             </div>
 
             <div class="quick-action-wrapper">
-                <button class="fab-btn fab-mini" onclick="openNfcScannerModal('FAST_RETURN')" title="NFC Fast Return">📥📡</button>
-                <span class="fab-label">Quick Return (NFC)</span>
-            </div>
-
-            <div class="quick-action-wrapper">
-                <button class="fab-btn fab-mini" onclick="openBarcodeScannerModal('FAST_RETURN')" title="Barcode Fast Return">📥📷</button>
-                <span class="fab-label">Quick Return (BC)</span>
+                <button class="fab-btn fab-mini" onclick="openQuickReturnModal()" title="Fast Return">🔄</button>
+                <span class="fab-label">Quick Return</span>
             </div>
 
             <div class="quick-action-wrapper">
                 <button class="fab-btn fab-mini" onclick="openQuantityAdjusterModal()" title="Fast Adjust Quantity">🔢</button>
-                <span class="fab-label">Quick Adjust (Q)</span>
+                <span class="fab-label">Quick Adjust</span>
             </div>
             
         </div>
@@ -783,6 +779,27 @@
     <button class="fab-btn fab-item" id="fabItemBtn" onclick="openAddItemModal()">+</button>
 </div>
 
+<div id="quickReturnModal" class="modal" style="z-index: 3000;">
+        <div class="modal-content" style="max-width: 500px; text-align: center; padding: 25px;">
+            <h2 style="color: #004a99; margin-bottom: 5px;">Quick Return</h2>
+            <p style="margin-bottom: 20px; color: #475569; font-size: 15px;">Scan Item Barcode or Tap NFC Tag</p>
+
+            <div style="position: relative;">
+                <div id="qrSplashOverlay" class="qa-splash-overlay">
+                    <div class="barcode-anim-container">
+                        <div class="laser-line"></div>
+                    </div>
+                    <h3 id="qrSplashText" style="color: #004a99; margin: 0; font-size: 18px; font-weight: bold;">Processing Return...</h3>
+                </div>
+
+                <div id="qrScannerReader" style="width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background: #000;"></div>
+            </div>
+
+            <div style="margin-top: 25px;">
+                <button class="btn-secondary" onclick="closeQuickReturnModal()" style="width: 100%;">Cancel</button>
+            </div>
+        </div>
+    </div>
 <script>
     function toggleFab() {
         document.getElementById('quickActionsStack').classList.toggle('open');

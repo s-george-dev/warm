@@ -339,7 +339,32 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
 
     /* Modals */
     .modal { padding: 2vh 10px; align-items: flex-start; }
-    .modal-content { padding: 20px 15px; width: 100%; margin: 0 auto; max-height: 92vh; }
+    body.modal-open {
+    overflow: hidden !important;
+    height: 100vh !important;
+}
+
+/* Ensure modals stay smaller than viewport and manage their own scroll tracks */
+/* =========================================================
+   SECURE MODAL SCROLLING & BACKGROUND LOCKS (ZERO-JS)
+========================================================= */
+
+/* Native Browser Fix: If any modal has inline display flex or block, freeze the background body */
+body:has(.modal[style*="display: flex"]),
+body:has(.modal[style*="display:flex"]),
+body:has(.modal[style*="display: block"]),
+body:has(.modal[style*="display:block"]) {
+    overflow: hidden !important;
+    height: 100vh !important;
+}
+
+/* Ensure modal contents manage their own dimensions and scroll tracks perfectly */
+.modal-content {
+    max-height: 82vh !important;            /* Caps modal height at 82% of screen so it's slightly smaller */
+    overflow-y: auto !important;             /* Guarantees internal scrollbars appear if content is long */
+    box-sizing: border-box !important;
+    overscroll-behavior: contain !important; /* Critical Fix: Blocks scroll chaining from moving the background window */
+}
     .modal-buttons { flex-direction: column; gap: 10px; }
     .modal-buttons > div { display: flex; flex-direction: column; width: 100%; gap: 10px; }
     .modal-buttons button { width: 100%; margin: 0 !important; }
@@ -546,7 +571,6 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
 
 /* Staggered delays (Bottom whips in first, Top whips in last) */
 /* Update Staggered delays for 4 buttons (Bottom whips in first, Top whips in last) */
-.fab-stack.open .quick-action-wrapper:nth-child(4) { transition-delay: 0.05s; }
 .fab-stack.open .quick-action-wrapper:nth-child(3) { transition-delay: 0.1s; }
 .fab-stack.open .quick-action-wrapper:nth-child(2) { transition-delay: 0.15s; }
 .fab-stack.open .quick-action-wrapper:nth-child(1) { transition-delay: 0.2s; }

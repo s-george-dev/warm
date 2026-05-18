@@ -2239,3 +2239,145 @@ async function renderQuickAssignees() {
         grid.appendChild(btn);
     });
 }
+
+/* =========================================================
+   UNIFIED QUICK RETURN: BARCODE & NFC CONCURRENT SCANNER
+========================================================= */
+let qrScannerInstance = null;
+let qrNfcAbortController = null;
+let qrIsProcessing = false;
+
+async function openQuickReturnModal() {
+    // Dismiss active FAB overlay views
+    document.getElementById('quickActionsStack').classList.remove('open');
+    document.getElementById('fabOverlay').classList.remove('open');
+    
+    document.getElementById("quickReturnModal").style.display = "flex";
+    
+    // Reset state locks
+    qrIsProcessing = false;
+    document.getElementById("qrSplashOverlay").classList.remove("active");
+    
+    // Boot up unified capture peripherals
+    startQuickReturnScanner();
+    startQuickReturnNFC();
+}
+
+function closeQuickReturnModal() {
+    document.getElementById("quickReturnModal").style.display = "none";
+    stopQuickReturnScanner();
+    stopQuickReturnNFC();
+    qrIsProcessing = false;
+}
+
+function startQuickReturnScanner() {
+    if (qrScannerInstance) return;
+    qrScannerInstance = new Html5Qrcode("qrScannerReader");
+    qrScannerInstance.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 180 } },
+        (decodedText) => { handleQuickReturnScan(decodedText); },
+        (err) => { /* Bypass framework noise */ }
+    ).catch(err => console.warn("QR Return camera initialization error:", err));
+}
+
+function stopQuickReturnScanner() {
+    if (qrScannerInstance) {
+        qrScannerInstance.stop().then(() => {
+            qrScannerInstance.clear();
+            qrScannerInstance = null;
+        }).catch(e => { qrScannerInstance = null; });
+    }
+}
+
+async function startQuickReturnNFC() {
+    if (!('NDEFReader' in window)) return;
+    try {
+        qrNfcAbortController = new AbortController();
+        const ndef = new NDEFReader();
+        await ndef.scan({ signal: qrNfcAbortController.signal });
+        ndef.onreading = event => {
+            // Read hardware serial tokens directly to ensure compatibility
+            if (event.serialNumber && !qrIsProcessing) {
+                handleQuickReturnScan(event.serialNumber);
+            }
+        };
+    } catch (error) { console.log("NFC Return initialization fault:", error); }
+}
+
+function stopQuickReturnNFC() {
+    if (qrNfcAbortController) {
+        qrNfcAbortController.abort();
+        qrNfcAbortController = null;
+    }
+}
+
+async function handleQuickReturnScan(scannedText) {
+    if (qrIsProcessing || !scannedText) return;
+    qrIsProcessing = true;
+    
+    const token = scannedText.trim().toLowerCase();
+    
+    try {
+        // Look up target record locally
+        const items = await localDB.items.toArray();
+        const match = items.find(item => (item.barcode && item.barcode.trim().toLowerCase() === token) || (item.nfc_tag && item.nfc_tag.trim().toLowerCase() === token));
+        
+        if (!match) {
+            await customAlert("No items found matching that asset tag!", "Scan Failed");
+            qrIsProcessing = false;
+            return;
+        }
+        
+        if (!match.assigned_to) {
+            await customAlert(`Item <b>[${match.name}]</b> is already in the warehouse (Not checked out).`, "Already In Stock");
+            qrIsProcessing = false;
+            return;
+        }
+        
+        // Fire laser splash animation framework
+        document.getElementById("qrSplashText").textContent = "Item Captured!";
+        document.getElementById("qrSplashOverlay").classList.add("active");
+        
+        // KILL ALL HARDWARE DRIVERS IMMEDIATELY to prevent repeat scanner queries
+        stopQuickReturnScanner();
+        stopQuickReturnNFC();
+        
+        // Write the update parameter directly to Dexie
+        const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: null }, match.id);
+        
+        if (response.success) {
+            const locPath = match.location_id ? buildLocationPath(match.location_id) : "Unallocated Items";
+            const successMsg = `🎉 Success! <b>[${match.name}]</b> has been checked back in.<br><br><b>📍 PLEASE RETURN TO:</b><br><span style="color: #004a99; font-weight: bold; font-size: 16px;">${locPath}</span>`;
+            
+            // Shut scanner modal window context before firing alerts to keep views clean
+            closeQuickReturnModal();
+            
+            await customAlert(successMsg, "Item Returned");
+            
+            lastMovedItemId = match.id;
+            logAction("RETURN", "Item", match.name, "Fast-Return via Unified Smart Scanner");
+            
+            // Refresh underlying UI components
+            await refreshAllDataFromLocal();
+            window.processSyncQueue();
+            
+            if (currentTempLocationId) loadTempLocationDetails(currentTempLocationId);
+            else if (currentLocationId) loadLocation(currentLocationId);
+            else loadRootLocations();
+            
+            setTimeout(() => { lastMovedItemId = null; }, 6000);
+        } else {
+            await customAlert("Failed to execute local storage update parameter.", "Transaction Error");
+            // Re-prime scanner window if mutation failed
+            document.getElementById("qrSplashOverlay").classList.remove("active");
+            startQuickReturnScanner();
+            startQuickReturnNFC();
+            qrIsProcessing = false;
+        }
+    } catch (e) {
+        console.error(e);
+        document.getElementById("qrSplashOverlay").classList.remove("active");
+        qrIsProcessing = false;
+    }
+}
