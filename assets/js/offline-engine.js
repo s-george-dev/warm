@@ -213,7 +213,12 @@ window.processSyncQueue = async function() {
             window.setStatus("syncing", `Syncing ${pendingTasks.length} data changes...`);
             for (const task of pendingTasks) {
                 let error = null;
-                if (task.action === 'CREATE') { const { error: err } = await window.db.from(task.table).insert([task.payload]); error = err; } 
+                // FIND THIS in offline-engine.js
+if (task.action === 'CREATE') {
+    // CHANGE THIS LINE:
+    const { error: err } = await window.db.from(task.table).upsert([task.payload]);
+    error = err;
+}
                 else if (task.action === 'UPDATE') { const { error: err } = await window.db.from(task.table).update(task.payload).eq('id', task.record_id); error = err; } 
                 else if (task.action === 'DELETE') { const { error: err } = await window.db.from(task.table).delete().eq('id', task.record_id); error = err; }
 

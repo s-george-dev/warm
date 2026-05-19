@@ -111,44 +111,74 @@ async function logAction(actionType, targetEntity, targetName, details = "") {
         await window.db.from("audit_logs").insert([{ user_email: currentUserEmail, action_type: actionType, target_entity: targetEntity, target_name: targetName, details: details }]);
     } catch(e) { console.error("Audit log failed:", e); }
 }
+// Mapping emails to shorthand
+const userMap = {
+    "steph@warmright.com": "Steph",
+    "admin@warmright.com": "Admin",
+    // Add more here as needed
+};
 
+// --- AUDIT LOG ENGINE ---
 async function loadAuditLogs() {
     try {
-        // Read directly from the blazing-fast local database
         const logs = await localDB.audit_logs.toArray();
-        
-        // Sort them newest-first
+        // Sort newest-first
         allAuditLogs = logs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        
         filterAuditLogs();
+        console.log("Logs loaded:", allAuditLogs.length);
     } catch (e) {
-        console.warn("Could not load audit logs:", e);
-        document.getElementById("auditLogTableBody").innerHTML = `<tr><td colspan="5" style="text-align: center; color: #999; padding: 20px;">No logs available.</td></tr>`;
+        console.error("Audit log failed to load:", e);
     }
 }
 
 function filterAuditLogs() {
     const actionFilter = document.getElementById("logActionFilter")?.value || "ALL";
+    const dateFilter = document.getElementById("logDateFilter")?.value || "FOREVER";
     const searchTerm = (document.getElementById("logSearchInput")?.value || "").toLowerCase();
-    const tbody = document.getElementById("auditLogTableBody"); if (!tbody) return; tbody.innerHTML = "";
+    const tbody = document.getElementById("auditLogTableBody"); 
+    if (!tbody) return; 
+    tbody.innerHTML = "";
 
+    const now = new Date();
     const filtered = allAuditLogs.filter(log => {
+        const logDate = new Date(log.created_at);
+        let matchDate = true;
+        
+        if (dateFilter === "TODAY") matchDate = logDate.toDateString() === now.toDateString();
+        else if (dateFilter === "7DAYS") matchDate = (now - logDate) < (7 * 24 * 60 * 60 * 1000);
+        else if (dateFilter === "MONTH") matchDate = (now - logDate) < (30 * 24 * 60 * 60 * 1000);
+        else if (dateFilter === "YEAR") matchDate = logDate.getFullYear() === now.getFullYear();
+
         const matchAction = actionFilter === "ALL" || log.action_type === actionFilter;
-        const matchSearch = (log.target_name && log.target_name.toLowerCase().includes(searchTerm)) || (log.user_email && log.user_email.toLowerCase().includes(searchTerm)) || (log.details && log.details.toLowerCase().includes(searchTerm));
-        return matchAction && matchSearch;
+        const matchSearch = (log.target_name || "").toLowerCase().includes(searchTerm) || 
+                            (log.user_email || "").toLowerCase().includes(searchTerm) || 
+                            (log.details || "").toLowerCase().includes(searchTerm);
+        
+        return matchDate && matchAction && matchSearch;
     });
 
-    if (filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #999; padding: 20px;">No logs match your criteria.</td></tr>`; return; }
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #999; padding: 20px;">No logs match your criteria.</td></tr>`;
+        return;
+    }
 
     filtered.forEach(log => {
         const date = new Date(log.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-        let actionColor = "#475569";
-        if (log.action_type === 'CREATE') actionColor = "#3b82f6"; if (log.action_type === 'UPDATE') actionColor = "#f59e0b"; if (log.action_type === 'DELETE') actionColor = "#ef4444";
-        if (log.action_type === 'CHECKOUT') actionColor = "#10b981"; if (log.action_type === 'RETURN') actionColor = "#8b5cf6"; if (log.action_type === 'MOVE') actionColor = "#ff8c00";
+        const shortName = userMap[log.user_email] || log.user_email.split('@')[0];
+        
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td style="font-size: 13px; color: #666;">${date}</td><td style="font-size: 13px; font-weight: 600;">${log.user_email}</td><td><span style="background: ${actionColor}20; color: ${actionColor}; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">${log.action_type}</span></td><td style="font-size: 13px; font-weight: bold; color: #333;">${log.target_entity}</td><td style="font-size: 13px;"><b>${log.target_name}</b> <span style="color:#666;">${log.details ? '- ' + log.details : ''}</span></td>`;
+        tr.innerHTML = `
+            <td class="col-date">${date}</td>
+            <td class="col-user" style="font-weight:600;">${shortName}</td>
+            <td class="col-action"><span class="badge">${log.action_type}</span></td>
+            <td class="col-entity">${log.target_entity}</td>
+            <td class="col-details"><b>${log.target_name}</b> ${log.details}</td>
+        `;
         tbody.appendChild(tr);
     });
+    
+    // Re-apply column visibility settings after re-rendering
+    applyColumnSettings();
 }
 
 /* =========================================================
@@ -638,6 +668,11 @@ async function initInventory() {
         await window.syncDatabaseToLocal();
     }
 
+    if (isImportingSyncLock) {
+        console.log("Sync locked due to import. Skipping fetch.");
+        return;
+    }
+
     document.addEventListener("focus", function(event) {
         const tag = event.target.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA") { setTimeout(() => { if (typeof event.target.select === "function") event.target.select(); }, 30); }
@@ -1017,7 +1052,7 @@ function renderItems(items) {
     if (sortedItems.length > 0) sortedItems.forEach(item => { combinedList.push({ isLocation: false, id: item.id, name: item.name, quantity: item.quantity, barcode: item.barcode || '', nfc_tag: item.nfc_tag || '', category: item.category || '—', tags: item.tags ? (Array.isArray(item.tags) ? item.tags.join(', ') : JSON.stringify(item.tags)) : '—', rawItem: item }); });
 
     const c = userSettings.columns; const w = userSettings.widths;
-    tableContainer.innerHTML = `<button class="col-picker-btn" onclick="toggleColumnMenu(event, 'itemColMenu')">⚙️ Columns</button>
+    tableContainer.innerHTML = `<button class="col-picker-btn" onclick="toggleColumnMenu(event, 'itemColMenu')">⚙️</button>
         <div id="itemColMenu" class="col-picker-menu">
             <label><input type="checkbox" ${c.name ? 'checked' : ''} onchange="toggleTableColumn('itemsTable', 'name', 1, this.checked)"> Name</label>
             <label><input type="checkbox" ${c.quantity ? 'checked' : ''} onchange="toggleTableColumn('itemsTable', 'quantity', 2, this.checked)"> Quantity</label>
@@ -1093,17 +1128,34 @@ function initResizableColumns(table) {
     });
 }
 
-function toggleTableColumn(tableId, colKey, colIndex, isVisible) {
-    const table = document.getElementById(tableId); if (!table) return; const displayValue = isVisible ? "" : "none";
-    const th = table.querySelectorAll("thead th")[colIndex]; if (th) th.style.display = displayValue;
-    table.querySelectorAll("tbody tr").forEach(tr => { const td = tr.children[colIndex]; if (td) td.style.display = displayValue; });
-    userSettings.columns[colKey] = isVisible; saveInventorySettings();
+function toggleTableColumn(tableId, colIndex, isVisible) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    
+    // Toggle header
+    const th = table.querySelectorAll("thead th")[colIndex];
+    if (th) th.style.display = isVisible ? "" : "none";
+    
+    // Toggle body cells
+    table.querySelectorAll("tbody tr").forEach(tr => {
+        const td = tr.cells[colIndex];
+        if (td) td.style.display = isVisible ? "" : "none";
+    });
+    
+    // Save preference
+    userSettings.auditLogColumns = userSettings.auditLogColumns || {};
+    userSettings.auditLogColumns[colIndex] = isVisible;
+    saveInventorySettings();
 }
 
-function toggleColumnMenu(event, menuId) {
-    event.stopPropagation(); const menu = document.getElementById(menuId); const isShowing = menu.style.display === "flex";
-    document.querySelectorAll('.col-picker-menu').forEach(m => m.style.display = "none"); menu.style.display = isShowing ? "none" : "flex";
-    document.onclick = () => menu.style.display = "none"; menu.onclick = (e) => e.stopPropagation();
+function applyColumnSettings() {
+    if (!userSettings.auditLogColumns) return;
+    Object.keys(userSettings.auditLogColumns).forEach(idx => {
+        const isVisible = userSettings.auditLogColumns[idx];
+        const checkbox = document.querySelector(`input[onchange*="toggleTableColumn('auditLogTable', ${idx}"]`);
+        if (checkbox) checkbox.checked = isVisible;
+        toggleTableColumn('auditLogTable', parseInt(idx), isVisible);
+    });
 }
 
 /* =========================================================
@@ -1462,7 +1514,7 @@ async function saveLocationEdits() {
         if (!uploadError) photoPath = fileName;
     } else if (window.locationPhotoDeleted) photoPath = null;
 
-    const payload = { name, location_description: document.getElementById("editLocationDescription").value, barcode, nfc_tag, category: document.getElementById("editLocationCategory").value, photo_path: photoPath };
+    const payload = { name, description: document.getElementById("editLocationDescription").value, barcode, nfc_tag, category: document.getElementById("editLocationCategory").value, photo_path: photoPath };
     const { error } = await withStatus(() => window.db.from("locations").update(payload).eq("id", editingLocationId), "Saving changes...");
     if (!error) { closeModal('locationActionsModal'); logAction("UPDATE", "Location", name, "Modified folder structure"); await syncAfterWrite(); loadLocationsAdmin(); }
 }
@@ -1856,7 +1908,7 @@ async function addLocation() {
     if (barcode && !(await isHardwareTagUnique(barcode))) return await customAlert("Barcode ID is already registered!", "Duplicate Code");
     if (nfc && !(await isHardwareTagUnique(nfc))) return await customAlert("NFC Tag is already registered!", "Duplicate Code");
 
-    const payload = { name, location_description: description, barcode, nfc_tag: nfc, category, parent_id: currentLocationAdmin };
+    const payload = { name, description: description, barcode, nfc_tag: nfc, category, parent_id: currentLocationAdmin };
     const response = await window.offlineSafeWrite('CREATE', 'locations', payload);
 
     if (response.success) {
@@ -1899,7 +1951,7 @@ async function saveLocationEdits() {
         if (!uploadError) photoPath = fileName;
     } else if (window.locationPhotoDeleted) photoPath = null;
 
-    const payload = { name, location_description: document.getElementById("editLocationDescription").value, barcode, nfc_tag, category: document.getElementById("editLocationCategory").value, photo_path: photoPath };
+    const payload = { name, description: document.getElementById("editLocationDescription").value, barcode, nfc_tag, category: document.getElementById("editLocationCategory").value, photo_path: photoPath };
     const { error } = await withStatus(() => window.db.from("locations").update(payload).eq("id", editingLocationId), "Saving changes...");
     if (!error) { closeModal('locationActionsModal'); logAction("UPDATE", "Location", name, "Modified folder structure"); await syncAfterWrite(); loadLocationsAdmin(); }
 }
@@ -4126,3 +4178,241 @@ function updateEditModalHardwareButtonsUI() {
     }
 }
 }
+
+
+/* =========================================================
+   DYNAMIC UNIFIED FILTER SURFACE MENU
+========================================================= */
+window.toggleFilterToolbar = function() {
+    const panel = document.getElementById("mobileFilterPanel");
+    if (!panel) return;
+    
+    if (window.getComputedStyle(panel).display === "none" || !panel.classList.contains("visible")) {
+        panel.style.display = "block";
+        setTimeout(() => panel.classList.add("visible"), 20);
+    } else {
+        panel.classList.remove("visible");
+        setTimeout(() => {
+            if (!panel.classList.contains("visible")) panel.style.display = "none";
+        }, 260); 
+    }
+};
+
+// Auto-close if clicking outside the panel
+document.addEventListener('click', function(event) {
+    const panel = document.getElementById("mobileFilterPanel");
+    if (!panel || !panel.classList.contains("visible")) return;
+    
+    const clickedInside = panel.contains(event.target);
+    const clickedToggleBtn = event.target.closest('[onclick*="toggleFilterToolbar"]') || event.target.textContent.includes('👁️');
+    
+    if (!clickedInside && !clickedToggleBtn) {
+        window.toggleFilterToolbar();
+    }
+});
+/* =========================================================
+   CUSTOM ROUNDED DROPDOWN LOGIC (REPLACES NATIVE SELECTS)
+========================================================= */
+window.toggleCustomSelect = function(triggerElement) {
+    // Close any other open custom dropdowns first
+    document.querySelectorAll('.custom-select-options').forEach(ul => {
+        if (ul !== triggerElement.nextElementSibling) ul.classList.remove('open');
+    });
+    // Toggle the clicked one
+    triggerElement.nextElementSibling.classList.toggle('open');
+};
+
+window.handleCustomSelect = function(liElement, functionName, value) {
+    const trigger = liElement.parentElement.previousElementSibling;
+    const textSpan = trigger.querySelector('.trigger-text');
+    
+    // Safely update the text while preserving the down arrow
+    if (textSpan) {
+        textSpan.textContent = liElement.textContent;
+    } else {
+        trigger.innerHTML = `<span class="trigger-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${liElement.textContent}</span> <span class="caret" style="font-size:9px; color:#94a3b8; margin-left:2px;">▼</span>`;
+    }
+    
+    // Manage visual selection styling
+    Array.from(liElement.parentElement.children).forEach(sibling => sibling.classList.remove('selected'));
+    liElement.classList.add('selected');
+
+    // Close the dropdown list
+    liElement.parentElement.classList.remove('open');
+
+    // Route the logic back to your original App functions
+    if (functionName === 'changeItemsView') {
+        changeItemsView(value);
+        if(typeof changeLocationsView === 'function') changeLocationsView(value);
+    } else if (functionName === 'changeItemsBrowserMode') {
+        changeItemsBrowserMode(value);
+        if(typeof changeAdminLocationView === 'function') changeAdminLocationView(value === 'flat' ? 'flat' : 'hierarchy');
+    } else if (functionName === 'changeSortOrder') {
+        changeSortOrder(value);
+        if(typeof changeSortOrderLocations === 'function') changeSortOrderLocations(value);
+    }
+};
+
+// Global intercept: Close custom dropdowns if the user clicks anywhere else on the screen
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.custom-select-wrapper')) {
+        document.querySelectorAll('.custom-select-options').forEach(ul => ul.classList.remove('open'));
+    }
+});
+
+/* =========================================================
+   COLUMN PICKER TOGGLE ENGINE
+========================================================= */
+window.toggleColumnMenu = function(event, menuId) {
+    event.stopPropagation(); // Prevents the click-away listener from closing it instantly
+    const menu = document.getElementById(menuId);
+    const btn = event.currentTarget;
+    
+    if (!menu) {
+        console.error("Column menu element not found:", menuId);
+        return;
+    }
+
+    // Get position of the button so we can place the menu directly underneath
+    const rect = btn.getBoundingClientRect();
+    
+    // Toggle display
+    const isHidden = (window.getComputedStyle(menu).display === "none");
+    
+    if (isHidden) {
+        menu.style.display = "block"; // Use block or flex based on your CSS
+        menu.style.position = "absolute";
+        menu.style.top = (rect.bottom + window.scrollY + 5) + "px";
+        menu.style.left = (rect.left + window.scrollX) + "px";
+    } else {
+        menu.style.display = "none";
+    }
+};
+
+// Global listener to close the menu if you click anywhere else
+document.addEventListener('click', function(e) {
+    const menus = document.querySelectorAll('.col-picker-menu');
+    menus.forEach(menu => {
+        if (!menu.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+});
+
+window.showSettingsTab = function(tabId, btn) {
+    // Hide all
+    document.querySelectorAll('.settings-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.s-tab').forEach(b => b.classList.remove('active'));
+    
+    // Show target
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    
+    // Trigger load if it's the logs tab
+    if (tabId === 'settings-logs') loadAuditLogs();
+};
+
+let pendingImportData = null;
+
+function handleImportFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            pendingImportData = JSON.parse(e.target.result);
+            document.getElementById('importWarningModal').style.display = 'flex';
+        } catch (err) { customAlert("Invalid JSON file provided.", "Import Error"); }
+    };
+    reader.readAsText(file);
+    input.value = ""; // Reset input
+}
+
+// Add this flag at the top of your inventory.js variables
+let isImportingSyncLock = false;
+
+async function executeImport() {
+    const confirmText = document.getElementById('importConfirmText').value;
+    if (confirmText !== "CONFIRMIMPORT") {
+        await customAlert("You must type CONFIRMIMPORT exactly as shown.", "Access Denied");
+        return;
+    }
+
+    if (!pendingImportData || !pendingImportData.tables) {
+        await customAlert("Invalid backup file.", "Error"); return;
+    }
+
+    isImportingSyncLock = true;
+    window.setStatus("syncing", "Wiping and Importing...");
+
+    try {
+        const tables = [
+            { db: 'items', json: 'items' },
+            { db: 'locations', json: 'locations' },
+            { db: 'temp_locations', json: 'temp_locations' },
+            { db: 'tags', json: 'tags' },
+            { db: 'item_categories', json: 'categories' }
+        ];
+
+        // 1. Wipe Supabase (Delete everything)
+        // We delete in reverse order of dependencies
+        for (let t of tables.reverse()) {
+            await window.db.from(t.db).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        }
+
+        // 2. Wipe Local DB
+        for (let t of tables) {
+            await localDB[t.db].clear();
+        }
+
+        // 3. Import into Supabase (Use simple insert now because DB is empty)
+        for (let t of tables) {
+            const data = pendingImportData.tables[t.json];
+            if (data && data.length > 0) {
+                await window.db.from(t.db).insert(data);
+            }
+        }
+
+        // 4. Import into Local DB
+        for (let t of tables) {
+            await localDB[t.db].bulkPut(pendingImportData.tables[t.json]);
+        }
+
+        // 5. Clear Sync Queue to prevent old conflicts
+        await localDB.sync_queue.clear();
+
+        closeModal('importWarningModal');
+        await customAlert("System Overwritten Successfully!", "Success");
+        
+        // Final Reload
+        window.location.reload();
+
+    } catch (e) {
+        console.error("Critical Import Error:", e);
+        await customAlert("Import Failed: " + e.message, "Critical Error");
+    } finally {
+        isImportingSyncLock = false;
+        window.setStatus("connected", "Ready");
+    }
+}
+
+window.setImportMode = function(mode, element) {
+    // 1. Update all radios logic (browser handles the 'checked' state automatically)
+    document.querySelector(`input[name="importMode"][value="${mode}"]`).checked = true;
+
+    // 2. Update Visuals
+    document.querySelectorAll('.radio-card').forEach(card => card.classList.remove('active'));
+    element.classList.add('active');
+
+    // 3. Update Text Labels dynamically
+    const appendCard = document.getElementById('card-append');
+    const eraseCard = document.getElementById('card-erase');
+
+    if (mode === 'append') {
+        appendCard.querySelector('.card-label').textContent = 'SELECTED - MERGE';
+        eraseCard.querySelector('.card-label').textContent = 'REPLACE';
+    } else {
+        appendCard.querySelector('.card-label').textContent = 'MERGE';
+        eraseCard.querySelector('.card-label').textContent = 'SELECTED - REPLACE';
+    }
+};

@@ -114,6 +114,7 @@
                 </div>
             </div>
             <div class="header-actions">
+                <button class="btn-primary app-add-btn" onclick="toggleFilterToolbar()">Change view</button>
                 <button class="btn-primary app-add-btn" onclick="openAddItemModal()">+ Add</button>
             </div>
         </div>
@@ -141,64 +142,11 @@
 
         <div id="pageItems" class="inventory-page active items-view-medium">
             
-            <div class="items-toolbar search-toolbar" style="display: flex; gap: 8px; align-items: center; padding: 12px 15px; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px;">
-                <select id="searchTypeFilter" autocomplete="off" onchange="handleSearchFilterTypeChange()" style="width: auto; margin-bottom: 0; padding: 10px 14px; border-radius: 8px; font-weight: 600;">
-                    <option value="all" selected>🌐 Search All</option>
-                    <option value="name">📝 Items (By Name)</option>
-                    <option value="tag">🏷️ Tag</option>
-                    <option value="category">🗂️ Category</option>
-                    <option value="location">📦 Location</option>
-                    <option value="barcode">📷 Hardware ID</option>
-                </select>
-                
-                <form onsubmit="document.getElementById('globalSearchInput').blur(); return false;" style="flex-grow: 1; display: flex; margin: 0; padding: 0;">
-                    <div style="position: relative; flex-grow: 1; display: flex; align-items: center; margin-bottom: 0;">
-                        <input type="search" id="globalSearchInput" placeholder="🔍 Search" oninput="handleGlobalSearch(this.value)" autocomplete="off" style="margin-bottom: 0; width: 100%; padding: 10px 35px 10px 15px; border: 1px solid #ddd; border-radius: 8px;">
-                    </div>
-                </form>
-
-                <button class="btn-outline icon-btn" onclick="openBarcodeScannerModal()" title="Barcode Search" style="height: 42px; width: 42px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;">📷</button>
-                <button class="btn-outline icon-btn" onclick="openNfcScannerModal()" title="NFC Search" style="height: 42px; width: 42px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;">📡</button>
-            </div>
+            
 
             <div id="searchFilterPillsRow" style="display: none; flex-wrap: wrap; gap: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px;"></div>
 
-            <div class="items-toolbar filters-toolbar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; padding: 12px 15px; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                <div class="toolbar-left" style="display: flex; gap: 15px; align-items: flex-start; width: 100%; max-width: 500px;">
-                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin:0;">View:</label>
-                        <select onchange="changeItemsView(this.value)" style="margin-bottom: 0; height: 38px; font-size: 13px; width: 100%;">
-                            <option value="small">Small</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="large">Large</option>
-                            <option value="list">List</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin:0;">Mode:</label>
-                        <select id="itemsBrowserModeSelect" onchange="changeItemsBrowserMode(this.value)" style="margin-bottom: 0; height: 38px; font-size: 13px; width: 100%;">
-                            <option value="hierarchy" selected>Folders</option>
-                            <option value="flat">All Items</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin:0;">Organise:</label>
-                        <select onchange="changeSortOrder(this.value)" style="margin-bottom: 0; height: 38px; font-size: 13px; width: 100%;">
-                            <option value="name_asc" selected>A-Z</option>
-                            <option value="name_desc">Z-A</option>
-                            <option value="qty_desc">Qty (High - Low)</option>
-                            <option value="qty_asc">Qty (Low - High)</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="fast-actions-desktop">
-                    <span style="font-size: 13px; font-weight: 700; color: #10b981; margin-right: 5px;">Fast actions</span>
-                    <button class="btn-outline icon-btn return-btn" onclick="openBarcodeScannerModal('FAST_RETURN')" title="Barcode Fast-Return" style="height: 38px; width: auto; padding: 0 10px !important; border-color: #10b981; color: #10b981; display: flex; align-items: center; justify-content: center; border-radius: 8px; gap: 6px; font-size: 16px;">📥 📷</button>
-                    <button class="btn-outline icon-btn return-btn" onclick="openNfcScannerModal('FAST_RETURN')" title="NFC Fast-Return" style="height: 38px; width: auto; padding: 0 10px !important; border-color: #10b981; color: #10b981; display: flex; align-items: center; justify-content: center; border-radius: 8px; gap: 6px; font-size: 16px;">📥 📡</button>
-                     <button class="btn-outline icon-btn return-btn" onclick="openQuantityAdjusterModal('FAST_RETURN')" title="Quantity-Fast-Adjuster" style="height: 38px; width: auto; padding: 0 10px !important; border-color: #10b981; color: #10b981; display: flex; align-items: center; justify-content: center; border-radius: 8px; gap: 6px; font-size: 16px;">📥🔢</button>
-                </div>
-            </div>
+           
 
             <div class="location-nav"><div id="breadcrumb" style="font-weight: bold; font-size: 1.1em;">Items</div></div>
             <div id="locationTiles" class="items-grid"></div>
@@ -207,34 +155,7 @@
         </div>
 
         <div id="pageLocations" class="inventory-page">
-            <div class="items-toolbar filters-toolbar" style="display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 15px; padding: 12px 15px; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                <div class="toolbar-left" style="display: flex; gap: 15px; align-items: flex-start; width: 100%; max-width: 500px;">
-                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin:0;">View:</label>
-                        <select onchange="changeLocationsView(this.value)" style="margin-bottom: 0; height: 38px; font-size: 13px; width: 100%;">
-                            <option value="small">Small</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="large">Large</option>
-                            <option value="list">List</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin:0;">Mode:</label>
-                        <select onchange="changeAdminLocationView(this.value)" style="margin-bottom: 0; height: 38px; font-size: 13px; width: 100%;">
-                            <option value="hierarchy" selected>Hierarchy</option>
-                            <option value="flat">Flat List</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin:0;">Organise:</label>
-                        <select onchange="changeSortOrderLocations(this.value)" style="margin-bottom: 0; height: 38px; font-size: 13px; width: 100%;">
-                            <option value="name_asc" selected>A-Z</option>
-                            <option value="name_desc">Z-A</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            
+                      
             <div class="location-nav"><div id="breadcrumbLocations" style="font-weight: bold; font-size: 1.1em;">Locations</div></div>
             <div id="locationTilesAdmin" class="items-grid"></div>
             <div class="items-table-wrapper" id="locationsTableWrapper"></div>
@@ -297,95 +218,131 @@
         </div>
 
         <div id="pageSettings" class="inventory-page">
-            <div class="items-toolbar">
-                <div class="toolbar-left">
-                    <h3 style="margin-bottom: 5px;">System Settings & Data Backup</h3>
-                    <p style="font-size: 13px; color: #666; margin: 0;">Export your inventory data and create secure system backups.</p>
-                </div>
+    <div class="items-toolbar">
+        <h3>System Settings</h3>
+    </div>
+
+    <div class="settings-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; overflow-x: auto; padding-bottom: 5px;">
+        <button class="s-tab active" onclick="showSettingsTab('settings-camera', this)">📷 Camera</button>
+        <button class="s-tab" onclick="showSettingsTab('settings-backups', this)">💾 Backups</button>
+        <button class="s-tab" onclick="showSettingsTab('settings-reports', this)">📊 Reports</button>
+        <button class="s-tab" onclick="showSettingsTab('settings-logs', this)">📜 Logs</button>
+    </div>
+
+    <div id="settings-camera" class="settings-tab-content">
+        <div class="item-card" style="text-align: left; padding: 25px; border: 1px solid #cbd5e1;">
+            <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">🤳 Camera & Hardware Zoom Settings</h3>
+            <p style="font-size: 14px; color: #475569; margin-bottom: 20px;">Prioritise camera lenses and apply hardware macro zoom capabilities.</p>
+            <div style="margin-bottom: 15px;">
+                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:#475569;">Default System Camera Lens:</label>
+                <select id="settingsDefaultCamera" onchange="saveHardwarePreferences()" style="width:100%; height:40px; font-size:13px; margin-bottom:0;">
+                    <option value="AUTO_REAR">🎯 Auto-Select Main Rear Lens</option>
+                </select>
             </div>
-            
-            <div class="item-card" style="text-align: left; padding: 25px; border: 1px solid #cbd5e1;">
-                    <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">🤳 Camera & Hardware Zoom Settings</h3>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 20px;">Prioritise camera lenses and apply hardware macro zoom capabilities directly to scanner viewfinders.</p>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:#475569;">Default System Camera Lens:</label>
-                        <select id="settingsDefaultCamera" onchange="saveHardwarePreferences()" style="width:100%; height:40px; font-size:13px; margin-bottom:0;">
-                            <option value="AUTO_REAR">🎯 Auto-Select Main Rear Lens</option>
-                            </select>
-                    </div>
-
-                    <div>
-                        <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:#475569;">Default Optical Macro Zoom Factor: <span id="settingsZoomValDisplay" style="color:#004a99; font-weight:800;">1.5x</span></label>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <input type="range" id="settingsDefaultZoom" min="1.0" max="4.0" step="0.1" value="1.5" oninput="document.getElementById('settingsZoomValDisplay').textContent = this.value + 'x'; saveHardwarePreferences();" style="flex-grow:1; margin:0;">
-                        </div>
-                        <span style="font-size:11px; color:#64748b; margin-top:4px; display:block;">Increase zoom to parse small barcodes on compact asset boxes without focus issues.</span>
-                    </div>
-                </div>
-
-            <div class="items-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
-                <div class="item-card" style="text-align: left; padding: 25px; border: 2px solid #10b981;">
-                    <h3 style="margin-top: 0; color: #10b981; font-size: 20px;">🗜️ Offline Master ZIP Archive</h3>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 25px;">Download a complete, self-contained offline backup. Includes the JSON database AND a local folder containing every uploaded photo, securely linked together.</p>
-                    <button class="btn-primary" id="btnExportZip" onclick="exportFullSystemZip()" style="width: 100%; height: 46px; font-size: 15px; background: #10b981; border-color: #10b981;">📦 Download Master ZIP</button>
-                </div>
-
-                <div class="item-card" style="text-align: left; padding: 25px;">
-                    <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">📦 Full System Backup</h3>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 25px;">Download a complete JSON snapshot of all your database tables including items, locations, assignments, tags, and categories. Highly recommended before making major changes.</p>
-                    <button class="btn-primary" onclick="exportFullBackup()" style="width: 100%; height: 46px; font-size: 15px;">⬇️ Download Full Database (.json)</button>
-                </div>
-                
-                <div class="item-card" style="text-align: left; padding: 25px;">
-                    <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">📊 Export to Spreadsheet</h3>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 25px;">Generate clean CSV files mapping your current stock or folder hierarchy. Compatible with Excel, Google Sheets, and accounting software imports.</p>
-                    <button class="btn-primary" onclick="exportItemsCSV()" style="width: 100%; height: 46px; font-size: 15px; margin-bottom: 12px; background: #0284c7; border-color: #0284c7;">⬇️ Export Items (CSV)</button>
-                    <button class="btn-outline" onclick="exportLocationsCSV()" style="width: 100%; height: 46px; font-size: 15px;">⬇️ Export Locations (CSV)</button>
-                </div>
-                
-                <div class="item-card" style="text-align: left; padding: 25px;">
-                    <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">📄 PDF Reporting</h3>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 25px;">Generate a professional, printable PDF report detailing your current inventory levels, item locations, and active check-out assignments.</p>
-                    <button class="btn-primary" onclick="exportItemsPDF()" style="width: 100%; height: 46px; font-size: 15px; background: #ef4444; border-color: #ef4444;">📄 Generate Stock Report (PDF)</button>
-                </div>
-            </div>
-
-            <div class="items-toolbar" style="margin-top: 40px;">
-                <div class="toolbar-left">
-                    <h3 style="margin-bottom: 5px;">System Audit Log</h3>
-                    <p style="font-size: 13px; color: #666; margin: 0;">Track all system changes, item movements, and user actions.</p>
-                </div>
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <select id="logActionFilter" onchange="filterAuditLogs()" style="margin-bottom: 0; min-width: 140px;">
-                        <option value="ALL">All Actions</option>
-                        <option value="CREATE">Creates (Added)</option>
-                        <option value="UPDATE">Updates (Edits)</option>
-                        <option value="DELETE">Deletes</option>
-                        <option value="CHECKOUT">Check-outs</option>
-                        <option value="RETURN">Returns</option>
-                        <option value="MOVE">Moves</option>
-                    </select>
-                    <input type="text" id="logSearchInput" placeholder="Search logs (user, item...)" oninput="filterAuditLogs()" style="margin-bottom: 0; min-width: 200px;">
-                    <button class="btn-outline" onclick="loadAuditLogs()">🔄 Refresh</button>
-                </div>
-            </div>
-            
-            <div class="items-table-wrapper" style="display: block; max-height: 500px; overflow-y: auto;">
-                <table class="custom-table" id="auditLogTable">
-                    <thead style="position: sticky; top: 0; z-index: 10;">
-                        <tr>
-                            <th style="width: 15%;">Date & Time</th>
-                            <th style="width: 20%;">User</th>
-                            <th style="width: 15%;">Action</th>
-                            <th style="width: 15%;">Entity Type</th>
-                            <th style="width: 35%;">Details</th>
-                        </tr>
-                    </thead>
-                    <tbody id="auditLogTableBody"></tbody>
-                </table>
+            <div>
+                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:#475569;">Macro Zoom: <span id="settingsZoomValDisplay" style="color:#004a99; font-weight:800;">1.5x</span></label>
+                <input type="range" id="settingsDefaultZoom" min="1.0" max="4.0" step="0.1" value="1.5" oninput="document.getElementById('settingsZoomValDisplay').textContent = this.value + 'x'; saveHardwarePreferences();" style="width:100%;">
             </div>
         </div>
+    </div>
+
+    <div id="settings-backups" class="settings-tab-content" style="display:none;">
+        <div class="items-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+            <div class="item-card" style="text-align: left; padding: 25px; border: 2px solid #10b981;">
+                <h3 style="margin-top: 0; color: #10b981; font-size: 20px;">🗜️ Offline Master ZIP Archive</h3>
+                <button class="btn-primary" id="btnExportZip" onclick="exportFullSystemZip()" style="width: 100%;">📦 Download Master ZIP</button>
+            </div>
+            <div class="item-card" style="text-align: left; padding: 25px;">
+                <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">📦 Full System Backup</h3>
+                <button class="btn-primary" onclick="exportFullBackup()" style="width: 100%;">⬇️ Download Full Database (.json)</button>
+            </div>
+            <div class="item-card" style="text-align: left; padding: 25px; border: 2px solid #ef4444;">
+    <h3 style="margin-top: 0; color: #ef4444; font-size: 20px;">⚠️ System Import</h3>
+    <p style="font-size: 14px; color: #475569; margin-bottom: 25px;">Restore inventory data from a previously exported JSON file. <b>Warning: This is a destructive operation.</b></p>
+    <input type="file" id="importJsonInput" accept=".json" style="display:none;" onchange="handleImportFile(this)">
+    <button class="btn-primary" onclick="document.getElementById('importJsonInput').click()" style="width: 100%; height: 46px; font-size: 15px; background: #ef4444; border-color: #ef4444;">📂 Import Database JSON</button>
+</div>
+        </div>
+    </div>
+
+    <div id="settings-reports" class="settings-tab-content" style="display:none;">
+        <div class="items-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+            <div class="item-card" style="text-align: left; padding: 25px;">
+                <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">📊 Export to Spreadsheet</h3>
+                <button class="btn-primary" onclick="exportItemsCSV()" style="width: 100%; margin-bottom: 12px; background: #0284c7;">⬇️ Export Items (CSV)</button>
+                <button class="btn-outline" onclick="exportLocationsCSV()" style="width: 100%;">⬇️ Export Locations (CSV)</button>
+            </div>
+            <div class="item-card" style="text-align: left; padding: 25px;">
+                <h3 style="margin-top: 0; color: #004a99; font-size: 20px;">📄 PDF Reporting</h3>
+                <button class="btn-primary" onclick="exportItemsPDF()" style="width: 100%; background: #ef4444; border-color: #ef4444;">📄 Generate Stock Report (PDF)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-logs" class="settings-tab-content" style="display:none;">
+        <div class="items-toolbar" style="margin-top: 40px; padding: 15px;">
+    <div style="margin-bottom: 10px;">
+        <h3 style="margin: 0;">System Audit Log</h3>
+    </div>
+    
+    <div class="log-toolbar-row">
+        <select id="logActionFilter" onchange="filterAuditLogs()">
+            <option value="ALL">All Actions</option>
+            <option value="CREATE">Creates</option>
+            <option value="UPDATE">Updates</option>
+            <option value="CHECKOUT">Check-outs</option>
+            <option value="RETURN">Returns</option>
+        </select>
+        
+        <select id="logDateFilter" onchange="filterAuditLogs()">
+            <option value="FOREVER">Forever</option>
+            <option value="TODAY">Today</option>
+            <option value="7DAYS">Last 7 Days</option>
+            <option value="MONTH">Last Month</option>
+            <option value="YEAR">This Year</option>
+        </select>
+    </div>
+
+    <div class="log-toolbar-row" style="margin-top: 10px;">
+        <input type="text" id="logSearchInput" placeholder="Search logs..." oninput="filterAuditLogs()" style="flex:1;">
+        <button class="btn-outline" onclick="toggleColumnMenu(event, 'logColMenu')">⚙️</button>
+        <button class="btn-outline" onclick="loadAuditLogs()">🔄</button>
+    </div>
+</div>
+
+<div id="logColMenu" class="col-picker-menu" style="display:none; position:absolute; right:20px; background:white; border:1px solid #ddd; padding:10px; z-index:100; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+    <label><input type="checkbox" checked onchange="toggleTableColumn('auditLogTable', 0, this.checked)"> Date</label><br>
+    <label><input type="checkbox" checked onchange="toggleTableColumn('auditLogTable', 1, this.checked)"> User</label><br>
+    <label><input type="checkbox" checked onchange="toggleTableColumn('auditLogTable', 2, this.checked)"> Action</label><br>
+    <label><input type="checkbox" checked onchange="toggleTableColumn('auditLogTable', 3, this.checked)"> Entity</label><br>
+    <label><input type="checkbox" checked onchange="toggleTableColumn('auditLogTable', 4, this.checked)"> Details</label>
+</div>
+
+<div style="width: 100%; overflow-x: auto; background: white; border-radius: 8px; margin-top: 15px;">
+    <table class="custom-table" id="auditLogTable" style="min-width: 800px;">
+        <thead style="background:#f1f5f9;">
+            <tr>
+                <th>Date & Time</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody id="auditLogTableBody"></tbody>
+    </table>
+</div>
+        </div>
+</div>
+
+            
+
+
+
+
+
+
+</div>
     </div>
 
     <div id="quantityAdjusterModal" class="modal">
@@ -745,7 +702,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="itemReturnModal" class="modal" style="z-index: 10006;">
         <div class="modal-content" style="max-width: 400px; padding: 25px; text-align: center;">
             <h3 style="margin-top: 0; color: #004a99; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -1008,6 +965,71 @@
         </div>
     </div>
 
+   <div id="mobileFilterPanel" class="filter-action-sheet">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #004a99; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 6px;">⚙️ Filter & Organise</h3>
+            <button class="btn-outline" onclick="toggleFilterToolbar()" style="height: 28px; padding: 0 10px; font-size: 11px; border-radius: 6px; border-color: #ef4444; color: #ef4444; font-weight: bold; background: transparent;">Close</button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="toolbar-left" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%;">
+                
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                    <label style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; margin:0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">View</label>
+                    <div class="custom-select-wrapper">
+                        <div class="custom-select-trigger" onclick="toggleCustomSelect(this)" style="padding: 0 6px; justify-content: center; font-size: 11px;">
+                            <span class="trigger-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Medium</span> 
+                            <span class="caret" style="font-size:9px; color:#94a3b8; margin-left:2px;">▼</span>
+                        </div>
+                        <ul class="custom-select-options">
+                            <li onclick="handleCustomSelect(this, 'changeItemsView', 'small')">Small</li>
+                            <li class="selected" onclick="handleCustomSelect(this, 'changeItemsView', 'medium')">Medium</li>
+                            <li onclick="handleCustomSelect(this, 'changeItemsView', 'large')">Large</li>
+                            <li onclick="handleCustomSelect(this, 'changeItemsView', 'list')">List</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                    <label style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; margin:0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Mode</label>
+                    <div class="custom-select-wrapper">
+                        <div class="custom-select-trigger" onclick="toggleCustomSelect(this)" style="padding: 0 6px; justify-content: center; font-size: 11px;">
+                            <span class="trigger-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Folders</span> 
+                            <span class="caret" style="font-size:9px; color:#94a3b8; margin-left:2px;">▼</span>
+                        </div>
+                        <ul class="custom-select-options">
+                            <li class="selected" onclick="handleCustomSelect(this, 'changeItemsBrowserMode', 'hierarchy')">Folders</li>
+                            <li onclick="handleCustomSelect(this, 'changeItemsBrowserMode', 'flat')">All Items</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                    <label style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; margin:0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Organise</label>
+                    <div class="custom-select-wrapper">
+                        <div class="custom-select-trigger" onclick="toggleCustomSelect(this)" style="padding: 0 6px; justify-content: center; font-size: 11px;">
+                            <span class="trigger-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">A-Z</span> 
+                            <span class="caret" style="font-size:9px; color:#94a3b8; margin-left:2px;">▼</span>
+                        </div>
+                        <ul class="custom-select-options">
+                            <li class="selected" onclick="handleCustomSelect(this, 'changeSortOrder', 'name_asc')">A-Z</li>
+                            <li onclick="handleCustomSelect(this, 'changeSortOrder', 'name_desc')">Z-A</li>
+                            <li onclick="handleCustomSelect(this, 'changeSortOrder', 'qty_desc')">Qty 📉</li>
+                            <li onclick="handleCustomSelect(this, 'changeSortOrder', 'qty_asc')">Qty 📈</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="fast-actions-desktop" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px; border-top: 1px dashed #cbd5e1; padding-top: 12px; margin-top: 4px; width: 100%;">
+                <span style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-right: auto;">Fast Actions:</span>
+                <button class="btn-outline icon-btn" onclick="toggleFilterToolbar(); openBarcodeScannerModal('FAST_RETURN');" title="Barcode Fast-Return" style="height: 36px; min-width: 48px; border-color: #10b981; color: #10b981; border-radius: 10px; font-size: 14px; background: #f0fdf4; font-weight: bold;">📥 📷</button>
+                <button class="btn-outline icon-btn" onclick="toggleFilterToolbar(); openNfcScannerModal('FAST_RETURN');" title="NFC Fast-Return" style="height: 36px; min-width: 48px; border-color: #10b981; color: #10b981; border-radius: 10px; font-size: 14px; background: #f0fdf4; font-weight: bold;">📥 📡</button>
+                <button class="btn-outline icon-btn" onclick="toggleFilterToolbar(); openQuantityAdjusterModal();" title="Quantity Fast Adjuster" style="height: 36px; min-width: 48px; border-color: #10b981; color: #10b981; border-radius: 10px; font-size: 14px; background: #f0fdf4; font-weight: bold;">📥 🔢</button>
+            </div>
+        </div>
+    </div>
+</div>
 
     <div class="fab-container left-side" id="mobileFabContainer" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000;">
         <div class="fab-half-screen-overlay" id="fabOverlay" onclick="toggleFab()"></div>
@@ -1035,8 +1057,24 @@
         </div>
         
         <button class="fab-btn fab-location" id="fabLocationBtn" onclick="openAddLocationModal()">📦<span style="position:absolute; top:4px; right:6px; font-size:16px; font-weight:bold;">+</span></button>
-        <button class="fab-btn fab-item" id="fabItemBtn" onclick="openAddItemModal()">+</button>
+        <button class="fab-btn fab-item" id="fabItemBtn" onclick="openAddItemModal();">+</button>
+        <button class="fab-btn fab-item" id="fabItemBtn" onclick="toggleFilterToolbar();">🏞️</button>
     </div>
+
+   <div id="importWarningModal" class="modal" style="z-index: 99999; background: rgba(153, 27, 27, 0.95);">
+    <div class="modal-content" style="max-width: 500px; border: 2px solid #ef4444; background: #fff; padding: 25px;">
+        <h2 style="color: #ef4444; margin-top:0;">🛑 DANGER: FULL OVERWRITE</h2>
+        <p style="color: #475569; font-size: 14px;">This will <b>permanently delete ALL current data</b> (Items, Locations, Categories, Tags) from both your device and the cloud, and replace it with the file data.</p>
+        
+        <p style="margin-top:20px;">Type <b>CONFIRMIMPORT</b> to unlock the process:</p>
+        <input type="text" id="importConfirmText" placeholder="CONFIRMIMPORT" style="width: 100%; text-align: center; font-weight: bold; margin-bottom: 20px; padding: 10px;">
+
+        <div class="modal-buttons">
+            <button class="btn-outline" onclick="closeModal('importWarningModal')">Cancel</button>
+            <button class="btn-primary" style="background: #ef4444; border-color: #ef4444;" onclick="executeImport()">Erase & Overwrite Database</button>
+        </div>
+    </div>
+</div>
 
     <script>
         function toggleFab() {
