@@ -323,7 +323,7 @@
                         <span style="font-size:11px; color:#64748b; margin-top:4px; display:block;">Increase zoom to parse small barcodes on compact asset boxes without focus issues.</span>
                     </div>
                 </div>
-                
+
             <div class="items-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
                 <div class="item-card" style="text-align: left; padding: 25px; border: 2px solid #10b981;">
                     <h3 style="margin-top: 0; color: #10b981; font-size: 20px;">🗜️ Offline Master ZIP Archive</h3>
@@ -428,9 +428,9 @@
             <div id="addItemPreviewsRow" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 80px; align-items: center;"></div>
             <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                 <input type="file" id="addItemPhotoInput" accept="image/*" multiple style="display: none;" onchange="handleMultipleFilesSelection(this, 'addItemPreviewsRow', 'add-item')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemPhotoInput').click()">📁 Upload Photos</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemPhotoInput').click()">📁 Upload</button>
                 <input type="file" id="addItemCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleMultipleFilesSelection(this, 'addItemPreviewsRow', 'add-item')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemCameraInput').click()">📷 Take Photo</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemCameraInput').click()">📷 Camera</button>
             </div>
             <label>Item Name</label><input id="itemName" placeholder="Name">
             <label>Quantity</label><input id="itemQuantity" placeholder="Quantity" type="number">
@@ -456,38 +456,94 @@
         </div>
     </div>
 
-    <div id="itemEditModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <h3>Edit Item Details</h3>
-            <label>Item Photos</label>
-            <div id="editItemPreviewsRow" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 80px; align-items: center;"></div>
-            <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+   <div id="itemEditModal" class="modal" style="z-index: 3500;">
+        <div class="modal-content" style="max-width: 440px; width: 92%; padding: 20px; border-radius: 16px; overflow-y: auto; max-height: 92vh; text-align: left; box-sizing: border-box;">
+            
+            <h3 style="margin: 0 0 15px 0; color: #004a99; font-size: 19px; font-weight: 700; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Edit Item Details</h3>
+
+            <div style="margin-bottom: 15px;">
+                <div id="editItemPreviewsRow" style="display: flex; flex-direction: row; gap: 8px; overflow-x: auto; padding: 4px 2px; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; min-height: 80px; align-items: center;"></div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <input type="file" id="editItemPhotoInput" accept="image/*" multiple style="display: none;" onchange="handleMultipleFilesSelection(this, 'editItemPreviewsRow', 'edit-item')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editItemPhotoInput').click()">📁 Upload Photos</button>
+                <button class="btn-outline" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; border-color: #cbd5e1;" onclick="document.getElementById('editItemPhotoInput').click()">📁 Upload</button>
+                
                 <input type="file" id="editItemCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleMultipleFilesSelection(this, 'editItemPreviewsRow', 'edit-item')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editItemCameraInput').click()">📷 Take Photo</button>
+                <button class="btn-outline" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; border-color: #cbd5e1;" onclick="document.getElementById('editItemCameraInput').click()">📷 Camera</button>
             </div>
-            <label>Item Name</label><input id="editItemName" type="text">
-            <label>Quantity</label><input id="editItemQuantity" type="number">
-            <label>Location Placement Folder</label><select id="editItemLocationSelect"></select>
-            <label>Description</label><textarea id="editItemDescription" rows="3"></textarea>
-            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-                <div style="flex-grow: 1;"><label>Barcode</label><input id="editItemBarcode" type="text" style="margin-bottom: 0;"></div>
-                <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openBarcodeScannerModal('editItemBarcode')">📷 Scan</button>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Item Name</label>
+                <input id="editItemName" type="text" style="height: 38px; padding: 6px 12px; font-size: 14px; margin-bottom: 0; width: 100%; box-sizing: border-box; border-radius: 8px;">
             </div>
-           <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-                <div style="flex-grow: 1;"><label>NFC Identity Tag</label><input id="editItemNFC" type="text" style="margin-bottom: 0;"></div>
-                <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openNfcScannerModal('editItemNFC')">📡 Scan</button>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Description</label>
+                <textarea id="editItemDescription" rows="2" style="padding: 8px 12px; font-size: 13px; margin-bottom: 0; resize: vertical; width: 100%; box-sizing: border-box; border-radius: 8px;"></textarea>
             </div>
-            <label>Category Group</label>
-            <div style="display: flex; gap: 8px;"><select id="editItemCategory" style="margin-bottom: 0;"></select><button class="btn-outline" style="height: 42px; padding: 10px 14px;" onclick="openCategoryModal(true)">+</button></div>
-            <label style="margin-top: 15px;">Tags</label>
-            <div style="display: flex; gap: 8px;"><select id="editItemTagSelect" style="margin-bottom: 0;" onchange="handleTagSelection('edit', this.value)"></select><button class="btn-outline" style="height: 42px; padding: 10px 14px;" onclick="openTagModal(true)">+</button></div>
-            <div id="editItemTagsPillsRow" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; margin-bottom: 10px;"></div>
-            <div class="modal-buttons" style="margin-top: 25px; justify-content: space-between;">
-                <button class="btn-danger" onclick="attemptDeleteItem()">Delete</button>
-                <div><button class="btn-outline" onclick="confirmCancel('itemEditModal')">Cancel</button><button class="btn-primary" onclick="saveItemEdits()">Save</button></div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: flex-start;">
+                
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+                    
+                    <div id="editItemQtyWrapper" style="transition: opacity 0.2s ease;">
+                        <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Quantity</label>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input id="editItemQuantity" type="text" style="height: 42px; width: 55px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 0; padding: 4px; border-radius: 8px;" value="1">
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <button class="btn-secondary" onclick="adjustEditModalQty(1)" style="width: 28px; height: 20px; font-size: 11px; padding: 0; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; background: white;">▲</button>
+                                <button class="btn-secondary" onclick="adjustEditModalQty(-1)" style="width: 28px; height: 20px; font-size: 11px; padding: 0; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; background: white;">▼</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; background: #fff7ed; padding: 8px 10px; border-radius: 8px; border: 1px solid #ffedd5; box-sizing: border-box; width: 100%;">
+                        <input type="checkbox" id="editItemIsEquipment" onchange="handleEquipmentCheckboxToggle(this.checked)" style="width: 16px; height: 16px; margin: 0; cursor: pointer; flex-shrink:0;">
+                        <label for="editItemIsEquipment" style="font-weight: 600; font-size: 12px; color: #c2410c; margin: 0; cursor: pointer; user-select: none; white-space: nowrap;">🛠️ Tool?</label>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Category</label>
+                        <select id="editItemCategory" style="height: 38px; padding: 4px 8px !important; font-size: 13px; margin-bottom: 0; width: 100%; border-radius: 8px; box-sizing: border-box;"></select>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 110px; flex-shrink: 0; pt: 18px;">
+                    <button class="btn-primary" style="width: 100%; padding: 8px 4px; font-size: 13px; font-weight: bold; background: #10b981; border-color: #10b981; height: 36px; border-radius: 8px;" onclick="saveItemEdits()">💾 Save</button>
+                    <button class="btn-outline" style="width: 100%; padding: 8px 4px; font-size: 13px; font-weight: 600; height: 36px; border-color: #cbd5e1; color: #475569; border-radius: 8px;" onclick="confirmCancel('itemEditModal')">Cancel</button>
+                    <button class="btn-danger" style="width: 100%; padding: 8px 4px; font-size: 13px; font-weight: bold; background: #ef4444; height: 36px; border-radius: 8px; margin-top: 10px;" onclick="attemptDeleteItem()">🗑️ Delete</button>
+                </div>
             </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                <div style="flex: 1; min-width: 0;">
+                    <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Barcode Target</label>
+                    <button id="btnEditModalBarcodeAction" class="btn-outline" onclick="triggerEditModalBarcodeScan()" style="width: 100%; height: 38px; text-align: left; padding: 0 10px; font-size: 12px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; border-radius: 8px; background: #f8fafc; border-color: #cbd5e1; color: #1e293b;">📷 No Barcode</button>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">NFC Proximity</label>
+                    <button id="btnEditModalNfcAction" class="btn-outline" onclick="triggerEditModalNfcClearanceRequest()" style="width: 100%; height: 38px; text-align: left; padding: 0 10px; font-size: 12px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; border-radius: 8px; background: #f8fafc; border-color: #cbd5e1; color: #1e293b;">📡 NFC Ready</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Storage Placement Location</label>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <select id="editItemLocationSelect" style="height: 38px; padding: 4px 8px !important; font-size: 13px; margin-bottom: 0; flex-grow: 1; border-radius: 8px;"></select>
+                    <button class="btn-outline icon-btn" onclick="openBarcodeScannerModal('editItemLocationSelect')" title="Scan Location Barcode" style="width: 38px; height: 38px; font-size: 14px; border-radius: 8px; flex-shrink: 0;">📁📷</button>
+                </div>
+            </div>
+
+            <div>
+                <label style="display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Registry Tags</label>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <select id="editItemTagSelect" style="height: 38px; padding: 4px 8px !important; font-size: 13px; margin-bottom: 0; flex-grow: 1; border-radius: 8px;" onchange="handleTagSelection('edit', this.value)"></select>
+                    <button class="btn-outline" style="height: 38px; padding: 0 12px; font-weight: bold; font-size: 16px; border-radius: 8px; flex-shrink: 0;" onclick="openTagModal(true)">+</button>
+                </div>
+                <div id="editItemTagsPillsRow" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;"></div>
+            </div>
+
         </div>
     </div>
 
@@ -500,9 +556,9 @@
             </div>
             <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                 <input type="file" id="addLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview', 'add')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationPhotoInput').click()">📁 Upload Photo</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationPhotoInput').click()">📁 Upload</button>
                 <input type="file" id="addLocationCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview', 'add')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationCameraInput').click()">📷 Take Photo</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationCameraInput').click()">📷 Camera</button>
             </div>
             <label>Location Name</label><input id="addLocationName" type="text">
             <label>Description</label><textarea id="addLocationDescription" rows="3"></textarea>
@@ -624,25 +680,37 @@
 
             <div style="padding: 0 25px; margin-top: 10px;"><div id="detailItemThumbsRow" class="view-thumb-strip"></div></div>
             
-            <div style="padding: 25px;">
-                <h2 id="detailItemName" style="margin: 0 0 5px 0; color: #004a99; font-size: 24px; font-weight: 700;">Item Name</h2>
-                <div id="detailItemLocation" style="font-size: 14px; color: #ff8c00; font-weight: 600; margin-bottom: 15px;">📍 Location Path</div>
+            <div style="padding: 25px; display: flex; gap: 20px; text-align: left;">
                 
-                <label style="margin-top: 15px;">Description</label>
-                <p id="detailItemDescription" style="margin: 4px 0 15px 0; font-size: 15px; color: #333; line-height: 1.5; white-space: pre-wrap;">No description provided.</p>
-                <label>Tags</label><div id="detailItemTagsContainer" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; margin-bottom: 15px;"></div>
+                <div style="flex: 1; min-width: 0;">
+                    <h2 id="detailItemName" style="margin: 0 0 5px 0; color: #004a99; font-size: 22px; font-weight: 700; line-height: 1.2;">Item Name</h2>
+                    <div id="detailItemLocation" style="font-size: 13px; color: #ff8c00; font-weight: 600; margin-bottom: 15px;">📍 Location Path</div>
+                    
+                    <label style="margin-top: 12px; display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Description</label>
+                    <p id="detailItemDescription" style="margin: 4px 0 15px 0; font-size: 14px; color: #334155; line-height: 1.5; white-space: pre-wrap;">No description provided.</p>
+                    
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Tags</label>
+                    <div id="detailItemTagsContainer" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; margin-bottom: 15px; max-width: 100%;"></div>
 
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <div style="flex: 1;"><label>Barcode</label><div id="detailItemBarcode" style="padding: 10px; background: #f8f9fa; border: 1px solid #eee; border-radius: 6px; font-size: 14px; font-family: monospace;">—</div></div>
-                    <div style="flex: 1;"><label>NFC Tag</label><div id="detailItemNFC" style="padding: 10px; background: #f8f9fa; border: 1px solid #eee; border-radius: 6px; font-size: 14px; font-family: monospace;">—</div></div>
+                    <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px;">
+                        <div>
+                            <label style="margin: 0 0 4px 0; display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Barcode</label>
+                            <div id="detailItemBarcode" style="padding: 10px; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; font-size: 13px; font-family: monospace; color: #334155;">—</div>
+                        </div>
+                        <div>
+                            <label style="margin: 0 0 4px 0; display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">NFC Tag</label>
+                            <div id="detailItemNFC" style="padding: 10px; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; font-size: 13px; font-family: monospace; color: #334155;">—</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="modal-buttons" style="margin-top: 25px; display: flex; flex-wrap: wrap; gap: 10px;">
-                    <button class="btn-primary" style="flex: 1; background: #10b981; border-color: #10b981;" id="btnAssignReturnToggle" onclick="handleAssignReturnToggle()">👤 Assign</button>
-                    <button class="btn-primary" style="flex: 1; background: #ff8c00; border-color: #ff8c00;" onclick="openMoveItemModal()">📦 Move</button>
-                    <button class="btn-primary" style="flex: 1;" onclick="switchToItemEdit()">Edit</button>
-                    <button class="btn-outline" style="flex: 1;" onclick="closeModal('itemDetailsModal')">Close</button>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 115px; flex-shrink: 0; justify-content: flex-start; pt: 4px;">
+                    <button class="btn-primary" style="width: 100%; padding: 10px 5px; background: #10b981; border-color: #10b981; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; height: 38px;" id="btnAssignReturnToggle" onclick="handleAssignReturnToggle()">👤 Assign</button>
+                    <button class="btn-primary" style="width: 100%; padding: 10px 5px; background: #ff8c00; border-color: #ff8c00; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; height: 38px;" onclick="openMoveItemModal()">📦 Move</button>
+                    <button class="btn-primary" style="width: 100%; padding: 10px 5px; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; height: 38px;" onclick="switchToItemEdit()">Edit</button>
+                    <button class="btn-outline" style="width: 100%; padding: 10px 5px; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; height: 38px; border-color: #cbd5e1; color: #475569;" onclick="closeModal('itemDetailsModal')">Close</button>
                 </div>
+
             </div>
         </div>
     </div>

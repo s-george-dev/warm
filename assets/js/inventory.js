@@ -984,13 +984,28 @@ function renderItems(items) {
             const card = document.createElement("div"); card.className = "item-card"; if (item.id === lastMovedItemId) card.classList.add("moved-item-highlight");
             let imgUrl = "../assets/images/no-image.jpg"; if (item.photos?.length) { const defP = item.photos.find(p => p.is_primary) || item.photos[0]; imgUrl = window.db.storage.from("item-photos").getPublicUrl(defP.file_path).data.publicUrl; }
             let locPath = item.location_id ? buildLocationPath(item.location_id) : "Unallocated";
+            
             let overlayHtml = ""; let quickReturnHtml = "";
+            let isOutOfStock = (parseInt(item.quantity) === 0 || item.quantity === "0");
+            
+            // NEW: Hardware Equipment system flag evaluator
+            let isEquipmentAsset = (String(item.quantity).trim() === "-");
+
             if (item.assigned_to) {
                 const tempLoc = tempLocationsAdmin.find(t => t.id === item.assigned_to);
                 overlayHtml = `<div class="assigned-overlay"><div class="assigned-icon">👤</div><div class="assigned-label">Out</div><div class="assigned-name">${tempLoc ? tempLoc.name : 'Unknown'}</div></div>`;
-                quickReturnHtml = `<div onclick="executeReturnItem('${item.id}'); event.stopPropagation();" style="position:absolute; top:8px; right:42px; background:#ef4444; color:white; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:bold; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2); cursor:pointer;">📥 Return</div>`;
+                quickReturnHtml = `<div onclick="executeReturnItem('${item.id}'); event.stopPropagation();" style="position:absolute; top:8px; right:10px; background:#ef4444; color:white; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:bold; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2); cursor:pointer;">📥 Return</div>`;
+            } else if (!isEquipmentAsset && isOutOfStock) {
+                overlayHtml = `<div class="assigned-overlay" style="background: rgba(30, 41, 59, 0.85); border-radius: 12px;"><div class="assigned-icon" style="font-size:22px;">📭</div><div class="assigned-label" style="color: #f87171; font-weight: bold;">Out of Stock</div></div>`;
             }
-            card.innerHTML = `<div class="item-card-photo-wrapper">${overlayHtml}<img src="${imgUrl}"></div><div class="item-card-qty-badge">Qty: ${item.quantity}</div>${quickReturnHtml}<div class="item-card-name">${item.name}</div><div style="font-size: 11px; color: #666; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 4px; position: relative; z-index: 6;"><span>📍</span> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%;">${locPath}</span></div>`;
+
+            // NEW: Dynamically shift quantity styling matrix to output "Equipment" pill if checked
+            let qtyBadgeHtml = `<div class="item-card-qty-badge" style="${isOutOfStock ? 'background:#ef4444;' : ''}">Qty: ${item.quantity}</div>`;
+            if (isEquipmentAsset) {
+                qtyBadgeHtml = `<div class="item-card-qty-badge" style="background: #8b5cf6; font-weight: 700;">Equipment</div>`;
+            }
+
+            card.innerHTML = `<div class="item-card-photo-wrapper" style="${(!isEquipmentAsset && isOutOfStock) ? 'filter: grayscale(60%) opacity(0.7);' : ''}">${overlayHtml}<img src="${imgUrl}"></div>${qtyBadgeHtml}${quickReturnHtml}<div class="item-card-name" style="${(!isEquipmentAsset && isOutOfStock) ? 'color:#94a3b8;' : ''}">${item.name}</div><div style="font-size: 11px; color: #666; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 4px; position: relative; z-index: 6;"><span>📍</span> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%;">${locPath}</span></div>`;
             card.onclick = () => openItemDetails(item); container.appendChild(card);
         });
     }
@@ -1218,42 +1233,41 @@ async function switchToItemEdit() {
     const item = currentItemForActions;
 
     try {
-        // 1. Safely populate standard text fields
         if (document.getElementById("editItemName")) document.getElementById("editItemName").value = item.name || "";
-        if (document.getElementById("editItemQuantity")) document.getElementById("editItemQuantity").value = item.quantity || 0;
         if (document.getElementById("editItemDescription")) document.getElementById("editItemDescription").value = item.description || "";
         if (document.getElementById("editItemBarcode")) document.getElementById("editItemBarcode").value = item.barcode || "";
         if (document.getElementById("editItemNFC")) document.getElementById("editItemNFC").value = item.nfc_tag || "";
         if (document.getElementById("editItemCategory")) document.getElementById("editItemCategory").value = item.category || "tools";
         if (document.getElementById("editItemLocationSelect")) document.getElementById("editItemLocationSelect").value = item.location_id || "";
 
-        // 2. Safely parse tags (handles both arrays and comma-separated strings)
-        let parsedTags = [];
-        if (Array.isArray(item.tags)) {
-            parsedTags = [...item.tags];
-        } else if (typeof item.tags === 'string' && item.tags.trim()) {
-            parsedTags = item.tags.split(',').map(t => t.trim());
+        // NEW: Evaluate Equipment status flag, toggle UI visibility parameters instantly
+        const isEquipment = (String(item.quantity).trim() === "-");
+        const checkbox = document.getElementById("editItemIsEquipment");
+        if (checkbox) {
+            checkbox.checked = isEquipment;
+            handleEquipmentCheckboxToggle(isEquipment);
         }
+        
+        if (!isEquipment) {
+            document.getElementById("editItemQuantity").value = item.quantity || 0;
+        }
+
+        let parsedTags = [];
+        if (Array.isArray(item.tags)) { parsedTags = [...item.tags]; } 
+        else if (typeof item.tags === 'string' && item.tags.trim()) { parsedTags = item.tags.split(',').map(t => t.trim()); }
         activeSelectedEditTags = parsedTags;
         renderActiveTagPills('edit');
 
-        // 3. Safely handle photos (removed strict syntax for maximum Android compatibility)
-        currentEditItemFiles = []; 
-        existingItemPhotosToDelete = []; 
-        primaryPhotoIdentifier = null;
-        
+        currentEditItemFiles = []; existingItemPhotosToDelete = []; primaryPhotoIdentifier = null;
         const photos = item.photos || [];
         const existingPrimary = photos.find(p => p.is_primary);
         primaryPhotoIdentifier = existingPrimary ? existingPrimary.file_path : (photos.length > 0 ? photos[0].file_path : null);
         
         renderMultipleFilesPreviews('editItemPreviewsRow', currentEditItemFiles, 'edit-item', photos);
-
-        // 4. Show the modal
         document.getElementById("itemEditModal").style.display = "flex";
         
     } catch (error) {
         console.error("Critical Error opening edit modal:", error);
-        alert("An error occurred trying to load the editor. Please refresh the app.");
     }
 }
 
@@ -1328,10 +1342,19 @@ async function saveItemEdits() {
                 }
             }
         }
+        // NEW: Dynamically write hyphen string indicator parameter if checkbox toggle is active
+        const checkboxIsTool = document.getElementById("editItemIsEquipment")?.checked;
+        const compiledQtyValue = checkboxIsTool ? "-" : (parseInt(document.getElementById("editItemQuantity").value) || 0);
+
         const payload = {
-            name: document.getElementById("editItemName").value, quantity: parseInt(document.getElementById("editItemQuantity").value) || 0,
-            location_id: document.getElementById("editItemLocationSelect").value || null, description: document.getElementById("editItemDescription").value,
-            barcode, nfc_tag, category: document.getElementById("editItemCategory").value, tags: activeSelectedEditTags
+            name: document.getElementById("editItemName").value, 
+            quantity: compiledQtyValue,
+            location_id: document.getElementById("editItemLocationSelect").value || null, 
+            description: document.getElementById("editItemDescription").value,
+            barcode, 
+            nfc_tag, 
+            category: document.getElementById("editItemCategory").value, 
+            tags: activeSelectedEditTags
         };
         const { error } = await withStatus(() => window.db.from("items").update(payload).eq("id", itemId), "Updating item...");
         if (!error) {
@@ -1522,52 +1545,436 @@ async function attemptDeleteTempLocation() {
 }
 
 /* =========================================================
-   RICH ITEM MODALS: VIEWER & ASSIGNMENT LOGIC
+   RICH ITEM MODALS: EDITOR INFRASTRUCTURE & STATE ENGINE
 ========================================================= */
-function openItemDetails(item) {
-    currentItemForActions = item;
-    document.getElementById("detailItemName").textContent = item.name;
-    document.getElementById("detailItemQtyBadge").textContent = "Qty: " + item.quantity;
-    document.getElementById("detailItemDescription").textContent = item.description || "No description provided.";
-    document.getElementById("detailItemBarcode").textContent = item.barcode || "—";
-    document.getElementById("detailItemNFC").textContent = item.nfc_tag || "—";
-    document.getElementById("detailItemLocation").textContent = item.location_id ? "📍 " + buildLocationPath(item.location_id) : "📍 Unallocated Items";
 
-    const imgEl = document.getElementById("detailItemImage"); const thumbsContainer = document.getElementById("detailItemThumbsRow"); const expandBtn = document.getElementById("lightboxLauncherBtn");
-    thumbsContainer.innerHTML = ""; lightboxImages = []; lightboxIndex = 0;
 
-    if (item.photos && item.photos.length > 0) {
-        expandBtn.style.display = "block";
-        const sortedPhotos = [...item.photos].sort((a,b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
-        imgEl.src = window.db.storage.from("item-photos").getPublicUrl(sortedPhotos[0].file_path).data.publicUrl;
-        sortedPhotos.forEach((photo, idx) => {
-            const publicUrl = window.db.storage.from("item-photos").getPublicUrl(photo.file_path).data.publicUrl;
-            lightboxImages.push(publicUrl);
-            const thumbImg = document.createElement("img"); thumbImg.className = `view-thumb-item ${idx === 0 ? 'active' : ''}`; thumbImg.src = publicUrl;
-            thumbImg.onclick = () => { document.querySelectorAll(".view-thumb-item").forEach(t => t.classList.remove("active")); thumbImg.classList.add("active"); imgEl.src = publicUrl; lightboxIndex = idx; };
-            thumbsContainer.appendChild(thumbImg);
-        });
-    } else { imgEl.src = "../assets/images/no-image.jpg"; expandBtn.style.display = "none"; }
+async function switchToItemEdit() {
+    if (!currentItemForActions) return;
+    closeModal('itemDetailsModal');
+    const item = currentItemForActions;
 
-    const tagsContainer = document.getElementById("detailItemTagsContainer"); tagsContainer.innerHTML = "";
-    let tagArray = Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' && item.tags.trim() ? item.tags.split(',').map(t => t.trim()) : []);
-    if (tagArray.length > 0) {
-        tagArray.forEach(tag => {
-            const span = document.createElement("span"); span.className = "tag-pill"; span.textContent = tag; span.style.cursor = "pointer"; span.style.transition = "background 0.15s"; span.title = `Click to search for all items tagged with "${tag}"`;
-            span.onmouseover = () => { span.style.background = "#bae6fd"; span.style.color = "#0369a1"; }; span.onmouseout = () => { span.style.background = "#f1f5f9"; span.style.color = "#475569"; };
-            span.onclick = () => clickSearchTag(tag); tagsContainer.appendChild(span);
-        });
-    } else tagsContainer.innerHTML = `<span style="color:#999; font-style:italic; font-size:13px;">No tags assigned</span>`;
+    try {
+        if (document.getElementById("editItemName")) document.getElementById("editItemName").value = item.name || "";
+        if (document.getElementById("editItemDescription")) document.getElementById("editItemDescription").value = item.description || "";
+        if (document.getElementById("editItemCategory")) document.getElementById("editItemCategory").value = item.category || "tools";
+        if (document.getElementById("editItemLocationSelect")) document.getElementById("editItemLocationSelect").value = item.location_id || "";
 
-    const assignBtn = document.getElementById("btnAssignReturnToggle"); const banner = document.getElementById("detailAssignedBanner"); const nameLabel = document.getElementById("detailAssignedTargetName");
-    if (item.assigned_to) {
-        const tempLoc = tempLocationsAdmin.find(t => t.id === item.assigned_to);
-        banner.style.display = "flex"; nameLabel.textContent = tempLoc ? tempLoc.name : "Unknown User";
-        assignBtn.textContent = "📥 Return Item"; assignBtn.style.background = "#ef4444"; assignBtn.style.borderColor = "#ef4444";
-    } else {
-        banner.style.display = "none"; assignBtn.textContent = "👤 Assign"; assignBtn.style.background = "#10b981"; assignBtn.style.borderColor = "#10b981";
+        // Populate local parameters with row entries data indices
+        editModalActiveBarcodeString = item.barcode || "";
+        editModalActiveNfcTagString = item.nfc_tag || "";
+
+        // Synchronize display text labels on button targets instantly
+        updateEditModalHardwareButtonsUI();
+
+        const isEquipment = (String(item.quantity).trim() === "-");
+        const checkbox = document.getElementById("editItemIsEquipment");
+        if (checkbox) {
+            checkbox.checked = isEquipment;
+            handleEquipmentCheckboxToggle(isEquipment);
+        }
+        
+        if (!isEquipment) {
+            document.getElementById("editItemQuantity").value = item.quantity || 0;
+        }
+
+        let parsedTags = [];
+        if (Array.isArray(item.tags)) { parsedTags = [...item.tags]; } 
+        else if (typeof item.tags === 'string' && item.tags.trim()) { parsedTags = item.tags.split(',').map(t => t.trim()); }
+        activeSelectedEditTags = parsedTags;
+        renderActiveTagPills('edit');
+
+        currentEditItemFiles = []; existingItemPhotosToDelete = []; primaryPhotoIdentifier = null;
+        const photos = item.photos || [];
+        const existingPrimary = photos.find(p => p.is_primary);
+        primaryPhotoIdentifier = existingPrimary ? existingPrimary.file_path : (photos.length > 0 ? photos[0].file_path : null);
+        
+        renderMultipleFilesPreviews('editItemPreviewsRow', currentEditItemFiles, 'edit-item', photos);
+        document.getElementById("itemEditModal").style.display = "flex";
+        
+    } catch (error) {
+        console.error("Critical Error opening edit modal:", error);
     }
-    document.getElementById("itemDetailsModal").style.display = "flex";
+}
+
+// Synchronize button layouts, text options, and colors dynamically based on variable values
+function updateEditModalHardwareButtonsUI() {
+    const barBtn = document.getElementById("btnEditModalBarcodeAction");
+    const nfcBtn = document.getElementById("btnEditModalNfcAction");
+    
+    if (barBtn) {
+        if (editModalActiveBarcodeString.trim() !== "") {
+            barBtn.textContent = `📷 ${editModalActiveBarcodeString}`;
+            barBtn.style.background = "#e0f2fe";
+            barBtn.style.color = "#0369a1";
+            barBtn.style.borderColor = "#7dd3fc";
+        } else {
+            barBtn.textContent = "📷 No Barcode Found";
+            barBtn.style.background = "#f8fafc";
+            barBtn.style.color = "#1e293b";
+            barBtn.style.borderColor = "#cbd5e1";
+        }
+    }
+    
+    if (nfcBtn) {
+        if (editModalActiveNfcTagString.trim() !== "") {
+            nfcBtn.textContent = "📡 NFC Tag Assigned";
+            nfcBtn.style.background = "#dcfce7";
+            nfcBtn.style.color = "#15803d";
+            nfcBtn.style.borderColor = "#86efac";
+        } else {
+            nfcBtn.textContent = "📡 NFC Ready (Tap)";
+            nfcBtn.style.background = "#f8fafc";
+            nfcBtn.style.color = "#1e293b";
+            nfcBtn.style.borderColor = "#cbd5e1";
+        }
+    }
+}
+
+// Safely requests permission before overriding barcode data indices
+window.triggerEditModalBarcodeAction = async function() {
+    if (editModalActiveBarcodeString.trim() !== "") {
+        const confirmClear = await customConfirm("Are you sure you want to rewrite or re-scan this barcode reference identity completely?", "Overwrite Barcode?");
+        if (!confirmClear) return;
+    }
+    openBarcodeScannerModal('EDIT_MODAL_BARCODE_INTERNAL_TUNNEL');
+};
+
+
+
+// Handles numeric boundaries via arrow step controls
+function adjustEditModalQty(amount) {
+    const isEquipment = document.getElementById("editItemIsEquipment").checked;
+    if (isEquipment) return; 
+    
+    const input = document.getElementById("editItemQuantity");
+    let currentVal = parseInt(input.value) || 0;
+    let targetVal = currentVal + amount;
+    if (targetVal < 0) targetVal = 0;
+    input.value = targetVal;
+}
+
+// Gray out and lock the quantity selection UI when an item is a tool
+function handleEquipmentCheckboxToggle(isChecked) {
+    const qtyWrapper = document.getElementById("editItemQtyWrapper");
+    const qtyInput = document.getElementById("editItemQuantity");
+    
+    if (isChecked) {
+        if (qtyWrapper) {
+            qtyWrapper.style.opacity = "0.35";
+            qtyWrapper.style.filter = "grayscale(100%)";
+            qtyWrapper.style.pointerEvents = "none";
+        }
+        if (qtyInput) {
+            qtyInput.value = "-";
+            qtyInput.disabled = true;
+            qtyInput.style.background = "#e2e8f0";
+        }
+    } else {
+        if (qtyWrapper) {
+            qtyWrapper.style.opacity = "1";
+            qtyWrapper.style.filter = "none";
+            qtyWrapper.style.pointerEvents = "auto";
+        }
+        if (qtyInput) {
+            qtyInput.value = "1";
+            qtyInput.disabled = false;
+            qtyInput.style.background = "#ffffff";
+        }
+    }
+}
+
+async function attemptDeleteItem() {
+    if (!currentItemForActions || !currentItemForActions.id) return await customAlert("No item selected.", "Error");
+    if (!(await customConfirm("Are you sure you want to permanently delete this item? This operation cannot be undone.", "Delete Item?", true))) return;
+
+    const itemName = currentItemForActions.name || "Unknown Item";
+    const response = await window.offlineSafeWrite('DELETE', 'items', null, currentItemForActions.id);
+
+    if (response.success) {
+        closeModal('itemEditModal');
+        logAction("DELETE", "Item", itemName, "Permanently removed from database");
+        await refreshAllDataFromLocal(); 
+        window.processSyncQueue(); 
+    }
+}
+
+async function saveItemEdits() {
+    if (!window.isAppOnline) return await customAlert("You must be connected to the internet to save edits.", "Offline Mode");
+    if (window.isProcessingTransaction) return;
+    window.isProcessingTransaction = true;
+
+    try {
+        if (!currentItemForActions || !currentItemForActions.id) return;
+        const itemId = currentItemForActions.id;
+
+        if (editModalActiveBarcodeString && !(await isHardwareTagUnique(editModalActiveBarcodeString, itemId))) return await customAlert("Barcode ID is already registered!", "Duplicate Code");
+        if (editModalActiveNfcTagString && !(await isHardwareTagUnique(editModalActiveNfcTagString, itemId))) return await customAlert("NFC Tag is already registered!", "Duplicate Code");
+
+        await window.db.from("photos").update({ is_primary: false }).eq("item_id", itemId);
+        if (existingItemPhotosToDelete.length > 0) { for (let path of existingItemPhotosToDelete) await window.db.from("photos").delete().eq("file_path", path); }
+        if (primaryPhotoIdentifier) await window.db.from("photos").update({ is_primary: true }).eq("file_path", primaryPhotoIdentifier);
+        
+        if (currentEditItemFiles.length > 0) {
+            for (let i = 0; i < currentEditItemFiles.length; i++) {
+                const file = currentEditItemFiles[i]; const fileName = `item-${itemId}-${Date.now()}-${i}`;
+                const { error: uploadError } = await window.db.storage.from("item-photos").upload(fileName, file);
+                if (!uploadError) {
+                    const isThisPrimary = file.name === primaryPhotoIdentifier || (!primaryPhotoIdentifier && i === 0 && currentItemForActions.photos.length === 0);
+                    await window.db.from("photos").insert([{ item_id: itemId, file_path: fileName, is_primary: isThisPrimary }]);
+                }
+            }
+        }
+        
+        const checkboxIsTool = document.getElementById("editItemIsEquipment")?.checked;
+        const compiledQtyValue = checkboxIsTool ? "-" : (parseInt(document.getElementById("editItemQuantity").value) || 0);
+
+        const payload = {
+            name: document.getElementById("editItemName").value, 
+            quantity: compiledQtyValue,
+            location_id: document.getElementById("editItemLocationSelect").value || null,
+            description: document.getElementById("editItemDescription").value,
+            barcode: editModalActiveBarcodeString, 
+            nfc_tag: editModalActiveNfcTagString, 
+            category: document.getElementById("editItemCategory").value,
+            tags: activeSelectedEditTags
+        };
+        
+        const { error } = await withStatus(() => window.db.from("items").update(payload).eq("id", itemId), "Updating item...");
+        if (!error) {
+            closeModal('itemEditModal'); logAction("UPDATE", "Item", payload.name, "Modified item details");
+            await syncAfterWrite();
+            if (currentTempLocationId) await loadTempLocationDetails(currentTempLocationId); else if (currentLocationId === "unallocated") await loadUnallocatedItems();
+            else if (currentLocationId) await loadLocation(currentLocationId); else await loadRootLocations();
+        }
+    } finally { window.isProcessingTransaction = false; }
+}
+
+// Intercept original scanner callback channels to hook hardware values into the modal elements
+if (typeof openBarcodeScannerModal === "function") {
+    const baseScannerLauncher = openBarcodeScannerModal;
+    openBarcodeScannerModal = function(targetId) {
+        if (targetId === 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL') {
+            window.activeBarcodeTargetInputId = 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL';
+            document.getElementById("barcodeScannerModal").style.display = "flex";
+            isProcessingScan = false;
+            html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
+            const lensConfig = (typeof determineActiveTargetLens === 'function') ? determineActiveTargetLens() : { facingMode: "environment" };
+            
+            html5QrcodeScannerInstance.start(lensConfig, { fps: 15, qrbox: { width: 260, height: 160 } },
+                (decodedText) => {
+                    if (isProcessingScan) return; isProcessingScan = true;
+                    editModalActiveBarcodeString = decodedText;
+                    updateEditModalHardwareButtonsUI();
+                    closeBarcodeScannerModal();
+                }, () => {}
+            ).then(() => {
+                if (typeof applyHardwareZoomToContainer === 'function') applyHardwareZoomToContainer("scannerReaderContainer");
+            }).catch(() => {});
+            return;
+        }
+        return baseScannerLauncher(targetId);
+    };
+}
+
+// Hook peripheral readings straight into variables
+if (typeof openNfcScannerModal === "function") {
+    const baseNfcLauncher = openNfcScannerModal;
+    openNfcScannerModal = function(targetId) {
+        if (document.getElementById("itemEditModal").style.display === "flex" && !targetId) {
+            if (editModalActiveNfcTagString.trim() !== "") {
+                triggerEditModalNfcClearanceRequest(); return;
+            }
+            window.activeNfcTargetInputId = "EDIT_MODAL_NFC_INTERNAL_TUNNEL";
+            document.getElementById("nfcScannerModal").style.display = "flex";
+            isProcessingNfcScan = false;
+            try {
+                const ndef = new NDEFReader(); nfcAbortController = new AbortController();
+                ndef.scan({ signal: nfcAbortController.signal }).then(() => {
+                    ndef.onreading = (event) => {
+                        if (isProcessingNfcScan) return; isProcessingNfcScan = true;
+                        editModalActiveNfcTagString = event.serialNumber;
+                        updateEditModalHardwareButtonsUI();
+                        closeNfcScannerModal();
+                    };
+                }).catch(() => closeNfcScannerModal());
+            } catch(e) { closeNfcScannerModal(); }
+            return;
+        }
+        return baseNfcLauncher(targetId);
+    };
+}
+
+/* =========================================================
+   ASYNC BATCH WORKFLOW OPERATIONS AND UTILITY LAYOUTS
+========================================================= */
+function openMoveItemModal() {
+    if (!currentItemForActions) return;
+    document.getElementById("moveItemLocationBarcode").value = ""; document.getElementById("moveItemLocationSelect").value = currentItemForActions.location_id || "";
+    document.getElementById("moveItemModal").style.display = "flex";
+}
+
+async function executeMoveItem() {
+    if (!window.isAppOnline) return await customAlert("You must be connected to the internet to move items.", "Offline Mode");
+    if (window.isProcessingTransaction) return;
+    window.isProcessingTransaction = true;
+
+    try {
+        if (!currentItemForActions || !currentItemForActions.id) return;
+        const destinationId = document.getElementById("moveItemLocationSelect").value || null;
+        const targetItemId = currentItemForActions.id; 
+
+        const { error } = await withStatus(() => window.db.from("items").update({ location_id: destinationId }).eq("id", targetItemId), "Relocating item...");
+        if (!error) {
+            closeModal('moveItemModal'); closeModal('itemDetailsModal'); closeBarcodeScannerModal();
+            lastMovedItemId = targetItemId; const destLoc = locationsAdmin.find(l => l.id === destinationId);
+            logAction("MOVE", "Item", currentItemForActions.name, `Moved to ${destLoc ? destLoc.name : 'Unallocated'}`);
+
+            await syncAfterWrite();
+            if (destinationId) { currentLocationId = destinationId; await loadLocation(destinationId); } 
+            else { currentLocationId = "unallocated"; await loadUnallocatedItems(); }
+            showPage('pageItems'); setTimeout(() => { lastMovedItemId = null; }, 6000);
+        }
+    } finally { window.isProcessingTransaction = false; }
+}
+
+function openAddLocationModal() {
+    ["addLocationName", "addLocationDescription", "addLocationBarcode", "addLocationNFC"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+    const cat = document.getElementById("addLocationCategory"); if (cat) cat.value = "storage";
+    document.getElementById("addLocationPhotoInput").value = ""; document.getElementById("addLocationCameraInput").value = ""; document.getElementById("addLocationPreview").src = "../assets/images/folder-icon.jpg";
+    currentAddLocationFiles = []; document.getElementById("addLocationModal").style.display = "flex";
+}
+
+async function addLocation() {
+    const name = document.getElementById("addLocationName").value; 
+    const description = document.getElementById("addLocationDescription").value; 
+    const barcode = document.getElementById("addLocationBarcode").value; 
+    const nfc = document.getElementById("addLocationNFC").value; 
+    const category = document.getElementById("addLocationCategory").value;
+    
+    if (!name) return await customAlert("Please enter a folder name", "Missing Name");
+    if (barcode && !(await isHardwareTagUnique(barcode))) return await customAlert("Barcode ID is already registered!", "Duplicate Code");
+    if (nfc && !(await isHardwareTagUnique(nfc))) return await customAlert("NFC Tag is already registered!", "Duplicate Code");
+
+    const payload = { name, location_description: description, barcode, nfc_tag: nfc, category, parent_id: currentLocationAdmin };
+    const response = await window.offlineSafeWrite('CREATE', 'locations', payload);
+
+    if (response.success) {
+        if (currentAddLocationFiles.length > 0) {
+            const file = currentAddLocationFiles[0]; 
+            const fileName = `location-${Date.now()}`;
+            const base64Data = await window.fileToBase64(file);
+            
+            await localDB.sync_photos_queue.add({
+                record_id: response.id, record_type: 'location', bucket: 'location-photos',
+                file_name: fileName, base64_data: base64Data, is_primary: true, status: 'pending'
+            });
+        }
+
+        closeModal('addLocationModal'); 
+        logAction("CREATE", "Location", name, "Created new folder"); 
+        await refreshAllDataFromLocal();
+        window.processSyncQueue();
+    }
+}
+
+function openLocationActions(id) {
+    editingLocationId = id; const loc = locationsAdmin.find(l => l.id === id); if (!loc) return;
+    document.getElementById("locationActionsName").textContent = loc.name; document.getElementById("editLocationName").value = loc.name || ""; document.getElementById("editLocationDescription").value = loc.location_description || ""; document.getElementById("editLocationBarcode").value = loc.barcode || ""; document.getElementById("editLocationNFC").value = loc.nfc || ""; document.getElementById("editLocationCategory").value = loc.category || "storage";
+    currentEditLocationFile = null; window.locationPhotoDeleted = false;
+    const previewImg = document.getElementById("editLocationPreview"); if (loc.photo) previewImg.src = window.db.storage.from("location-photos").getPublicUrl(loc.photo).data.publicUrl; else previewImg.src = "../assets/images/folder-icon.jpg";
+    document.getElementById("locationActionsModal").style.display = "flex";
+}
+
+async function saveLocationEdits() {
+    if (!window.isAppOnline) return await customAlert("You must be connected to the internet to save edits.", "Offline Mode");
+    if (!editingLocationId) return;
+    const barcode = document.getElementById("editLocationBarcode").value; const nfc_tag = document.getElementById("editLocationNFC").value; const name = document.getElementById("editLocationName").value;
+    if (barcode && !(await isHardwareTagUnique(barcode, editingLocationId))) return await customAlert("Barcode ID is already registered!", "Duplicate Code");
+    if (nfc_tag && !(await isHardwareTagUnique(nfc_tag, editingLocationId))) return await customAlert("NFC Tag is already registered!", "Duplicate Code");
+
+    let photoPath = locationsAdmin.find(l => l.id === editingLocationId)?.photo || null;
+    if (currentEditLocationFile) {
+        const fileName = `location-${Date.now()}`; const { error: uploadError } = await window.db.storage.from("location-photos").upload(fileName, currentEditLocationFile);
+        if (!uploadError) photoPath = fileName;
+    } else if (window.locationPhotoDeleted) photoPath = null;
+
+    const payload = { name, location_description: document.getElementById("editLocationDescription").value, barcode, nfc_tag, category: document.getElementById("editLocationCategory").value, photo_path: photoPath };
+    const { error } = await withStatus(() => window.db.from("locations").update(payload).eq("id", editingLocationId), "Saving changes...");
+    if (!error) { closeModal('locationActionsModal'); logAction("UPDATE", "Location", name, "Modified folder structure"); await syncAfterWrite(); loadLocationsAdmin(); }
+}
+
+async function attemptDeleteLocation() {
+    if (!window.isAppOnline) return await customAlert("You must be connected to the internet to delete folders.", "Offline Mode");
+    if (!editingLocationId) return;
+    const loc = locationsAdmin.find(l => l.id === editingLocationId);
+    if (locationsAdmin.some(l => l.parent === editingLocationId)) return await customAlert("Cannot delete: This folder contains sub-folders.", "Folder Not Empty");
+    const items = await localDB.items.where('location_id').equals(editingLocationId).toArray();
+    if (items && items.length > 0) return await customAlert("Cannot delete: This folder contains items.", "Folder Not Empty");
+    if (!(await customConfirm("Are you sure? This cannot be undone.", "Delete Folder?", true))) return;
+
+    const { error = null } = await withStatus(() => window.db.from("locations").delete().eq("id", editingLocationId), "Deleting folder...");
+    if (!error) { closeModal('locationActionsModal'); logAction("DELETE", "Location", loc ? loc.name : 'Unknown', "Deleted folder"); await syncAfterWrite(); loadLocationsAdmin(); }
+}
+
+function openAddTempLocationModal() {
+    document.getElementById("addTempLocationName").value = ""; document.getElementById("addTempLocationDescription").value = ""; document.getElementById("addTempLocationBarcode").value = "";
+    document.getElementById("addTempLocationPhotoInput").value = ""; document.getElementById("addTempLocationCameraInput").value = ""; document.getElementById("addTempLocationPreview").src = "../assets/images/folder-icon.jpg";
+    currentAddLocationFiles = []; document.getElementById("addTempLocationModal").style.display = "flex";
+}
+
+async function addTempLocation() {
+    if (!window.isAppOnline) return await customAlert("You must be connected to the internet to create an assignee.", "Offline Mode");
+    const name = document.getElementById("addTempLocationName").value; const desc = document.getElementById("addTempLocationDescription").value; const barcode = document.getElementById("addTempLocationBarcode").value;
+    if (!name) return await customAlert("Please enter a name for the assignee.", "Missing Name");
+    if (barcode && !(await isHardwareTagUnique(barcode))) return await customAlert("That ID code is already in use.", "Duplicate Code");
+
+    let uploadedPhotoPath = null;
+    if (currentAddLocationFiles.length > 0) {
+        const file = currentAddLocationFiles[0]; const fileName = `temp-loc-${Date.now()}`;
+        const { error: uploadError } = await window.db.storage.from("location-photos").upload(fileName, file);
+        if (!uploadError) uploadedPhotoPath = fileName;
+    }
+
+    const { error } = await withStatus(() => window.db.from("temp_locations").insert([{ name, description: desc, barcode, photo_path: uploadedPhotoPath }]), "Creating...");
+    if (!error) { closeModal('addTempLocationModal'); logAction("CREATE", "Temp Location", name, "Created new assignee profile"); await syncAfterWrite(); loadTempLocationsAdmin(); }
+}
+
+function openTempLocationActions(id) {
+    editingTempLocationId = id; const loc = tempLocationsAdmin.find(l => l.id === id); if (!loc) return;
+    document.getElementById("tempLocationActionsName").textContent = loc.name; document.getElementById("editTempLocationName").value = loc.name || ""; document.getElementById("editTempLocationDescription").value = loc.description || ""; document.getElementById("editTempLocationBarcode").value = loc.barcode || "";
+    currentEditLocationFile = null; window.locationPhotoDeleted = false;
+    const previewImg = document.getElementById("editTempLocationPreview"); if (loc.photo_path) previewImg.src = window.db.storage.from("location-photos").getPublicUrl(loc.photo_path).data.publicUrl; else previewImg.src = "../assets/images/folder-icon.jpg";
+    document.getElementById("tempLocationActionsModal").style.display = "flex";
+}
+
+async function saveTempLocationEdits() {
+    if (!window.isAppOnline) return await customAlert("You must be connected to the internet to save edits.", "Offline Mode");
+    if (!editingTempLocationId) return;
+    const barcode = document.getElementById("editTempLocationBarcode").value; const name = document.getElementById("editTempLocationName").value;
+    if (barcode && !(await isHardwareTagUnique(barcode, editingTempLocationId))) return await customAlert("Barcode in use.", "Duplicate Code");
+
+    let photoPath = tempLocationsAdmin.find(l => l.id === editingTempLocationId)?.photo_path || null;
+    if (currentEditLocationFile) {
+        const fileName = `temp-loc-${Date.now()}`; const { error: uploadError } = await window.db.storage.from("location-photos").upload(fileName, currentEditLocationFile);
+        if (!uploadError) photoPath = fileName;
+    } else if (window.locationPhotoDeleted) photoPath = null;
+
+    const payload = { name, description: document.getElementById("editTempLocationDescription").value, barcode, photo_path: photoPath };
+    const { error } = await withStatus(() => window.db.from("temp_locations").update(payload).eq("id", editingTempLocationId), "Saving updates...");
+    if (!error) { closeModal('tempLocationActionsModal'); logAction("UPDATE", "Temp Location", name, "Updated assignee details"); await syncAfterWrite(); loadTempLocationsAdmin(); }
+}
+
+async function attemptDeleteTempLocation() {
+    if (!window.isAppOnline) return await customAlert("You must be connected to the internet to delete an assignee.", "Offline Mode");
+    if (!editingTempLocationId) return;
+    const loc = tempLocationsAdmin.find(t => t.id === editingTempLocationId);
+    const items = await localDB.items.where('assigned_to').equals(editingTempLocationId).toArray();
+    if (items && items.length > 0) return await customAlert("Cannot delete: Items are currently assigned to this profile.", "Assignee Active");
+    if (!(await customConfirm("Delete this Temporary Location?", "Delete Assignee?", true))) return;
+
+    const { error } = await withStatus(() => window.db.from("temp_locations").delete().eq("id", editingTempLocationId), "Deleting...");
+    if (!error) { closeModal('tempLocationActionsModal'); logAction("DELETE", "Temp Location", loc.name, "Deleted assignee profile"); await syncAfterWrite(); loadTempLocationsAdmin(); }
 }
 
 function openLightbox() { if (!lightboxImages || lightboxImages.length === 0) return; document.getElementById("review-lightbox").style.display = "flex"; updateLightboxUI(); }
@@ -1575,10 +1982,6 @@ function closeLightbox() { document.getElementById("review-lightbox").style.disp
 function changeLightboxImage(direction) { lightboxIndex += direction; if (lightboxIndex < 0) lightboxIndex = lightboxImages.length - 1; if (lightboxIndex >= lightboxImages.length) lightboxIndex = 0; updateLightboxUI(); }
 function updateLightboxUI() { const imgEl = document.getElementById("lightbox-img"); const counterEl = document.getElementById("lightbox-counter"); if (imgEl && lightboxImages[lightboxIndex]) imgEl.src = lightboxImages[lightboxIndex]; if (counterEl) counterEl.textContent = `${lightboxIndex + 1} / ${lightboxImages.length}`; }
 
-
-/* =========================================================
-   ASSIGNMENT / RETURN LOGIC
-========================================================= */
 function handleAssignReturnToggle() {
     if (!currentItemForActions) return;
     if (currentItemForActions.assigned_to) executeReturnItem(currentItemForActions.id);
@@ -1591,15 +1994,12 @@ async function executeAssignItem() {
     if (!targetId) return await customAlert("Please select a valid assignee.", "Missing Target");
     const tempLoc = tempLocationsAdmin.find(t => t.id === targetId);
 
-    // Offline Safe Update
     const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: targetId }, currentItemForActions.id);
-    
     if (response.success) {
         closeModal("assignItemModal"); closeModal("itemDetailsModal"); lastMovedItemId = currentItemForActions.id; 
         logAction("CHECKOUT", "Item", currentItemForActions.name, `Assigned out to ${tempLoc ? tempLoc.name : 'User'}`);
-        
-        await refreshAllDataFromLocal(); // Instant UI update
-        window.processSyncQueue(); // Sync if online
+        await refreshAllDataFromLocal(); 
+        window.processSyncQueue(); 
         setTimeout(() => { lastMovedItemId = null; }, 6000);
     }
 }
@@ -1608,17 +2008,12 @@ async function executeReturnItem(itemId, fromTempView = false) {
     if (!(await customConfirm("Check this item back into the warehouse?", "Confirm Return"))) return;
     const itemData = currentBrowserItems.find(i => i.id === itemId) || currentItemForActions;
 
-    // Offline Safe Update
     const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: null }, itemId);
-    
     if (response.success) {
         closeModal("itemDetailsModal"); lastMovedItemId = itemId; 
         logAction("RETURN", "Item", itemData ? itemData.name : 'Item', "Checked back into warehouse");
-        
-        await refreshAllDataFromLocal(); // Instant UI update
-        window.processSyncQueue(); // Sync if online
-        
-        // Force the Temp view to refresh its specific grid if we are on that tab
+        await refreshAllDataFromLocal(); 
+        window.processSyncQueue(); 
         if (currentTempLocationId || fromTempView) await loadTempLocationDetails(currentTempLocationId || fromTempView); 
         setTimeout(() => { lastMovedItemId = null; }, 6000);
     }
@@ -1634,48 +2029,29 @@ function handleAssignBarcodeLookup(scannedText) {
 async function executeFastReturnLookup(scannedCodeString) {
     if (!scannedCodeString || !scannedCodeString.trim()) return;
     const lowerToken = scannedCodeString.trim().toLowerCase();
-    
-    // Read directly from the offline hard drive for instant speed
     const items = await localDB.items.toArray(); 
     if (!items) return;
 
     const match = items.find(item => (item.barcode && item.barcode.trim().toLowerCase() === lowerToken) || (item.nfc_tag && item.nfc_tag.trim().toLowerCase() === lowerToken));
-    
     if (!match) return await customAlert(`No items found matching that tag!`, "Scan Failed");
     if (!match.assigned_to) return await customAlert(`Item <b>[${match.name}]</b> is already in the warehouse (Not checked out).`, "Already In Stock");
 
-    // Use the Universal Offline Writer!
     const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: null }, match.id);
-    
     if (response.success) {
-        // Find the human-readable path for where this item belongs
         const locPath = match.location_id ? buildLocationPath(match.location_id) : "Unallocated Items";
-        
-        // Assemble the success message with the Party Popper and Bold instructions!
         const successMsg = `🎉 Success! <b>[${match.name}]</b> has been checked back in.<br><br><b>📍 PLEASE RETURN TO:</b><br><span style="color: #004a99; font-weight: bold; font-size: 16px;">${locPath}</span>`;
-        
         await customAlert(successMsg, "Item Returned");
-        
         lastMovedItemId = match.id; 
         logAction("RETURN", "Item", match.name, "Fast-Return via Scanner");
-        
-        // Instantly update UI and trigger background sync
         await refreshAllDataFromLocal();
         window.processSyncQueue(); 
-        
-        // Refresh the current view
         if (currentTempLocationId) loadTempLocationDetails(currentTempLocationId);
         else if (currentLocationId) loadLocation(currentLocationId);
         else loadRootLocations();
-        
         setTimeout(() => { lastMovedItemId = null; }, 6000);
     }
 }
 
-
-/* =========================================================
-   SEARCH & FILTER LOGIC
-========================================================= */
 async function handleGlobalSearch(term) {
     const filterType = document.getElementById("searchTypeFilter")?.value || "all";
     const lowerTerm = term.toLowerCase().trim();
@@ -1712,8 +2088,6 @@ async function handleGlobalSearch(term) {
 
 function renderSectionedSearchResults(sections, filterType) {
     let combinedResults = [];
-    
-    // 1. Gather the results based on the active filter
     if (filterType === "all") {
         combinedResults = [...sections.name, ...sections.location, ...sections.tag, ...sections.category];
     } else if (filterType === "name" || filterType === "barcode") {
@@ -1726,15 +2100,11 @@ function renderSectionedSearchResults(sections, filterType) {
         combinedResults = [...sections.category];
     }
 
-    // 2. Remove duplicates (An item might match multiple criteria)
     const uniqueResults = Array.from(new Set(combinedResults.map(i => i.id)))
         .map(id => combinedResults.find(i => i.id === id));
 
-    // 3. Update the global state so sorting/views work on the search results
     currentBrowserLocations = []; 
     currentBrowserItems = uniqueResults;
-    
-    // 4. Render the results to the screen
     renderLocations([]); 
     renderItems(uniqueResults);
 }
@@ -1746,9 +2116,6 @@ function handleLocationBarcodeLookup(scannedText) {
     if (match) { document.getElementById("moveItemLocationSelect").value = match.id; executeMoveItem(); }
 }
 
-/* =========================================================
-   DYNAMIC TAGS & CATEGORIES MANAGEMENT SYSTEM
-========================================================= */
 function handleSearchFilterTypeChange() {
     const filterType = document.getElementById("searchTypeFilter").value; const pillsRow = document.getElementById("searchFilterPillsRow"); const searchInput = document.getElementById("globalSearchInput");
     activeSearchTags = []; activeSearchCategory = null; 
@@ -1826,28 +2193,23 @@ async function loadCategoriesAdmin() {
 
 function openTagModal(isSubCall = false, id = null, name = '') { isSubModalContextCall = isSubCall; editingTagTargetId = id; document.getElementById("tagModalTitle").textContent = id ? "Modify Tag Name" : "Add New Tag Label"; document.getElementById("tagModalInput").value = name; document.getElementById("centralTagModal").style.display = "flex"; }
 
-
 async function saveCentralTag() { 
     const name = document.getElementById("tagModalInput").value.trim(); 
     if (!name) return await customAlert("Please enter a tag label designation.", "Missing Label"); 
-    
-    // Check local Dexie DB for duplicates first
     const existing = globalCachedTags.find(t => t.name.toLowerCase() === name.toLowerCase());
     if (existing && existing.id !== editingTagTargetId) return await customAlert("Tag already exists.", "Duplicate Error");
 
     let response;
     if (editingTagTargetId) {
-        // UPDATE Existing
         response = await window.offlineSafeWrite('UPDATE', 'tags', { name }, editingTagTargetId);
     } else {
-        // CREATE New
         response = await window.offlineSafeWrite('CREATE', 'tags', { name });
     }
     
     if (!response.error) { 
         closeModal('centralTagModal'); 
         logAction("CREATE/UPDATE", "Tag", name, "Modified system tag"); 
-        await refreshAllDataFromLocal(); // Instantly update the UI
+        await refreshAllDataFromLocal(); 
         if (isSubModalContextCall) { 
             const currentActiveMode = document.getElementById("itemEditModal").style.display === 'flex' ? 'edit' : 'add'; 
             handleTagSelection(currentActiveMode, name); 
@@ -1860,28 +2222,19 @@ async function saveCentralTag() {
 async function deleteCentralTag(id) { 
     const tag = globalCachedTags.find(t => t.id === id);
     if (!(await customConfirm("Are you sure? Removing this tag will strip it from any item that uses it.", "Delete Tag?", true))) return; 
-    
     const { error } = await window.offlineSafeWrite('DELETE', 'tags', null, id);
-    
     if (!error) { 
         logAction("DELETE", "Tag", tag ? tag.name : "Unknown", "Removed system tag"); 
-        await refreshAllDataFromLocal(); // Instantly update the UI
+        await refreshAllDataFromLocal(); 
         loadTagsAdmin(); 
     } 
 }
-
-
-
-
-
 
 function openCategoryModal(isSubCall = false, id = null, name = '') { isSubModalContextCall = isSubCall; editingCategoryTargetId = id; document.getElementById("categoryModalTitle").textContent = id ? "Modify Category Classification" : "Add New Item Category"; document.getElementById("categoryModalInput").value = name; document.getElementById("centralCategoryModal").style.display = "flex"; }
 
 async function saveCentralCategory() { 
     const name = document.getElementById("categoryModalInput").value.trim(); 
     if (!name) return await customAlert("Please specify classification name parameter.", "Missing Name"); 
-    
-    // Check local Dexie DB for duplicates first
     const existing = globalCachedCategories.find(c => c.name.toLowerCase() === name.toLowerCase());
     if (existing && existing.id !== editingCategoryTargetId) return await customAlert("Category already exists.", "Duplicate Error");
 
@@ -1895,7 +2248,7 @@ async function saveCentralCategory() {
     if (!response.error) { 
         closeModal('centralCategoryModal'); 
         logAction("CREATE/UPDATE", "Category", name, "Modified classification"); 
-        await refreshAllDataFromLocal(); // Instantly update UI
+        await refreshAllDataFromLocal(); 
         if (isSubModalContextCall) { 
             const targetSelId = document.getElementById("itemEditModal").style.display === 'flex' ? "editItemCategory" : "itemCategorySelect"; 
             document.getElementById(targetSelId).value = name; 
@@ -1908,21 +2261,15 @@ async function saveCentralCategory() {
 async function deleteCentralCategory(id) { 
     const cat = globalCachedCategories.find(c => c.id === id);
     if (!(await customConfirm("Are you sure you want to drop this classification option?", "Delete Category?", true))) return; 
-    
     const { error } = await window.offlineSafeWrite('DELETE', 'item_categories', null, id); 
-    
     if (!error) { 
         logAction("DELETE", "Category", cat ? cat.name : "Unknown", "Removed category"); 
-        await refreshAllDataFromLocal(); // Instantly update UI
+        await refreshAllDataFromLocal(); 
         loadCategoriesAdmin(); 
     } 
 }
 
-
-/* =========================================================
-   RAPID QUANTITY ADJUSTER FEATURE
-========================================================= */
-let currentQtyAdjusterItem = null;
+currentQtyAdjusterItem = null;
 
 function openQuantityAdjusterModal() {
     currentQtyAdjusterItem = null;
@@ -1974,62 +2321,178 @@ async function saveQuantityAdjustment(closeAfter) {
     } finally { window.isProcessingTransaction = false; }
 }
 
-
 /* =========================================================
-   NFC & BARCODE HARDWARE SCANNERS
+   NFC & BARCODE HARDWARE SCANNERS (UNIFIED MASTER ENGINE)
 ========================================================= */
 let nfcAbortController = null;
 let isProcessingNfcScan = false;
 let html5QrcodeScannerInstance = null;
 let isProcessingScan = false;
 
-async function openNfcScannerModal(targetInputId = null) {
-    if (!("NDEFReader" in window)) { await customAlert("NFC scanning requires a secure HTTPS connection. If you are testing on a local IP address or HTTP, Chrome blocks the NFC reader for security.", "Connection Error"); return; }
-    window.activeNfcTargetInputId = targetInputId; document.getElementById("nfcScannerModal").style.display = "flex"; isProcessingNfcScan = false;
+window.openBarcodeScannerModal = async function(targetInputId = null) {
+    // 1. Force Clean Reset: Ensure no hidden scanner instance is locking the hardware
+    if (html5QrcodeScannerInstance) {
+        try { await html5QrcodeScannerInstance.stop(); html5QrcodeScannerInstance.clear(); } catch(e) {}
+        html5QrcodeScannerInstance = null;
+    }
+
+    // 2. Prepare the UI Modal
+    document.getElementById("barcodeScannerModal").style.display = "flex"; 
+    window.activeBarcodeTargetInputId = targetInputId;
+    isProcessingScan = false;
+    
+    // Critical: Force DOM dimensions before camera init to prevent blank screen
+    const container = document.getElementById("scannerReaderContainer");
+    container.innerHTML = "";
+    container.style.display = "block";
+    container.style.height = "260px"; 
+    
+    // 3. Wait for the modal animation to finish so the camera has a physical space to draw into
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 4. Initialize Scanner
+    html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
+    const lensConfig = (typeof determineActiveTargetLens === 'function') ? await determineActiveTargetLens() : { facingMode: "environment" };
+
+    html5QrcodeScannerInstance.start(
+        lensConfig, 
+        { fps: 15, qrbox: { width: 260, height: 160 }, aspectRatio: 1.333333 },
+        (decodedText) => {
+            if (isProcessingScan) return; 
+            isProcessingScan = true; 
+            const cleanToken = decodedText.trim();
+            
+            // --- MASTER ROUTING LOGIC ---
+            if (targetInputId === 'FAST_RETURN') { 
+                closeBarcodeScannerModal(); executeFastReturnLookup(cleanToken); 
+            } else if (targetInputId === 'FAST_QTY_ADJUST') { 
+                closeBarcodeScannerModal(); handleQuantityAdjusterLookup(cleanToken); 
+            } else if (targetInputId === 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL') {
+                editModalActiveBarcodeString = cleanToken;
+                updateEditModalHardwareButtonsUI();
+                closeBarcodeScannerModal();
+            } else if (targetInputId === 'editItemLocationSelect') {
+                closeBarcodeScannerModal();
+                const lowerToken = cleanToken.toLowerCase();
+                const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
+                if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
+                else { customAlert("No location folder found matching that barcode.", "Not Found"); }
+            } else if (targetInputId === 'moveItemLocationBarcode') {
+                document.getElementById('moveItemLocationBarcode').value = cleanToken;
+                handleLocationBarcodeLookup(cleanToken);
+                closeBarcodeScannerModal();
+            } else if (targetInputId === 'assignItemBarcode') {
+                document.getElementById('assignItemBarcode').value = cleanToken;
+                handleAssignBarcodeLookup(cleanToken);
+                closeBarcodeScannerModal();
+            } else if (targetInputId) {
+                document.getElementById(targetInputId).value = cleanToken;
+                closeBarcodeScannerModal();
+            } else { 
+                document.getElementById("globalSearchInput").value = cleanToken; 
+                const typeFilter = document.getElementById("searchTypeFilter"); 
+                if (typeFilter) typeFilter.value = "barcode"; 
+                closeBarcodeScannerModal(); 
+                handleGlobalSearch(cleanToken); 
+            }
+        }, 
+        (errorMessage) => { /* Ignore frequent scanning frame noise */ }
+    ).then(() => {
+        if (typeof applyHardwareZoomToContainer === 'function') applyHardwareZoomToContainer("scannerReaderContainer");
+    }).catch(err => {
+        console.error("Camera Init Error:", err);
+        container.innerHTML = `<div style="padding:20px; color:white;">Error: Camera blocked or in use. Check browser permissions.</div>`;
+    });
+};
+
+function closeBarcodeScannerModal() { 
+    document.getElementById("barcodeScannerModal").style.display = "none"; 
+    if (html5QrcodeScannerInstance) { 
+        html5QrcodeScannerInstance.stop().then(() => { 
+            html5QrcodeScannerInstance = null; 
+            document.getElementById("scannerReaderContainer").innerHTML = ""; 
+            isProcessingScan = false; 
+        }).catch(err => { 
+            html5QrcodeScannerInstance = null; 
+            isProcessingScan = false; 
+        }); 
+    } 
+}
+
+window.openNfcScannerModal = async function(targetInputId = null) {
+    if (!("NDEFReader" in window)) { 
+        await customAlert("NFC scanning requires a secure HTTPS connection. If you are testing on a local IP address or HTTP, Chrome blocks the NFC reader for security.", "Connection Error"); 
+        return; 
+    }
+    
+    window.activeNfcTargetInputId = targetInputId; 
+    document.getElementById("nfcScannerModal").style.display = "flex"; 
+    isProcessingNfcScan = false;
+    
     try {
-        const ndef = new NDEFReader(); nfcAbortController = new AbortController();
+        const ndef = new NDEFReader(); 
+        if (nfcAbortController) nfcAbortController.abort();
+        nfcAbortController = new AbortController();
+        
         await ndef.scan({ signal: nfcAbortController.signal });
+        
         ndef.onreading = (event) => {
             if (isProcessingNfcScan) return;
-            isProcessingNfcScan = true; const decodedText = event.serialNumber;
-            if (window.activeNfcTargetInputId === 'FAST_RETURN') { closeNfcScannerModal(); executeFastReturnLookup(decodedText); } 
-            else if (window.activeNfcTargetInputId === 'FAST_QTY_ADJUST') { closeNfcScannerModal(); handleQuantityAdjusterLookup(decodedText); }
-            else if (window.activeNfcTargetInputId) {
-                document.getElementById(window.activeNfcTargetInputId).value = decodedText;
-                if (window.activeNfcTargetInputId === 'moveItemLocationBarcode') handleLocationBarcodeLookup(decodedText);
-                if (window.activeNfcTargetInputId === 'assignItemBarcode') handleAssignBarcodeLookup(decodedText);
+            isProcessingNfcScan = true; 
+            const token = event.serialNumber;
+            
+            // --- MASTER ROUTING LOGIC ---
+            if (targetInputId === 'FAST_RETURN') { 
+                closeNfcScannerModal(); executeFastReturnLookup(token); 
+            } else if (targetInputId === 'FAST_QTY_ADJUST') { 
+                closeNfcScannerModal(); handleQuantityAdjusterLookup(token); 
+            } else if (targetInputId === 'EDIT_MODAL_NFC_INTERNAL_TUNNEL') {
+                editModalActiveNfcTagString = token;
+                updateEditModalHardwareButtonsUI();
+                closeNfcScannerModal();
+            } else if (targetInputId === 'editItemLocationSelect') {
+                closeNfcScannerModal();
+                const lowerToken = token.toLowerCase();
+                const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
+                if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
+                else { customAlert("No location folder found matching that NFC tag.", "Not Found"); }
+            } else if (targetInputId === 'moveItemLocationBarcode') {
+                document.getElementById('moveItemLocationBarcode').value = token;
+                handleLocationBarcodeLookup(token);
+                closeNfcScannerModal();
+            } else if (targetInputId === 'assignItemBarcode') {
+                document.getElementById('assignItemBarcode').value = token;
+                handleAssignBarcodeLookup(token);
+                closeNfcScannerModal();
+            } else if (targetInputId) {
+                document.getElementById(targetInputId).value = token;
                 closeNfcScannerModal();
             } else {
-                document.getElementById("globalSearchInput").value = decodedText; const typeFilter = document.getElementById("searchTypeFilter"); if (typeFilter) typeFilter.value = "barcode";
-                closeNfcScannerModal(); handleGlobalSearch(decodedText); 
+                document.getElementById("globalSearchInput").value = token; 
+                const typeFilter = document.getElementById("searchTypeFilter"); 
+                if (typeFilter) typeFilter.value = "barcode";
+                closeNfcScannerModal(); 
+                handleGlobalSearch(token); 
             }
         };
-        ndef.onreadingerror = async () => { isProcessingNfcScan = false; await customAlert("Error reading NFC tag. Try shifting it slightly.", "Read Error"); };
-    } catch (error) { closeNfcScannerModal(); await customAlert("NFC Scan failed to initialize: " + error.message, "System Error"); }
-}
-function closeNfcScannerModal() { document.getElementById("nfcScannerModal").style.display = "none"; if (nfcAbortController) { nfcAbortController.abort(); nfcAbortController = null; } isProcessingNfcScan = false; }
+        ndef.onreadingerror = async () => { 
+            isProcessingNfcScan = false; 
+            await customAlert("Error reading NFC tag. Try shifting it slightly.", "Read Error"); 
+        };
+    } catch (error) { 
+        closeNfcScannerModal(); 
+        await customAlert("NFC Scan failed to initialize: " + error.message, "System Error"); 
+    }
+};
 
-function openBarcodeScannerModal(targetInputId = null) {
-    document.getElementById("barcodeScannerModal").style.display = "flex"; isProcessingScan = false; window.activeBarcodeTargetInputId = targetInputId;
-    html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
-    html5QrcodeScannerInstance.start( { facingMode: "environment" }, { fps: 15, qrbox: { width: 260, height: 160 }, aspectRatio: 1.333333 },
-        (decodedText) => {
-            if (isProcessingScan) return; isProcessingScan = true; 
-            if (window.activeBarcodeTargetInputId === 'FAST_RETURN') { closeBarcodeScannerModal(); executeFastReturnLookup(decodedText); } 
-            else if (window.activeBarcodeTargetInputId === 'FAST_QTY_ADJUST') { closeBarcodeScannerModal(); handleQuantityAdjusterLookup(decodedText); }
-            else if (window.activeBarcodeTargetInputId) {
-                document.getElementById(window.activeBarcodeTargetInputId).value = decodedText;
-                if (window.activeBarcodeTargetInputId === 'moveItemLocationBarcode') handleLocationBarcodeLookup(decodedText);
-                if (window.activeBarcodeTargetInputId === 'assignItemBarcode') handleAssignBarcodeLookup(decodedText);
-                closeBarcodeScannerModal();
-            } else { document.getElementById("globalSearchInput").value = decodedText; const typeFilter = document.getElementById("searchTypeFilter"); if (typeFilter) typeFilter.value = "barcode"; closeBarcodeScannerModal(); handleGlobalSearch(decodedText); }
-        }, (errorMessage) => {}
-    ).catch(err => { console.warn("Camera failure: ", err); });
+function closeNfcScannerModal() { 
+    document.getElementById("nfcScannerModal").style.display = "none"; 
+    if (nfcAbortController) { nfcAbortController.abort(); nfcAbortController = null; } 
+    isProcessingNfcScan = false; 
 }
+
 function closeBarcodeScannerModal() { document.getElementById("barcodeScannerModal").style.display = "none"; if (html5QrcodeScannerInstance) { html5QrcodeScannerInstance.stop().then(() => { html5QrcodeScannerInstance = null; document.getElementById("scannerReaderContainer").innerHTML = ""; isProcessingScan = false; }).catch(err => { html5QrcodeScannerInstance = null; isProcessingScan = false; }); } }
 
-
-// Controls the fading of the mobile FAB when hitting the bottom of the page
 function initFabScrollFade() {
     window.addEventListener('scroll', () => {
         if (window.innerWidth > 768) return;
@@ -2041,7 +2504,6 @@ function initFabScrollFade() {
         else fabContainer.classList.remove('fab-faded');
     }, { passive: true });
 }
-
 
 /* =========================================================
    ASYNC SMART ENGINE: BATCH-COMPATIBLE WORKFLOW STACKS
@@ -2059,13 +2521,108 @@ let qaQueue = [], qmQueue = [], qrQueue = [];
 let globalCamerasList = [];
 let currentCameraIndex = 0;
 
-// --- UPGRADED: INTELLIGENT HARDWARE LENS INITIALIZATION & SELECTION REGISTRY ---
+/* =========================================================
+   RICH ITEM MODALS: VIEWER & ASSIGNMENT LOGIC
+========================================================= */
+function openItemDetails(item) {
+    currentItemForActions = item;
+    document.getElementById("detailItemName").textContent = item.name;
+    
+    // Evaluate if this is an Equipment Asset and color the badge dynamically
+    const isEquipment = (String(item.quantity).trim() === "-");
+    const qtyBadge = document.getElementById("detailItemQtyBadge");
+    if (isEquipment) {
+        qtyBadge.textContent = "Equipment Asset";
+        qtyBadge.style.background = "#8b5cf6";
+    } else {
+        qtyBadge.textContent = "Qty: " + item.quantity;
+        qtyBadge.style.background = "rgba(0,0,0,0.7)";
+    }
+
+    document.getElementById("detailItemDescription").textContent = item.description || "No description provided.";
+    document.getElementById("detailItemBarcode").textContent = item.barcode || "—";
+    document.getElementById("detailItemNFC").textContent = item.nfc_tag || "—";
+    document.getElementById("detailItemLocation").textContent = item.location_id ? "📍 " + buildLocationPath(item.location_id) : "📍 Unallocated Items";
+
+    const imgEl = document.getElementById("detailItemImage"); 
+    const thumbsContainer = document.getElementById("detailItemThumbsRow"); 
+    const expandBtn = document.getElementById("lightboxLauncherBtn");
+    thumbsContainer.innerHTML = ""; lightboxImages = []; lightboxIndex = 0;
+
+    if (item.photos && item.photos.length > 0) {
+        expandBtn.style.display = "block";
+        const sortedPhotos = [...item.photos].sort((a,b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+        imgEl.src = window.db.storage.from("item-photos").getPublicUrl(sortedPhotos[0].file_path).data.publicUrl;
+        
+        sortedPhotos.forEach((photo, idx) => {
+            const publicUrl = window.db.storage.from("item-photos").getPublicUrl(photo.file_path).data.publicUrl;
+            lightboxImages.push(publicUrl);
+            const thumbImg = document.createElement("img"); 
+            thumbImg.className = `view-thumb-item ${idx === 0 ? 'active' : ''}`; 
+            thumbImg.src = publicUrl;
+            thumbImg.onclick = () => { 
+                document.querySelectorAll(".view-thumb-item").forEach(t => t.classList.remove("active")); 
+                thumbImg.classList.add("active"); 
+                imgEl.src = publicUrl; 
+                lightboxIndex = idx; 
+            };
+            thumbsContainer.appendChild(thumbImg);
+        });
+    } else { 
+        imgEl.src = "../assets/images/no-image.jpg"; 
+        expandBtn.style.display = "none"; 
+    }
+
+    const tagsContainer = document.getElementById("detailItemTagsContainer"); tagsContainer.innerHTML = "";
+    let tagArray = Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' && item.tags.trim() ? item.tags.split(',').map(t => t.trim()) : []);
+    
+    if (tagArray.length > 0) {
+        tagArray.forEach(tag => {
+            const span = document.createElement("span"); span.className = "tag-pill"; span.textContent = tag; 
+            span.style.cursor = "pointer"; span.style.transition = "background 0.15s"; span.title = `Click to search for all items tagged with "${tag}"`;
+            span.onmouseover = () => { span.style.background = "#bae6fd"; span.style.color = "#0369a1"; }; 
+            span.onmouseout = () => { span.style.background = "#f1f5f9"; span.style.color = "#475569"; };
+            span.onclick = () => clickSearchTag(tag); 
+            tagsContainer.appendChild(span);
+        });
+    } else {
+        tagsContainer.innerHTML = `<span style="color:#999; font-style:italic; font-size:13px;">No tags assigned</span>`;
+    }
+
+    const assignBtn = document.getElementById("btnAssignReturnToggle"); 
+    const banner = document.getElementById("detailAssignedBanner"); 
+    const nameLabel = document.getElementById("detailAssignedTargetName");
+    
+    if (item.assigned_to) {
+        const tempLoc = tempLocationsAdmin.find(t => t.id === item.assigned_to);
+        banner.style.display = "flex"; 
+        nameLabel.textContent = tempLoc ? tempLoc.name : "Unknown User";
+        assignBtn.textContent = "📥 Return Item"; 
+        assignBtn.style.background = "#ef4444"; 
+        assignBtn.style.borderColor = "#ef4444";
+    } else {
+        banner.style.display = "none"; 
+        assignBtn.textContent = "👤 Assign"; 
+        assignBtn.style.background = "#10b981"; 
+        assignBtn.style.borderColor = "#10b981";
+    }
+    
+    document.getElementById("itemDetailsModal").style.display = "flex";
+}
+
+function openLightbox() { if (!lightboxImages || lightboxImages.length === 0) return; document.getElementById("review-lightbox").style.display = "flex"; updateLightboxUI(); }
+function closeLightbox() { document.getElementById("review-lightbox").style.display = "none"; }
+function changeLightboxImage(direction) { lightboxIndex += direction; if (lightboxIndex < 0) lightboxIndex = lightboxImages.length - 1; if (lightboxIndex >= lightboxImages.length) lightboxIndex = 0; updateLightboxUI(); }
+function updateLightboxUI() { const imgEl = document.getElementById("lightbox-img"); const counterEl = document.getElementById("lightbox-counter"); if (imgEl && lightboxImages[lightboxIndex]) imgEl.src = lightboxImages[lightboxIndex]; if (counterEl) counterEl.textContent = `${lightboxIndex + 1} / ${lightboxImages.length}`; }
+// Local strings to store assets during layout transitions inside the edit panel view context
+let editModalActiveBarcodeString = "";
+let editModalActiveNfcTagString = "";
+
+// --- INTELLIGENT HARDWARE LENS INITIALIZATION & SELECTION REGISTRY ---
 async function getOrFetchCameras() {
     try {
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length > 0) {
-            // Sort cameras array so that primary 1x main rear cameras sit at index 0
-            // Skips front/selfie/facetime cameras and avoids wide .6x lens bus orders
             globalCamerasList = [...devices].sort((a, b) => {
                 const labelA = a.label.toLowerCase();
                 const labelB = b.label.toLowerCase();
@@ -2073,11 +2630,9 @@ async function getOrFetchCameras() {
                 const isBackA = labelA.includes('back') || labelA.includes('rear') || labelA.includes('environment');
                 const isBackB = labelB.includes('back') || labelB.includes('rear') || labelB.includes('environment');
                 
-                // Prioritise back over front cameras
                 if (isBackA && !isBackB) return -1;
                 if (!isBackA && isBackB) return 1;
                 
-                // Secondary check: Avoid wide/ultra-wide macro failure modules if standard labels match
                 if (labelA.includes('wide') && !labelA.includes('ultra') && !labelB.includes('wide')) return -1;
                 if (labelB.includes('wide') && !labelB.includes('ultra') && !labelA.includes('wide')) return 1;
                 
@@ -2096,7 +2651,6 @@ window.saveHardwarePreferences = async function() {
     userSettings.defaultCameraId = camId;
     userSettings.defaultZoom = zoomVal;
     
-    // Save configuration directly to offline IndexedDB system layout configurations mapping tracking tables
     if (typeof saveInventorySettings === "function") {
         await saveInventorySettings();
     } else if (typeof localDB !== "undefined" && localDB.settings) {
@@ -2111,7 +2665,6 @@ window.populateHardwareSettingsDropdowns = async function() {
     const display = document.getElementById("settingsZoomValDisplay");
     if (!dropdown) return;
     
-    // Mount loaded preferences states values
     slider.value = userSettings.defaultZoom || 1.5;
     display.textContent = (userSettings.defaultZoom || 1.5) + "x";
     
@@ -2129,7 +2682,7 @@ window.populateHardwareSettingsDropdowns = async function() {
     });
 };
 
-// NEW: Hardware constraints optical macro zoom modifier injector engine
+// Hardware constraints optical macro zoom modifier injector engine
 function applyHardwareZoomToContainer(containerId) {
     setTimeout(() => {
         const container = document.getElementById(containerId);
@@ -2141,7 +2694,6 @@ function applyHardwareZoomToContainer(containerId) {
                 const capabilities = track.getCapabilities();
                 if ("zoom" in capabilities) {
                     let targetZoomMultiplier = parseFloat(userSettings.defaultZoom) || 1.5;
-                    // Clamp bounds constraints properties to prevent browser crash parameter faults
                     if (targetZoomMultiplier < capabilities.zoom.min) targetZoomMultiplier = capabilities.zoom.min;
                     if (targetZoomMultiplier > capabilities.zoom.max) targetZoomMultiplier = capabilities.zoom.max;
                     
@@ -2151,7 +2703,7 @@ function applyHardwareZoomToContainer(containerId) {
                 }
             }
         }
-    }, 450); // Small procedural delay forces track parsing execution threads to load safely
+    }, 450); 
 }
 
 // Core Runtime Context Camera Switch Logic
@@ -2177,17 +2729,85 @@ window.switchScannerCamera = async function(modalPrefix) {
     } catch (err) { console.warn(err); }
 };
 
-// Helper: Calculate Target Lens configuration on initialization
+// 1. FIXED LENS DETERMINER (More resilient)
 async function determineActiveTargetLens() {
-    const devices = await getOrFetchCameras();
-    if (!devices || devices.length === 0) return { facingMode: "environment" };
-    
-    if (userSettings.defaultCameraId && userSettings.defaultCameraId !== "AUTO_REAR") {
-        const savedMatch = devices.find(d => String(d.id) === String(userSettings.defaultCameraId));
-        if (savedMatch) return savedMatch.id;
+    try {
+        const devices = await getOrFetchCameras();
+        if (!devices || devices.length === 0) return { facingMode: "environment" };
+        
+        // If user has a preference, try to find it in the current device list
+        if (userSettings.defaultCameraId && userSettings.defaultCameraId !== "AUTO_REAR") {
+            const savedMatch = devices.find(d => String(d.id) === String(userSettings.defaultCameraId));
+            if (savedMatch) return { deviceId: { exact: savedMatch.id } };
+        }
+        
+        // Fallback to primary rear lens
+        return { deviceId: { exact: devices[0].id } };
+    } catch (e) {
+        return { facingMode: "environment" };
     }
-    // Fallback to sorted index 0 (Guaranteed primary rear 1x lens via our sorting algorithm)
-    return devices[0].id;
+}
+
+// 2. ROBUST BARCODE MODAL LAUNCHER
+function openBarcodeScannerModal(targetInputId = null) {
+    // FORCE CLEAR: Ensure no hidden scanner instance is locking the hardware
+    if (html5QrcodeScannerInstance) {
+        try { html5QrcodeScannerInstance.stop(); html5QrcodeScannerInstance.clear(); } catch(e) {}
+    }
+
+    document.getElementById("barcodeScannerModal").style.display = "flex"; 
+    window.activeBarcodeTargetInputId = targetInputId;
+    isProcessingScan = false;
+    
+    // Clear container before init
+    document.getElementById("scannerReaderContainer").innerHTML = "";
+    html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
+    
+    // Get the lens configuration
+    determineActiveTargetLens().then(lensConfig => {
+        html5QrcodeScannerInstance.start(
+            lensConfig, 
+            { fps: 10, qrbox: { width: 260, height: 160 }, aspectRatio: 1.333333 },
+            (decodedText) => {
+                if (isProcessingScan) return; 
+                isProcessingScan = true; 
+                
+                // Route the data
+                if (window.activeBarcodeTargetInputId === 'FAST_RETURN') { 
+                    closeBarcodeScannerModal(); executeFastReturnLookup(decodedText); 
+                } else if (window.activeBarcodeTargetInputId === 'FAST_QTY_ADJUST') { 
+                    closeBarcodeScannerModal(); handleQuantityAdjusterLookup(decodedText); 
+                } else if (window.activeBarcodeTargetInputId === 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL') {
+                    editModalActiveBarcodeString = decodedText;
+                    updateEditModalHardwareButtonsUI();
+                    closeBarcodeScannerModal();
+                } else if (window.activeBarcodeTargetInputId === 'editItemLocationSelect') {
+                    closeBarcodeScannerModal();
+                    const cleanToken = decodedText.trim().toLowerCase();
+                    const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === cleanToken) || (l.nfc && l.nfc.trim().toLowerCase() === cleanToken));
+                    if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
+                    else { customAlert("No location folder found matching that barcode.", "Not Found"); }
+                } else if (window.activeBarcodeTargetInputId) {
+                    document.getElementById(window.activeBarcodeTargetInputId).value = decodedText;
+                    closeBarcodeScannerModal();
+                } else { 
+                    document.getElementById("globalSearchInput").value = decodedText; 
+                    const typeFilter = document.getElementById("searchTypeFilter"); 
+                    if (typeFilter) typeFilter.value = "barcode"; 
+                    closeBarcodeScannerModal(); 
+                    handleGlobalSearch(decodedText); 
+                }
+            }, 
+            (errorMessage) => { /* Ignore frequent scanning noise */ }
+        ).then(() => {
+            if (typeof applyHardwareZoomToContainer === 'function') {
+                applyHardwareZoomToContainer("scannerReaderContainer");
+            }
+        }).catch(err => {
+            console.error("Scanner failed to start:", err);
+            customAlert("Camera could not start. Ensure you have granted camera permissions.", "Scanner Error");
+        });
+    });
 }
 
 // --- GLOBAL ATOMIC SHARED QUANTITY HANDLERS ---
@@ -2222,9 +2842,6 @@ function setupInlineQtyPicker(prefix, itemMatch, onConfirmCallback) {
     };
 }
 
-// ==========================================
-// 1. QUICK ASSIGN ENGINE
-// ==========================================
 async function openQuickAssignModal() {
     document.getElementById('quickActionsStack').classList.remove('open');
     document.getElementById('fabOverlay').classList.remove('open');
@@ -2439,9 +3056,6 @@ async function executeQuickAssignment(assigneeId, assigneeName) {
 function restartQuickAssignProcess() { resetQuickAssignUI(); startQuickAssignScanner(); startQuickAssignNFC(); }
 
 
-// ==========================================
-// 2. QUICK MOVE ENGINE
-// ==========================================
 async function openQuickMoveModal() {
     document.getElementById('quickActionsStack').classList.remove('open');
     document.getElementById('fabOverlay').classList.remove('open');
@@ -2620,9 +3234,6 @@ async function executeQuickMoveAssignment(destId, destName) {
 function restartQuickMoveProcess() { resetQuickMoveUI(); startQuickMoveScanner(); startQuickMoveNFC(); }
 
 
-// ==========================================
-// 3. UNIFIED QUICK RETURN ENGINE
-// ==========================================
 async function openQuickReturnModal() {
     document.getElementById('quickActionsStack').classList.remove('open');
     document.getElementById('fabOverlay').classList.remove('open');
@@ -2840,21 +3451,13 @@ async function executeBatchReturn() {
     qrIsProcessing = false;
 }
 
-
-
-
-
-
-
 /* =========================================================
    ASSIGNEE STOCK CONSUMPTION & DEPLOYMENT MANAGEMENT ENGINE
 ========================================================= */
 
-// --- STATE MANAGEMENT ---
 let isStockUsageModeActive = false;
 let stockUsageChangesMap = {}; // Maps itemId -> { originalQty, currentQty }
 
-// 1. Intercept the standard loading routine to plug into our renderer safely
 if (typeof window.loadTempLocationDetails === "function") {
     const originalLoadTempLocationDetails = window.loadTempLocationDetails;
     window.loadTempLocationDetails = async function(tempLocId) {
@@ -2865,7 +3468,6 @@ if (typeof window.loadTempLocationDetails === "function") {
         await renderTempLocationItems(tempLocId);
     };
 } else {
-    // Fallback registration handler if click triggers vary across deployment revisions
     window.loadTempLocationDetails = async function(tempLocId) {
         currentTempLocationId = tempLocId;
         isStockUsageModeActive = false;
@@ -2875,14 +3477,12 @@ if (typeof window.loadTempLocationDetails === "function") {
     };
 }
 
-// 2. Complete Custom Renderer Engine for Assignee Stock Items view
 async function renderTempLocationItems(tempLocId) {
     currentTempLocationId = tempLocId;
     const tempLocs = await localDB.temp_locations.toArray();
     const activeLoc = tempLocs.find(t => String(t.id) === String(tempLocId));
     if (!activeLoc) return;
     
-    // Mount the Toolbar HUD
     const toolbar = document.getElementById("tempLocationItemActionsToolbar");
     if (toolbar) {
         toolbar.style.display = "flex";
@@ -2899,7 +3499,6 @@ async function renderTempLocationItems(tempLocId) {
     const mainTiles = document.getElementById("tempLocationTilesAdmin");
     if (mainTiles) mainTiles.style.display = "none";
     
-    // Update breadcrumbs to enable navigation backtracking
     const breadcrumb = document.getElementById("breadcrumbTempLocations");
     if (breadcrumb) {
         breadcrumb.innerHTML = `<span class="breadcrumb-link" onclick="resetTempLocationView()" style="cursor:pointer; color:#004a99; text-decoration:underline; font-weight:normal;">Assigned Log</span> ➔ <b>${activeLoc.name}</b>`;
@@ -2914,41 +3513,51 @@ async function renderTempLocationItems(tempLocId) {
     assigneeItems.forEach(item => {
         const card = document.createElement("div");
         card.className = "item-card";
+        let isItemEquipment = (String(item.quantity).trim() === "-");
         
+        if (!stockUsageChangesMap[item.id]) {
+            stockUsageChangesMap[item.id] = { originalQty: isItemEquipment ? "-" : (parseInt(item.quantity) || 0), currentQty: isItemEquipment ? "-" : (parseInt(item.quantity) || 0) };
+        }
+        const state = stockUsageChangesMap[item.id];
+        
+        let interactiveControlsHtml = `<div class="item-card-qty-badge" style="background:#10b981;">Qty: ${state.currentQty}</div>`;
+        if (isItemEquipment) {
+            interactiveControlsHtml = `<div class="item-card-qty-badge" style="background:#8b5cf6; font-weight:bold;">Equipment</div>`;
+        }
+        
+        if (isStockUsageModeActive) {
+            if (isItemEquipment) {
+                interactiveControlsHtml = `
+                    <div style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; background: #fee2e2; padding: 6px 12px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 20; border: 1px solid #fca5a5; font-size:11px; font-weight:bold; color:#991b1b; white-space:nowrap; pointer-events:none;">
+                        🛠️ Tool: Qty Locked
+                    </div>
+                    <div class="item-card-qty-badge" style="background: #8b5cf6; top: 10px; right: 10px; left: auto;">Equipment</div>
+                `;
+            } else {
+                const showPlusBtn = state.currentQty < state.originalQty;
+                interactiveControlsHtml = `
+                    <div style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: white; padding: 6px 12px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 20; border: 1px solid #cbd5e1;">
+                        <button onclick="stepAssigneeItemQty('${item.id}', -1); event.stopPropagation();" style="width: 26px; height: 26px; border-radius: 50%; font-size: 16px; font-weight: bold; border: none; background: #fee2e2; color: #ef4444; cursor: pointer; display:flex; align-items:center; justify-content:center; padding:0;">-</button>
+                        <span style="font-weight: bold; font-size: 16px; color: #0f172a; min-width: 18px; text-align: center;">${state.currentQty}</span>
+                        <button onclick="stepAssigneeItemQty('${item.id}', 1); event.stopPropagation();" style="width: 26px; height: 26px; border-radius: 50%; font-size: 14px; font-weight: bold; border: none; background: #dbeafe; color: #2563eb; cursor: pointer; display:flex; align-items:center; justify-content:center; padding:0; visibility: ${showPlusBtn ? 'visible' : 'hidden'};">+</button>
+                    </div>
+                    <div class="item-card-qty-badge" style="background: #334155; top: 10px; right: 10px; left: auto;">Max: ${state.originalQty}</div>
+                `;
+            }
+        }
+
         let imgUrl = "../assets/images/no-image.jpg";
         if (item.photos?.length) {
             const defP = item.photos.find(p => p.is_primary) || item.photos[0];
             imgUrl = window.db.storage.from("item-photos").getPublicUrl(defP.file_path).data.publicUrl;
         }
         
-        // Initialize instance state mapping parameters if blank
-        if (!stockUsageChangesMap[item.id]) {
-            stockUsageChangesMap[item.id] = { originalQty: parseInt(item.quantity) || 0, currentQty: parseInt(item.quantity) || 0 };
-        }
-        const state = stockUsageChangesMap[item.id];
-        
-        let interactiveControlsHtml = `<div class="item-card-qty-badge" style="background:#10b981;">Qty: ${state.currentQty}</div>`;
-        
-        // Render Interactive Adjustment HUD components if mode flag is thrown
-        if (isStockUsageModeActive) {
-            const showPlusBtn = state.currentQty < state.originalQty;
-            interactiveControlsHtml = `
-                <div style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: white; padding: 6px 12px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 20; border: 1px solid #cbd5e1;">
-                    <button onclick="stepAssigneeItemQty('${item.id}', -1); event.stopPropagation();" style="width: 26px; height: 26px; border-radius: 50%; font-size: 16px; font-weight: bold; border: none; background: #fee2e2; color: #ef4444; cursor: pointer; display:flex; align-items:center; justify-content:center; padding:0;">-</button>
-                    <span style="font-weight: bold; font-size: 16px; color: #0f172a; min-width: 18px; text-align: center;">${state.currentQty}</span>
-                    <button onclick="stepAssigneeItemQty('${item.id}', 1); event.stopPropagation();" style="width: 26px; height: 26px; border-radius: 50%; font-size: 14px; font-weight: bold; border: none; background: #dbeafe; color: #2563eb; cursor: pointer; display:flex; align-items:center; justify-content:center; padding:0; visibility: ${showPlusBtn ? 'visible' : 'hidden'};">+</button>
-                </div>
-                <div class="item-card-qty-badge" style="background: #334155; top: 10px; right: 10px; left: auto;">Max: ${state.originalQty}</div>
-            `;
-        }
-        
-        // Styling state management layout logic modifications
         let opacityStyle = "";
         let bannerHtml = "";
-        if (isStockUsageModeActive && state.currentQty === 0) {
+        if (isStockUsageModeActive && !isItemEquipment && state.currentQty === 0) {
             opacityStyle = "filter: grayscale(90%) opacity(0.5);";
             bannerHtml = `<div class="assigned-overlay" style="background: rgba(239, 68, 68, 0.85); border-radius: 12px;"><div class="assigned-icon" style="font-size:20px;">📉</div><div class="assigned-label" style="color: white; font-weight: bold;">Fully Used</div></div>`;
-        } else if (isStockUsageModeActive && state.currentQty < state.originalQty) {
+        } else if (isStockUsageModeActive && !isItemEquipment && state.currentQty < state.originalQty) {
             bannerHtml = `<div class="assigned-overlay" style="background: rgba(37, 99, 235, 0.25); border-radius: 12px;"><div class="assigned-label" style="color: white; font-weight: bold; background: #2563eb; padding: 2px 8px; border-radius: 4px; font-size:11px;">Reduced (-${state.originalQty - state.currentQty})</div></div>`;
         }
         
@@ -2961,13 +3570,11 @@ async function renderTempLocationItems(tempLocId) {
             <div class="item-card-name" style="margin-bottom: 8px;">${item.name}</div>
         `;
         
-        // Prevent details modal from opening if user is actively clicking adjustment steppers
         card.onclick = () => { if(!isStockUsageModeActive) openItemDetails(item); };
         grid.appendChild(card);
     });
 }
 
-// 3. Incremental numeric bounds clamp checking helper
 window.stepAssigneeItemQty = function(itemId, amount) {
     const state = stockUsageChangesMap[itemId];
     if (!state) return;
@@ -2979,11 +3586,9 @@ window.stepAssigneeItemQty = function(itemId, amount) {
     }
 };
 
-// 4. Structural layout mode context switch toggle handler
 window.toggleStockUsageMode = function() {
     isStockUsageModeActive = !isStockUsageModeActive;
     if (!isStockUsageModeActive) {
-        // If user rolls back out manually, clean state arrays
         for (let id in stockUsageChangesMap) {
             stockUsageChangesMap[id].currentQty = stockUsageChangesMap[id].originalQty;
         }
@@ -2992,7 +3597,6 @@ window.toggleStockUsageMode = function() {
     renderTempLocationItems(currentTempLocationId);
 };
 
-// 5. Visibility and state alteration checking validator
 function updateStockUsageToolbarButtons() {
     const modeBtn = document.getElementById("btnToggleStockUsageMode");
     const cancelBtn = document.getElementById("btnCancelStockUsage");
@@ -3035,7 +3639,6 @@ window.cancelStockUsageChanges = function() {
     renderTempLocationItems(currentTempLocationId);
 };
 
-// 6. Asynchronous transaction writer and action auditing engine
 window.confirmStockUsageChanges = async function() {
     let processedRecordsCount = 0;
     const items = await localDB.items.toArray();
@@ -3052,14 +3655,11 @@ window.confirmStockUsageChanges = async function() {
             const totalUnitsUsed = state.originalQty - state.currentQty;
             
             if (state.currentQty === 0) {
-                // If balance clears down to zero, remove reference item placeholder natively
                 await window.offlineSafeWrite('DELETE', 'items', null, itemRecord.id);
             } else {
-                // Mutate the remaining quantity slice payload values
                 await window.offlineSafeWrite('UPDATE', 'items', { quantity: state.currentQty }, itemRecord.id);
             }
             
-            // Record full summary strings straight inside System Audit tables framework
             logAction("UPDATE", "Item", itemRecord.name, `Stock Deployment: ${totalUnitsUsed} unit(s) consumed/used from [${locationLabelName}] inventory allocation portfolio. New Balance: ${state.currentQty}`);
             processedRecordsCount++;
         }
@@ -3073,12 +3673,10 @@ window.confirmStockUsageChanges = async function() {
         await refreshAllDataFromLocal();
         window.processSyncQueue();
         
-        // Redraw current dashboard view frames
         await renderTempLocationItems(currentTempLocationId);
     }
 };
 
-// 7. Override fallback navigator to reset panels on tab backing switches
 window.resetTempLocationView = function() {
     isStockUsageModeActive = false;
     stockUsageChangesMap = {};
@@ -3097,3 +3695,211 @@ window.resetTempLocationView = function() {
     
     currentTempLocationId = null;
 };
+
+// --- NEW OPERATIONAL ROUTINES MATCHING CUSTOM FORM WIREFRAMES ---
+
+function adjustEditModalQty(amount) {
+    const isEquipment = document.getElementById("editItemIsEquipment").checked;
+    if (isEquipment) return;
+    
+    const input = document.getElementById("editItemQuantity");
+    let currentVal = parseInt(input.value) || 0;
+    let targetVal = currentVal + amount;
+    if (targetVal < 0) targetVal = 0;
+    input.value = targetVal;
+}
+
+function handleEquipmentCheckboxToggle(isChecked) {
+    const qtyWrapper = document.getElementById("editItemQtyWrapper");
+    const qtyInput = document.getElementById("editItemQuantity");
+    
+    if (isChecked) {
+        if (qtyWrapper) {
+            qtyWrapper.style.opacity = "0.35";
+            qtyWrapper.style.filter = "grayscale(100%)";
+            qtyWrapper.style.pointerEvents = "none";
+        }
+        if (qtyInput) {
+            qtyInput.value = "-";
+            qtyInput.disabled = true;
+            qtyInput.style.background = "#e2e8f0";
+        }
+    } else {
+        if (qtyWrapper) {
+            qtyWrapper.style.opacity = "1";
+            qtyWrapper.style.filter = "none";
+            qtyWrapper.style.pointerEvents = "auto";
+        }
+        if (qtyInput) {
+            qtyInput.value = "1";
+            qtyInput.disabled = false;
+            qtyInput.style.background = "#ffffff";
+        }
+    }
+}
+
+// Safely requests permission before overriding barcode data indices
+window.triggerEditModalBarcodeScan = async function() {
+    // --- 1. OVERRIDE SEARCH FOR INSTANT LOCATION NAVIGATION ---
+if (typeof handleGlobalSearch === "function" && !window.searchInterceptApplied) {
+    window.searchInterceptApplied = true;
+    const originalGlobalSearch = handleGlobalSearch;
+    window.handleGlobalSearch = async function(term) {
+        const filterType = document.getElementById("searchTypeFilter")?.value || "all";
+        const lowerTerm = term.toLowerCase().trim();
+        
+        // Intercept: If the search term is an exact match for a Location Barcode/NFC, navigate directly to that folder
+        if (lowerTerm && filterType !== "tag" && filterType !== "category") {
+            const locMatch = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerTerm) || (l.nfc && l.nfc.trim().toLowerCase() === lowerTerm));
+            if (locMatch) {
+                document.getElementById('globalSearchInput').value = '';
+                navigateToLocation(locMatch.id); // Inherently builds and displays the breadcrumb!
+                return; 
+            }
+        }
+        return originalGlobalSearch(term);
+    };
+}
+
+// --- 2. THE 3-BUTTON BARCODE ACTION MODAL ---
+window.triggerEditModalBarcodeScan = async function() {
+    if (editModalActiveBarcodeString.trim() !== "") {
+        const action = await new Promise((resolve) => {
+            document.getElementById("dialogTitle").textContent = "Manage Barcode";
+            document.getElementById("dialogMessage").innerHTML = `An active barcode is already mapped to this item:<br><b style="color:#004a99; font-size:16px;">${editModalActiveBarcodeString}</b><br><br>What would you like to do?`;
+            
+            const btnContainer = document.getElementById("dialogButtons");
+            btnContainer.innerHTML = `
+                <button class="btn-danger" id="dialogDeleteBtn" style="min-width: 80px; padding:8px 10px; font-size:13px;">Delete</button>
+                <button class="btn-primary" id="dialogRewriteBtn" style="min-width: 80px; padding:8px 10px; font-size:13px; background:#ff8c00; border-color:#ff8c00;">Rewrite</button>
+                <button class="btn-outline" id="dialogCancelBtn" style="min-width: 80px; padding:8px 10px; font-size:13px;">Cancel</button>
+            `;
+            document.getElementById("customDialogModal").style.display = "flex";
+            
+            document.getElementById("dialogDeleteBtn").onclick = () => { document.getElementById("customDialogModal").style.display = "none"; resolve('delete'); };
+            document.getElementById("dialogRewriteBtn").onclick = () => { document.getElementById("customDialogModal").style.display = "none"; resolve('rewrite'); };
+            document.getElementById("dialogCancelBtn").onclick = () => { document.getElementById("customDialogModal").style.display = "none"; resolve('cancel'); };
+        });
+
+        if (action === 'delete') {
+            editModalActiveBarcodeString = "";
+            updateEditModalHardwareButtonsUI();
+            return;
+        } else if (action === 'cancel') {
+            return;
+        }
+    }
+    window.openBarcodeScannerModal('EDIT_MODAL_BARCODE_INTERNAL_TUNNEL');
+};
+
+// --- 3. NFC BACKGROUND LISTENER & DELETE PROMPT ---
+window.triggerEditModalNfcClearanceRequest = async function() {
+    if (editModalActiveNfcTagString.trim() !== "") {
+        const confirmPurge = await customConfirm("An active NFC tag mapping exists on this item card. Do you want to detach and delete it?", "Remove NFC Identity Tag?");
+        if (confirmPurge) {
+            editModalActiveNfcTagString = "";
+            updateEditModalHardwareButtonsUI();
+        }
+    } else {
+        // Force the scanner modal open specifically for this tunnel
+        window.openNfcScannerModal('EDIT_MODAL_NFC_INTERNAL_TUNNEL');
+    }
+};
+
+async function switchToItemEdit() {
+    if (!currentItemForActions) return;
+    closeModal('itemDetailsModal');
+    const item = currentItemForActions;
+
+    try {
+        if (document.getElementById("editItemName")) document.getElementById("editItemName").value = item.name || "";
+        if (document.getElementById("editItemDescription")) document.getElementById("editItemDescription").value = item.description || "";
+        if (document.getElementById("editItemCategory")) document.getElementById("editItemCategory").value = item.category || "tools";
+        if (document.getElementById("editItemLocationSelect")) document.getElementById("editItemLocationSelect").value = item.location_id || "";
+
+        editModalActiveBarcodeString = item.barcode || "";
+        editModalActiveNfcTagString = item.nfc_tag || "";
+        updateEditModalHardwareButtonsUI();
+
+        const isEquipment = (String(item.quantity).trim() === "-");
+        const checkbox = document.getElementById("editItemIsEquipment");
+        if (checkbox) {
+            checkbox.checked = isEquipment;
+            handleEquipmentCheckboxToggle(isEquipment);
+        }
+        
+        if (!isEquipment) {
+            document.getElementById("editItemQuantity").value = item.quantity || 0;
+        }
+
+        let parsedTags = [];
+        if (Array.isArray(item.tags)) { parsedTags = [...item.tags]; } 
+        else if (typeof item.tags === 'string' && item.tags.trim()) { parsedTags = item.tags.split(',').map(t => t.trim()); }
+        activeSelectedEditTags = parsedTags;
+        renderActiveTagPills('edit');
+
+        currentEditItemFiles = []; existingItemPhotosToDelete = []; primaryPhotoIdentifier = null;
+        const photos = item.photos || [];
+        const existingPrimary = photos.find(p => p.is_primary);
+        primaryPhotoIdentifier = existingPrimary ? existingPrimary.file_path : (photos.length > 0 ? photos[0].file_path : null);
+        
+        renderMultipleFilesPreviews('editItemPreviewsRow', currentEditItemFiles, 'edit-item', photos);
+        document.getElementById("itemEditModal").style.display = "flex";
+
+        // NEW: Auto-start silent NFC background listener
+        if ("NDEFReader" in window) {
+            try {
+                if (nfcAbortController) nfcAbortController.abort();
+                nfcAbortController = new AbortController();
+                const ndef = new NDEFReader();
+                await ndef.scan({ signal: nfcAbortController.signal });
+                ndef.onreading = async (event) => {
+                    if (editModalActiveNfcTagString.trim() !== "") {
+                        await customAlert("An NFC tag is already assigned to this item. Please delete the old tag first by clicking the 'NFC Assigned' button.", "Tag Exists");
+                        return;
+                    }
+                    editModalActiveNfcTagString = event.serialNumber;
+                    updateEditModalHardwareButtonsUI();
+                };
+            } catch(e) { console.log("Background NFC unavailable:", e); }
+        }
+        
+    } catch (error) {
+        console.error("Critical Error opening edit modal:", error);
+    }
+}
+
+// Synchronize button layouts, text options, and colors dynamically based on variable values
+function updateEditModalHardwareButtonsUI() {
+    const barBtn = document.getElementById("btnEditModalBarcodeAction");
+    const nfcBtn = document.getElementById("btnEditModalNfcAction");
+    
+    if (barBtn) {
+        if (editModalActiveBarcodeString.trim() !== "") {
+            barBtn.textContent = `📷 ${editModalActiveBarcodeString}`;
+            barBtn.style.background = "#e0f2fe";
+            barBtn.style.color = "#0369a1";
+            barBtn.style.borderColor = "#7dd3fc";
+        } else {
+            barBtn.textContent = "📷 No Barcode Found";
+            barBtn.style.background = "#f8fafc";
+            barBtn.style.color = "#1e293b";
+            barBtn.style.borderColor = "#cbd5e1";
+        }
+    }
+    
+    if (nfcBtn) {
+        if (editModalActiveNfcTagString.trim() !== "") {
+            nfcBtn.textContent = "📡 NFC Tag Assigned";
+            nfcBtn.style.background = "#dcfce7";
+            nfcBtn.style.color = "#15803d";
+            nfcBtn.style.borderColor = "#86efac";
+        } else {
+            nfcBtn.textContent = "📡 NFC Ready (Tap)";
+            nfcBtn.style.background = "#f8fafc";
+            nfcBtn.style.color = "#1e293b";
+            nfcBtn.style.borderColor = "#cbd5e1";
+        }
+    }
+}
+}
