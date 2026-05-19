@@ -142,7 +142,29 @@
 
         <div id="pageItems" class="inventory-page active items-view-medium">
             
-            
+             <div class="items-toolbar search-toolbar" style="display: flex; gap: 8px; align-items: center; padding: 12px 15px; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px;">
+                <select id="searchTypeFilter" autocomplete="off" onchange="handleSearchFilterTypeChange()" style="width: auto; margin-bottom: 0; padding: 10px 14px; border-radius: 8px; font-weight: 600;">
+                    <option value="all" selected>🌐 Search All</option>
+                    <option value="name">📝 Items (By Name)</option>
+                    <option value="tag">🏷️ Tag</option>
+                    <option value="category">🗂️ Category</option>
+                    <option value="location">📦 Location</option>
+                    <option value="barcode">📷 Hardware ID</option>
+                </select>
+                
+                <form onsubmit="document.getElementById('globalSearchInput').blur(); return false;" style="flex-grow: 1; display: flex; margin: 0; padding: 0;">
+                    <div style="position: relative; flex-grow: 1; display: flex; align-items: center; margin-bottom: 0;">
+                        <input type="search" id="globalSearchInput" placeholder="🔍 Search" oninput="handleGlobalSearch(this.value)" autocomplete="off" style="margin-bottom: 0; width: 100%; padding: 10px 35px 10px 15px; border: 1px solid #ddd; border-radius: 8px;">
+                    </div>
+                </form>
+
+                <button class="btn-outline icon-btn" onclick="openBarcodeScannerModal()" title="Barcode Search" style="height: 42px; width: 42px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;">📷</button>
+                <button class="btn-outline icon-btn" onclick="openNfcScannerModal()" title="NFC Search" style="height: 42px; width: 42px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;">📡</button>
+            </div>
+
+            <div id="searchFilterPillsRow" style="display: none; flex-wrap: wrap; gap: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px;"></div>
+
+
 
             <div id="searchFilterPillsRow" style="display: none; flex-wrap: wrap; gap: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px;"></div>
 
