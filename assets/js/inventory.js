@@ -1982,10 +1982,126 @@ function closeLightbox() { document.getElementById("review-lightbox").style.disp
 function changeLightboxImage(direction) { lightboxIndex += direction; if (lightboxIndex < 0) lightboxIndex = lightboxImages.length - 1; if (lightboxIndex >= lightboxImages.length) lightboxIndex = 0; updateLightboxUI(); }
 function updateLightboxUI() { const imgEl = document.getElementById("lightbox-img"); const counterEl = document.getElementById("lightbox-counter"); if (imgEl && lightboxImages[lightboxIndex]) imgEl.src = lightboxImages[lightboxIndex]; if (counterEl) counterEl.textContent = `${lightboxIndex + 1} / ${lightboxImages.length}`; }
 
+// --- UPGRADED ITEM ASSIGNMENT & MERGE ENGINE ---
 function handleAssignReturnToggle() {
     if (!currentItemForActions) return;
-    if (currentItemForActions.assigned_to) executeReturnItem(currentItemForActions.id);
-    else { document.getElementById("assignItemBarcode").value = ""; document.getElementById("assignItemSelect").value = ""; document.getElementById("assignItemModal").style.display = "flex"; }
+    
+    if (currentItemForActions.assigned_to) {
+        // Route to the dedicated Return Modal we built previously
+        executeReturnItem(currentItemForActions.id);
+    } else {
+        // Prepare the Assignment Modal
+        document.getElementById("assignModalItemName").textContent = currentItemForActions.name;
+        
+        const isEquipment = (String(currentItemForActions.quantity).trim() === "-");
+        const qtyWrapper = document.getElementById("assignModalQtyWrapper");
+        const qtyInput = document.getElementById("assignModalQtyValue");
+        const maxQtyLabel = document.getElementById("assignModalMaxQty");
+
+        if (isEquipment) {
+            maxQtyLabel.textContent = "Equipment Asset (1 Unit)";
+            qtyInput.value = "-";
+            qtyInput.disabled = true;
+            qtyWrapper.style.opacity = "0.5";
+            qtyWrapper.style.pointerEvents = "none";
+        } else {
+            maxQtyLabel.textContent = currentItemForActions.quantity + " Available";
+            qtyInput.value = 1;
+            qtyInput.disabled = false;
+            qtyWrapper.style.opacity = "1";
+            qtyWrapper.style.pointerEvents = "auto";
+        }
+
+        document.getElementById("assignItemSelect").value = ""; 
+        document.getElementById("assignItemModal").style.display = "flex"; 
+    }
+}
+
+function changeAssignModalQty(amount) {
+    if (!currentItemForActions) return;
+    const isEquipment = (String(currentItemForActions.quantity).trim() === "-");
+    if (isEquipment) return;
+
+    const input = document.getElementById("assignModalQtyValue");
+    const max = parseInt(currentItemForActions.quantity) || 1;
+    let val = parseInt(input.value) || 1;
+    val += amount;
+    if (val < 1) val = 1;
+    if (val > max) val = max;
+    input.value = val;
+}
+
+async function executeAssignItem() {
+    if (!currentItemForActions) return;
+    if (window.isProcessingTransaction) return;
+    window.isProcessingTransaction = true;
+
+    try {
+        const targetId = document.getElementById("assignItemSelect").value;
+        if (!targetId) return await customAlert("Please select a valid assignee profile.", "Missing Target");
+        const tempLoc = tempLocationsAdmin.find(t => t.id === targetId);
+
+        const item = currentItemForActions;
+        const isEquipment = (String(item.quantity).trim() === "-");
+        const qtyToAssign = isEquipment ? 1 : (parseInt(document.getElementById("assignModalQtyValue").value) || 1);
+        const originalQty = parseInt(item.quantity) || 0;
+        
+        const allItems = await localDB.items.toArray();
+
+        // 1. Subtract or delete from the master warehouse record
+        if (isEquipment || originalQty - qtyToAssign <= 0) {
+            await window.offlineSafeWrite('DELETE', 'items', null, item.id);
+        } else {
+            await window.offlineSafeWrite('UPDATE', 'items', { quantity: originalQty - qtyToAssign }, item.id);
+        }
+
+        // 2. Identify if Assignee already holds this specific stock
+        const existingAssigneeRow = allItems.find(i => {
+            if (String(i.assigned_to || '') !== String(targetId)) return false;
+            if (String(i.location_id || '') !== String(item.location_id || '')) return false;
+            if (i.barcode && item.barcode && i.barcode.trim().toLowerCase() === item.barcode.trim().toLowerCase()) return true;
+            if (i.nfc_tag && item.nfc_tag && i.nfc_tag.trim().toLowerCase() === item.nfc_tag.trim().toLowerCase()) return true;
+            return i.name.trim().toLowerCase() === item.name.trim().toLowerCase();
+        });
+
+        // 3. Merge or Create a new Assigned Row
+        if (existingAssigneeRow && !isEquipment) {
+            const currentAssigneeQty = parseInt(existingAssigneeRow.quantity) || 0;
+            await window.offlineSafeWrite('UPDATE', 'items', { quantity: currentAssigneeQty + qtyToAssign }, existingAssigneeRow.id);
+        } else {
+            const newId = crypto.randomUUID();
+            const newAssigneeRow = {
+                ...item, id: newId, quantity: isEquipment ? "-" : qtyToAssign, assigned_to: targetId
+            };
+            const databasePayload = { ...newAssigneeRow };
+            delete databasePayload.photos; // Photos map via relation
+
+            await localDB.items.put(newAssigneeRow);
+            await localDB.sync_queue.add({ action: 'CREATE', table: 'items', payload: databasePayload, record_id: newId, created_at: new Date().toISOString(), status: 'pending' });
+
+            if (item.photos && item.photos.length > 0) {
+                for (let p of item.photos) {
+                    await localDB.sync_queue.add({
+                        action: 'CREATE', table: 'photos', payload: { item_id: newId, file_path: p.file_path, is_primary: p.is_primary }, record_id: null, created_at: new Date().toISOString(), status: 'pending'
+                    });
+                }
+            }
+        }
+
+        logAction("CHECKOUT", "Item", item.name, `Assigned ${isEquipment ? 'Equipment' : (qtyToAssign + ' unit(s)')} to ${tempLoc ? tempLoc.name : 'User'}`);
+        
+        closeModal("assignItemModal"); 
+        closeModal("itemDetailsModal"); 
+        lastMovedItemId = item.id; 
+        
+        await refreshAllDataFromLocal(); 
+        window.processSyncQueue(); 
+        setTimeout(() => { lastMovedItemId = null; }, 6000);
+        await customAlert(`🎉 Success! <b>[${item.name}]</b> has been assigned to <b>${tempLoc ? tempLoc.name : 'User'}</b>.`, "Assignment Complete");
+
+    } finally {
+        window.isProcessingTransaction = false;
+    }
 }
 
 async function executeAssignItem() {
@@ -2004,19 +2120,148 @@ async function executeAssignItem() {
     }
 }
 
-async function executeReturnItem(itemId, fromTempView = false) {
-    if (!(await customConfirm("Check this item back into the warehouse?", "Confirm Return"))) return;
-    const itemData = currentBrowserItems.find(i => i.id === itemId) || currentItemForActions;
+// --- UPGRADED ITEM RETURN & MERGE ENGINE ---
+let currentReturnItemContext = null;
 
-    const response = await window.offlineSafeWrite('UPDATE', 'items', { assigned_to: null }, itemId);
-    if (response.success) {
-        closeModal("itemDetailsModal"); lastMovedItemId = itemId; 
-        logAction("RETURN", "Item", itemData ? itemData.name : 'Item', "Checked back into warehouse");
-        await refreshAllDataFromLocal(); 
-        window.processSyncQueue(); 
-        if (currentTempLocationId || fromTempView) await loadTempLocationDetails(currentTempLocationId || fromTempView); 
-        setTimeout(() => { lastMovedItemId = null; }, 6000);
+async function executeReturnItem(itemId, fromTempView = false) {
+    const allItems = await localDB.items.toArray();
+    const itemData = allItems.find(i => i.id === itemId) || currentItemForActions;
+    if (!itemData || !itemData.assigned_to) return;
+
+    currentReturnItemContext = { item: itemData, fromTempView };
+
+    // 1. Populate Modal UI
+    document.getElementById("returnModalItemName").textContent = itemData.name;
+    const tempLoc = tempLocationsAdmin.find(t => t.id === itemData.assigned_to);
+    document.getElementById("returnModalAssigneeName").textContent = tempLoc ? tempLoc.name : 'Unknown';
+    
+    const isEquipment = (String(itemData.quantity).trim() === "-");
+    const qtyWrapper = document.getElementById("returnModalQtyWrapper");
+    const qtyInput = document.getElementById("returnModalQtyValue");
+    const maxQtyLabel = document.getElementById("returnModalMaxQty");
+
+    // Protect Equipment Assets from Quantity Adjustments
+    if (isEquipment) {
+        maxQtyLabel.textContent = "Equipment Asset (1 Unit)";
+        qtyInput.value = "-";
+        qtyInput.disabled = true;
+        qtyWrapper.style.opacity = "0.5";
+        qtyWrapper.style.pointerEvents = "none";
+    } else {
+        maxQtyLabel.textContent = itemData.quantity + " Available";
+        qtyInput.value = 1;
+        qtyInput.disabled = false;
+        qtyWrapper.style.opacity = "1";
+        qtyWrapper.style.pointerEvents = "auto";
     }
+
+    // 2. Map "Use Items" Jump Action
+    document.getElementById("returnModalUseBtn").onclick = () => {
+        closeModal('itemReturnModal');
+        closeModal('itemDetailsModal');
+        showPage('pageTempLocations');
+        loadTempLocationDetails(itemData.assigned_to);
+        // Automatically switch into Stock Consumption Mode upon arrival
+        setTimeout(() => {
+            if (!isStockUsageModeActive) toggleStockUsageMode();
+        }, 300);
+    };
+
+    document.getElementById("itemReturnModal").style.display = "flex";
+}
+
+function changeReturnModalQty(amount) {
+    if (!currentReturnItemContext) return;
+    const isEquipment = (String(currentReturnItemContext.item.quantity).trim() === "-");
+    if (isEquipment) return;
+
+    const input = document.getElementById("returnModalQtyValue");
+    const max = parseInt(currentReturnItemContext.item.quantity) || 1;
+    let val = parseInt(input.value) || 1;
+    val += amount;
+    if (val < 1) val = 1;
+    if (val > max) val = max;
+    input.value = val;
+}
+
+async function confirmProcessItemReturn() {
+    if (!currentReturnItemContext) return;
+    if (window.isProcessingTransaction) return;
+    window.isProcessingTransaction = true;
+
+    try {
+        const loanItem = currentReturnItemContext.item;
+        const isEquipment = (String(loanItem.quantity).trim() === "-");
+        const qtyToReturn = isEquipment ? 1 : (parseInt(document.getElementById("returnModalQtyValue").value) || 1);
+        
+        const currentLoanQty = parseInt(loanItem.quantity) || 0;
+        const newLoanQty = currentLoanQty - qtyToReturn;
+
+        const allItems = await localDB.items.toArray();
+
+        // 1. Locate Original Warehouse Item (Strict Matching prevents duplicates)
+        const warehouseRow = allItems.find(i => {
+            const assigned = String(i.assigned_to || '').trim().toLowerCase();
+            if (assigned !== '' && assigned !== 'null' && assigned !== 'undefined') return false;
+            if (String(i.location_id || '') !== String(loanItem.location_id || '')) return false;
+            if (i.barcode && loanItem.barcode && i.barcode.trim().toLowerCase() === loanItem.barcode.trim().toLowerCase()) return true;
+            if (i.nfc_tag && loanItem.nfc_tag && i.nfc_tag.trim().toLowerCase() === loanItem.nfc_tag.trim().toLowerCase()) return true;
+            return i.name.trim().toLowerCase() === loanItem.name.trim().toLowerCase();
+        });
+
+        // 2. Mutate Assignee Loan Row
+        if (isEquipment || newLoanQty <= 0) {
+            await window.offlineSafeWrite('DELETE', 'items', null, loanItem.id);
+        } else {
+            await window.offlineSafeWrite('UPDATE', 'items', { quantity: newLoanQty }, loanItem.id);
+        }
+
+        // 3. Mutate or Generate Warehouse Row
+        if (warehouseRow) {
+            if (!isEquipment) {
+                const currentWhQty = parseInt(warehouseRow.quantity) || 0;
+                await window.offlineSafeWrite('UPDATE', 'items', { quantity: currentWhQty + qtyToReturn }, warehouseRow.id);
+            }
+        } else {
+            // Re-create the master record if the warehouse pool was completely depleted
+            const newId = crypto.randomUUID();
+            const restoredRow = {
+                ...loanItem, id: newId, quantity: isEquipment ? "-" : qtyToReturn, assigned_to: null
+            };
+            delete restoredRow.photos; 
+            
+            await localDB.items.put(restoredRow);
+            await localDB.sync_queue.add({ action: 'CREATE', table: 'items', payload: restoredRow, record_id: newId, created_at: new Date().toISOString(), status: 'pending' });
+
+            // Automatically clone physical photos over to the new master record
+            if (loanItem.photos && loanItem.photos.length > 0) {
+                for (let p of loanItem.photos) {
+                    await localDB.sync_queue.add({
+                        action: 'CREATE', table: 'photos', payload: { item_id: newId, file_path: p.file_path, is_primary: p.is_primary }, record_id: null, created_at: new Date().toISOString(), status: 'pending'
+                    });
+                }
+            }
+        }
+
+        // 4. Register Transaction Log
+        const assigneeName = document.getElementById("returnModalAssigneeName").textContent;
+        logAction("RETURN", "Item", loanItem.name, `Returned ${isEquipment ? 'Equipment' : (qtyToReturn + ' unit(s)')} from ${assigneeName} to stock.`);
+
+        closeModal('itemReturnModal');
+        closeModal('itemDetailsModal');
+        lastMovedItemId = warehouseRow ? warehouseRow.id : loanItem.id;
+        
+        await refreshAllDataFromLocal();
+        window.processSyncQueue();
+        
+        if (currentReturnItemContext.fromTempView) {
+            await loadTempLocationDetails(currentTempLocationId || currentReturnItemContext.fromTempView);
+        }
+        
+        setTimeout(() => { lastMovedItemId = null; }, 6000);
+        await customAlert(`🎉 Success! <b>[${loanItem.name}]</b> has been checked back into stock.`, "Return Complete");
+
+    } finally { window.isProcessingTransaction = false; }
 }
 
 function handleAssignBarcodeLookup(scannedText) {
@@ -2330,27 +2575,22 @@ let html5QrcodeScannerInstance = null;
 let isProcessingScan = false;
 
 window.openBarcodeScannerModal = async function(targetInputId = null) {
-    // 1. Force Clean Reset: Ensure no hidden scanner instance is locking the hardware
     if (html5QrcodeScannerInstance) {
         try { await html5QrcodeScannerInstance.stop(); html5QrcodeScannerInstance.clear(); } catch(e) {}
         html5QrcodeScannerInstance = null;
     }
 
-    // 2. Prepare the UI Modal
     document.getElementById("barcodeScannerModal").style.display = "flex"; 
     window.activeBarcodeTargetInputId = targetInputId;
     isProcessingScan = false;
     
-    // Critical: Force DOM dimensions before camera init to prevent blank screen
     const container = document.getElementById("scannerReaderContainer");
     container.innerHTML = "";
     container.style.display = "block";
     container.style.height = "260px"; 
     
-    // 3. Wait for the modal animation to finish so the camera has a physical space to draw into
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // 4. Initialize Scanner
     html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
     const lensConfig = (typeof determineActiveTargetLens === 'function') ? await determineActiveTargetLens() : { facingMode: "environment" };
 
@@ -2361,47 +2601,41 @@ window.openBarcodeScannerModal = async function(targetInputId = null) {
             if (isProcessingScan) return; 
             isProcessingScan = true; 
             const cleanToken = decodedText.trim();
+            closeBarcodeScannerModal();
             
-            // --- MASTER ROUTING LOGIC ---
+            // MASTER ROUTING
             if (targetInputId === 'FAST_RETURN') { 
-                closeBarcodeScannerModal(); executeFastReturnLookup(cleanToken); 
+                executeFastReturnLookup(cleanToken); 
             } else if (targetInputId === 'FAST_QTY_ADJUST') { 
-                closeBarcodeScannerModal(); handleQuantityAdjusterLookup(cleanToken); 
+                handleQuantityAdjusterLookup(cleanToken); 
             } else if (targetInputId === 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL') {
                 editModalActiveBarcodeString = cleanToken;
                 updateEditModalHardwareButtonsUI();
-                closeBarcodeScannerModal();
+            } else if (targetInputId === 'assignItemBarcodeTunnel') {
+                const match = tempLocationsAdmin.find(t => (t.barcode && t.barcode.trim().toLowerCase() === cleanToken.toLowerCase()));
+                if (match) { document.getElementById("assignItemSelect").value = match.id; }
+                else { customAlert("No assignee profile found matching that barcode.", "Not Found"); }
             } else if (targetInputId === 'editItemLocationSelect') {
-                closeBarcodeScannerModal();
                 const lowerToken = cleanToken.toLowerCase();
                 const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
                 if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
                 else { customAlert("No location folder found matching that barcode.", "Not Found"); }
-            } else if (targetInputId === 'moveItemLocationBarcode') {
-                document.getElementById('moveItemLocationBarcode').value = cleanToken;
-                handleLocationBarcodeLookup(cleanToken);
-                closeBarcodeScannerModal();
-            } else if (targetInputId === 'assignItemBarcode') {
-                document.getElementById('assignItemBarcode').value = cleanToken;
-                handleAssignBarcodeLookup(cleanToken);
-                closeBarcodeScannerModal();
             } else if (targetInputId) {
                 document.getElementById(targetInputId).value = cleanToken;
-                closeBarcodeScannerModal();
+                if (targetInputId === 'moveItemLocationBarcode') handleLocationBarcodeLookup(cleanToken);
+                if (targetInputId === 'assignItemBarcode') handleAssignBarcodeLookup(cleanToken);
             } else { 
                 document.getElementById("globalSearchInput").value = cleanToken; 
                 const typeFilter = document.getElementById("searchTypeFilter"); 
                 if (typeFilter) typeFilter.value = "barcode"; 
-                closeBarcodeScannerModal(); 
                 handleGlobalSearch(cleanToken); 
             }
         }, 
-        (errorMessage) => { /* Ignore frequent scanning frame noise */ }
+        () => {}
     ).then(() => {
         if (typeof applyHardwareZoomToContainer === 'function') applyHardwareZoomToContainer("scannerReaderContainer");
     }).catch(err => {
         console.error("Camera Init Error:", err);
-        container.innerHTML = `<div style="padding:20px; color:white;">Error: Camera blocked or in use. Check browser permissions.</div>`;
     });
 };
 
@@ -2421,7 +2655,7 @@ function closeBarcodeScannerModal() {
 
 window.openNfcScannerModal = async function(targetInputId = null) {
     if (!("NDEFReader" in window)) { 
-        await customAlert("NFC scanning requires a secure HTTPS connection. If you are testing on a local IP address or HTTP, Chrome blocks the NFC reader for security.", "Connection Error"); 
+        await customAlert("NFC scanning requires a secure HTTPS connection.", "Connection Error"); 
         return; 
     }
     
@@ -2440,48 +2674,37 @@ window.openNfcScannerModal = async function(targetInputId = null) {
             if (isProcessingNfcScan) return;
             isProcessingNfcScan = true; 
             const token = event.serialNumber;
+            closeNfcScannerModal();
             
-            // --- MASTER ROUTING LOGIC ---
+            // MASTER ROUTING
             if (targetInputId === 'FAST_RETURN') { 
-                closeNfcScannerModal(); executeFastReturnLookup(token); 
+                executeFastReturnLookup(token); 
             } else if (targetInputId === 'FAST_QTY_ADJUST') { 
-                closeNfcScannerModal(); handleQuantityAdjusterLookup(token); 
+                handleQuantityAdjusterLookup(token); 
             } else if (targetInputId === 'EDIT_MODAL_NFC_INTERNAL_TUNNEL') {
                 editModalActiveNfcTagString = token;
                 updateEditModalHardwareButtonsUI();
-                closeNfcScannerModal();
+            } else if (targetInputId === 'assignItemNfcTunnel') {
+                const match = tempLocationsAdmin.find(t => (t.nfc_tag && t.nfc_tag.trim().toLowerCase() === token.toLowerCase()));
+                if (match) { document.getElementById("assignItemSelect").value = match.id; }
+                else { customAlert("No assignee profile found matching that NFC tag.", "Not Found"); }
             } else if (targetInputId === 'editItemLocationSelect') {
-                closeNfcScannerModal();
                 const lowerToken = token.toLowerCase();
                 const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
                 if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
                 else { customAlert("No location folder found matching that NFC tag.", "Not Found"); }
-            } else if (targetInputId === 'moveItemLocationBarcode') {
-                document.getElementById('moveItemLocationBarcode').value = token;
-                handleLocationBarcodeLookup(token);
-                closeNfcScannerModal();
-            } else if (targetInputId === 'assignItemBarcode') {
-                document.getElementById('assignItemBarcode').value = token;
-                handleAssignBarcodeLookup(token);
-                closeNfcScannerModal();
             } else if (targetInputId) {
                 document.getElementById(targetInputId).value = token;
-                closeNfcScannerModal();
             } else {
                 document.getElementById("globalSearchInput").value = token; 
                 const typeFilter = document.getElementById("searchTypeFilter"); 
                 if (typeFilter) typeFilter.value = "barcode";
-                closeNfcScannerModal(); 
                 handleGlobalSearch(token); 
             }
         };
-        ndef.onreadingerror = async () => { 
-            isProcessingNfcScan = false; 
-            await customAlert("Error reading NFC tag. Try shifting it slightly.", "Read Error"); 
-        };
     } catch (error) { 
         closeNfcScannerModal(); 
-        await customAlert("NFC Scan failed to initialize: " + error.message, "System Error"); 
+        await customAlert("NFC Scan failed: " + error.message, "System Error"); 
     }
 };
 
