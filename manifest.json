@@ -1,6 +1,6 @@
 {
-  "name": "Warm Right Engineer's Portal",
-  "short_name": "Warm Right Portal",
+  "name": "Warm Right Ltd Engineer's Portal",
+  "short_name": "Engineer Hub",
   "start_url": "./admin/admin-landed.html",
   "display": "standalone",
   "background_color": "#f8fafc",
@@ -8,12 +8,12 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "./assets/images/logo.png",
+      "src": "./assets/images/wrep-logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "./assets/images/logo.png",
+      "src": "./assets/images/wrep-logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }
