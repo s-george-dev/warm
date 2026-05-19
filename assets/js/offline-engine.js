@@ -278,3 +278,47 @@ window.base64ToBlob = function(base64Data) {
     while(n--){ u8arr[n] = bstr.charCodeAt(n); }
     return new Blob([u8arr], {type: mime});
 };
+
+let deferredPrompt;
+
+// 1. Capture the install prompt
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+    // Stash the event so it can be triggered later.
+    deferredPrompt = e;
+    
+    // Optional: Show your custom install button
+    // e.g., document.getElementById('installAppBtn').style.display = 'block';
+    console.log("PWA Install ready. Button can be clicked.");
+});
+
+// 2. The function to call when the button is clicked
+window.triggerAppInstall = async function() {
+    if (deferredPrompt) {
+        // Show the native install prompt
+        deferredPrompt.prompt();
+        
+        // Wait for the user to respond to the prompt
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            console.log('User accepted the install prompt');
+            // Hide the button once installed
+            // document.getElementById('installAppBtn').style.display = 'none';
+        } else {
+            console.log('User dismissed the install prompt');
+        }
+        
+        // We can only use the prompt once, so clear it
+        deferredPrompt = null;
+    } else {
+        alert("The app is either already installed, or your browser doesn't support installation.");
+    }
+};
+
+// 3. Listen for successful installation
+window.addEventListener('appinstalled', () => {
+    console.log('PWA was installed successfully');
+    // Hide the button permanently
+    deferredPrompt = null;
+});
