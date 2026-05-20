@@ -175,6 +175,12 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
     border-bottom: 3px solid transparent; transition: 0.2s;
 }
 .settings-tabs .s-tab.active { color: #004a99; border-bottom-color: #004a99; }
+
+#itemLocationSelect{
+    width:65%;
+
+
+}
 /* =========================================================
    4. GRIDS, CARDS & VIEWS (Small, Medium, Large)
 ========================================================= */

@@ -106,3 +106,37 @@ function fixAdminInjectedPaths(container, root) {
         }
     });
 }
+
+
+// Function to protect pages based on role
+window.requireRole = async function(allowedRoles) {
+    // 1. Get the current session
+   const { data: { session } } = await window.db.auth.getSession();
+    
+    // 2. If they aren't logged in at all, kick them to login
+    if (!session) {
+        window.location.replace('/admin/login.html');
+        return;
+    }
+
+    try {
+        // 3. Decode the JWT token (the VIP badge) to read the custom stamp
+        // (This safely splits the token and reads the JSON data inside)
+        const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+        const userRole = payload.user_role || 'none'; 
+
+        // 4. Check if their role is in the allowed list
+        if (!allowedRoles.includes(userRole)) {
+            console.warn(`Access denied. User role '${userRole}' not in allowed list:`, allowedRoles);
+            
+            // Optional: Show an alert
+            alert("You do not have permission to view this page.");
+            
+            // Redirect them back to the Hub/Dashboard
+            window.location.replace('/admin/admin-landed.html'); 
+        }
+    } catch (e) {
+        console.error("Error reading token:", e);
+        window.location.replace('/admin/login.html');
+    }
+};

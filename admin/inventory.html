@@ -162,13 +162,10 @@
                 <button class="btn-outline icon-btn" onclick="openNfcScannerModal()" title="NFC Search" style="height: 42px; width: 42px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;">📡</button>
             </div>
 
-            <div id="searchFilterPillsRow" style="display: none; flex-wrap: wrap; gap: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px;"></div>
+            <div id="searchFilterPillsRow" style="display: none; max-height:150px; overflow-y: auto; flex-wrap: wrap; gap: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px;"></div>
 
 
-
-            <div id="searchFilterPillsRow" style="display: none; flex-wrap: wrap; gap: 8px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 12px;"></div>
-
-           
+          
 
             <div class="location-nav"><div id="breadcrumb" style="font-weight: bold; font-size: 1.1em;">Items</div></div>
             <div id="locationTiles" class="items-grid"></div>
@@ -414,6 +411,11 @@
             <label>Item Name</label><input id="itemName" placeholder="Name">
             <label>Quantity</label><input id="itemQuantity" placeholder="Quantity" type="number">
             <label>Location Placement Folder</label><select id="itemLocationSelect"></select>
+            
+            
+            <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openBarcodeScannerModal('itemLocationTunnel')">📷</button>
+             <button class="btn-outline" style="padding: 10px; height: 42px;" onclick="openNfcScannerModal('itemLocationTunnel')">📡</button>
+
             <label>Description</label><textarea id="itemDescription" rows="3"></textarea>
             <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
                 <div style="flex-grow: 1;"><label>Barcode ID</label><input id="addItemBarcode" type="text" style="margin-bottom: 0;"></div>
@@ -1107,6 +1109,11 @@
 
     <script src="../assets/js/inventory.js"></script>
     <script>
+
+document.addEventListener('DOMContentLoaded', () => {
+        // THEN check the role
+        window.requireRole(['admin', 'engineer']);
+    });
         window.addEventListener('pageshow', function() {
             setTimeout(function() {
                 const filterBox = document.getElementById("searchTypeFilter");

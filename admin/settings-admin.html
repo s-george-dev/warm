@@ -12,7 +12,7 @@
   
   <script>window.adminPageTitle = "WarmHub - Account Settings";</script>
   <script src="../assets/js/admin-include.js"></script>
-
+<script src="../assets/js/settings-admin.js"></script>
   <style>
     :root { 
       --primary-blue: #004a99; 
@@ -94,6 +94,7 @@
         <button class="nav-btn" id="btn-mfa" onclick="showTab('mfa-tab', this)">MFA</button>
         <button class="nav-btn" id="btn-identity" onclick="showTab('display-tab', this)">Identity</button>
         <button class="nav-btn" id="btn-avatar" onclick="showTab('avatar-tab', this)">Avatar</button>
+         <button class="nav-btn" id="btn-app-users" onclick="showTab('app-user-tab', this)">Users and Permissions</button>
       </div>
 
       <div id="email-tab" class="settings-section active">
@@ -178,10 +179,48 @@
       </div>
 
       <p id="msg"></p>
+
+<div id="app-user-tab" class="settings-section">
+        <h2>Profile Picture</h2>
+        <span class="tab-desc">Manage users and app settings.</span>
+        <div class="user-management-section">
+    <h3>Users and permissions</h3>
+    <table id="userTable">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="userTableBody">
+            </tbody>
+    </table>
+</div>
+ <h3>App settings</h3>
+<button id="installAppBtn" class="btn-primary" onclick="triggerAppInstall()" style="background: #10b981; border-color: #10b981;">
+    ⬇️ Install Warm Right App
+</button>
+      </div>
+
+
+
+
+
+
+
+      
     </div>
   </div>
 
   <script>
+// ONLY 'admin' can view this page
+document.addEventListener('DOMContentLoaded', () => {
+        // THEN check the role
+        window.requireRole(['admin']);
+    });
+
+
     /* 1. INITIALIZATION & SECURITY */
     let db;
     let currentFactorId = null;

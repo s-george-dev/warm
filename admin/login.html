@@ -155,6 +155,13 @@
   </div>
 
   <script>
+
+    
+   
+    
+
+
+
     let db;
 
     function initSupabase() {
@@ -274,7 +281,7 @@
         }
 
         const { error } = await db.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + '/admin/reset-password.html',
+            redirectTo: window.location.origin + '../admin/reset-password.html',
         });
 
         if (error) {
@@ -285,6 +292,50 @@
             msg.textContent = "Password reset email sent! Check your inbox.";
         }
     });
+
+    async function debugAuth() {
+        console.log("--- Debugging Login Redirect ---");
+        
+        // 1. Check if window.db exists
+        if (typeof window.db === 'undefined') {
+            console.error("FAIL: window.db is not defined! Are your script tags in the right order?");
+            return;
+        }
+
+        // 2. Try to get the session
+        const { data, error } = await window.db.auth.getSession();
+        
+        if (error) {
+            console.error("FAIL: Supabase error:", error);
+            return;
+        }
+
+        if (!data.session) {
+            console.log("SUCCESS: No user logged in. Allowing access to login page.");
+            return;
+        }
+
+        // 3. Decode the JWT
+        try {
+            const token = data.session.access_token;
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            console.log("Logged in as:", payload.email, "with role:", payload.user_role);
+
+            // 4. Check Roles
+            const forbiddenRoles = ['customer', 'site-viewer', 'site-viewer-engineer'];
+            if (forbiddenRoles.includes(payload.user_role)) {
+                console.log("FORBIDDEN: Redirecting to /index.html...");
+                window.location.replace('/index.html');
+            } else {
+                console.log("ALLOWED: This user is an Admin/Engineer.");
+            }
+        } catch (e) {
+            console.error("FAIL: Could not decode token:", e);
+        }
+    }
+    
+    // Run it
+    debugAuth();
   </script>
 </body>
 </html>

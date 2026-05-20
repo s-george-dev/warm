@@ -1,6 +1,7 @@
 /* =========================================================
    GLOBAL STATE & UTILITIES
 ========================================================= */
+let isImportingSyncLock = false;
 let currentItemForActions = null;
 let currentLocationId = null;
 let locationHistory = [];
@@ -618,17 +619,32 @@ async function saveInventorySettings() {
 
 async function loadInventorySettings() {
     try {
-        const key = await getSettingsKey(); const saved = localStorage.getItem(key);
-        if (saved) { const parsed = JSON.parse(saved); userSettings = { ...userSettings, ...parsed }; }
-        const itemsSelect = document.querySelector('select[onchange*="changeItemsView"]');
-        if (itemsSelect) itemsSelect.value = userSettings.view || 'medium';
-        changeItemsView(userSettings.view || 'medium');
+        const key = await getSettingsKey(); 
+        const saved = localStorage.getItem(key);
+        if (saved) { 
+            const parsed = JSON.parse(saved); 
+            userSettings = { ...userSettings, ...parsed }; 
+        }
+        
+        // 1. Load and apply Items View
+        const itemsView = userSettings.view || 'medium';
+        changeItemsView(itemsView);
+        updateCustomSelectUI('changeItemsView', itemsView); // Updates the custom dropdown text!
 
-        const locsSelect = document.querySelector('select[onchange*="changeLocationsView"]');
-        if (locsSelect) locsSelect.value = userSettings.locationsView || 'medium';
-        changeLocationsView(userSettings.locationsView || 'medium');
-    } catch (error) { console.warn("Could not load settings:", error); }
+        // 2. Load and apply Locations View
+        const locsView = userSettings.locationsView || 'medium';
+        changeLocationsView(locsView);
+        updateCustomSelectUI('changeLocationsView', locsView); 
+        
+        // Note: If you add sorting/filtering saves in the future, 
+        // you can easily sync those dropdowns the same way:
+        // if (userSettings.sortOrder) updateCustomSelectUI('changeSortOrder', userSettings.sortOrder);
+
+    } catch (error) { 
+        console.warn("Could not load settings:", error); 
+    }
 }
+
 
 function changeItemsView(view) { 
     const page = document.getElementById("pageItems");
@@ -2427,7 +2443,19 @@ function renderSearchFilterPills(filterType) {
             const pill = document.createElement("span"); pill.className = "tag-pill"; const isActive = activeSearchTags.includes(tag.name);
             pill.style.cssText = "cursor: pointer; user-select: none; transition: all 0.15s ease; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;";
             if (isActive) { pill.style.background = "#004a99"; pill.style.color = "#ffffff"; pill.style.borderColor = "#004a99"; pill.textContent = `✓ ${tag.name}`; } else { pill.style.background = "#f1f5f9"; pill.style.color = "#475569"; pill.style.borderColor = "#e2e8f0"; pill.textContent = `🏷️ ${tag.name}`; }
-            pill.onclick = () => { if (activeSearchTags.includes(tag.name)) activeSearchTags = activeSearchTags.filter(t => t !== tag.name); else activeSearchTags.push(tag.name); renderSearchFilterPills("tag"); handleGlobalSearch(document.getElementById("globalSearchInput").value); }; pillsRow.appendChild(pill);
+            pill.onclick = () => { 
+    if (activeSearchTags.includes(tag.name)) {
+        // If it's already selected, clicking it again deselects it (clears the array)
+        activeSearchTags = []; 
+    } else {
+        // EXCLUSIVE SELECT: Overwrite the array to ONLY contain the clicked tag
+        activeSearchTags = [tag.name]; 
+    } 
+    
+    // Re-render the UI and trigger the search
+    renderSearchFilterPills("tag"); 
+    handleGlobalSearch(document.getElementById("globalSearchInput").value); 
+}; pillsRow.appendChild(pill);
         });
     } else if (filterType === "category") {
         globalCachedCategories.forEach(cat => {
@@ -2619,30 +2647,92 @@ async function saveQuantityAdjustment(closeAfter) {
 }
 
 /* =========================================================
-   NFC & BARCODE HARDWARE SCANNERS (UNIFIED MASTER ENGINE)
+   UNIFIED HARDWARE SCANNER (BARCODE + NFC + LIVE ZOOM)
 ========================================================= */
-let nfcAbortController = null;
-let isProcessingNfcScan = false;
+let unifiedNfcAbortController = null;
 let html5QrcodeScannerInstance = null;
-let isProcessingScan = false;
+let isProcessingUnifiedScan = false;
 
 window.openBarcodeScannerModal = async function(targetInputId = null) {
+    // 1. Clean up any previous instances
     if (html5QrcodeScannerInstance) {
         try { await html5QrcodeScannerInstance.stop(); html5QrcodeScannerInstance.clear(); } catch(e) {}
         html5QrcodeScannerInstance = null;
     }
+    if (unifiedNfcAbortController) { 
+        unifiedNfcAbortController.abort(); 
+        unifiedNfcAbortController = null; 
+    }
 
     document.getElementById("barcodeScannerModal").style.display = "flex"; 
-    window.activeBarcodeTargetInputId = targetInputId;
-    isProcessingScan = false;
+    window.activeBarcodeTargetInputId = targetInputId; // Kept for legacy compatibility
+    isProcessingUnifiedScan = false;
     
     const container = document.getElementById("scannerReaderContainer");
     container.innerHTML = "";
     container.style.display = "block";
     container.style.height = "260px"; 
     
+    // 2. DYNAMIC UI INJECTION (NFC Banner & Live Zoom Slider)
+    let uiWrapper = document.getElementById("unifiedScannerUI");
+    if (!uiWrapper) {
+        uiWrapper = document.createElement("div");
+        uiWrapper.id = "unifiedScannerUI";
+        uiWrapper.style.marginTop = "15px";
+        uiWrapper.style.display = "flex";
+        uiWrapper.style.flexDirection = "column";
+        uiWrapper.style.gap = "10px";
+        container.parentElement.appendChild(uiWrapper);
+    }
+
+    const defaultZoom = userSettings.defaultZoom || 1.5;
+    
+    uiWrapper.innerHTML = `
+        <div id="nfcStatusDisplay" style="padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; text-align: center; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; transition: all 0.3s ease;">
+            ⏳ Initializing NFC...
+        </div>
+        <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #475569; margin-bottom: 8px;">
+                <span>Live Camera Zoom (Temporary)</span>
+                <span id="liveZoomValDisplay">${defaultZoom}x</span>
+            </div>
+            <input type="range" id="liveZoomSlider" min="1.0" max="4.0" step="0.1" value="${defaultZoom}" 
+                   oninput="applyDynamicZoom(this.value)" style="width: 100%; accent-color: #004a99;">
+        </div>
+    `;
+
+    // 3. START NFC BACKGROUND ENGINE
+    const nfcStatusDiv = document.getElementById("nfcStatusDisplay");
+    if ("NDEFReader" in window && window.isSecureContext) {
+        nfcStatusDiv.innerHTML = "📡 NFC Active: Ready to scan";
+        nfcStatusDiv.style.color = "#15803d";
+        nfcStatusDiv.style.background = "#dcfce7";
+        nfcStatusDiv.style.borderColor = "#bbf7d0";
+        try {
+            unifiedNfcAbortController = new AbortController();
+            const ndef = new NDEFReader();
+            await ndef.scan({ signal: unifiedNfcAbortController.signal });
+            ndef.onreading = (event) => {
+                if (isProcessingUnifiedScan) return; 
+                isProcessingUnifiedScan = true;
+                executeUnifiedScannerRouting(event.serialNumber, targetInputId);
+            };
+        } catch (err) {
+            nfcStatusDiv.innerHTML = "⚠️ NFC Error: Please check device settings.";
+            nfcStatusDiv.style.color = "#b91c1c";
+            nfcStatusDiv.style.background = "#fee2e2";
+            nfcStatusDiv.style.borderColor = "#fecaca";
+        }
+    } else {
+        nfcStatusDiv.innerHTML = "⚠️ NFC Unavailable (Requires HTTPS & Compatible Device)";
+        nfcStatusDiv.style.color = "#9a3412";
+        nfcStatusDiv.style.background = "#ffedd5";
+        nfcStatusDiv.style.borderColor = "#fed7aa";
+    }
+
     await new Promise(resolve => setTimeout(resolve, 300));
 
+    // 4. START OPTICAL CAMERA ENGINE
     html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
     const lensConfig = (typeof determineActiveTargetLens === 'function') ? await determineActiveTargetLens() : { facingMode: "environment" };
 
@@ -2650,123 +2740,126 @@ window.openBarcodeScannerModal = async function(targetInputId = null) {
         lensConfig, 
         { fps: 15, qrbox: { width: 260, height: 160 }, aspectRatio: 1.333333 },
         (decodedText) => {
-            if (isProcessingScan) return; 
-            isProcessingScan = true; 
-            const cleanToken = decodedText.trim();
-            closeBarcodeScannerModal();
-            
-            // MASTER ROUTING
-            if (targetInputId === 'FAST_RETURN') { 
-                executeFastReturnLookup(cleanToken); 
-            } else if (targetInputId === 'FAST_QTY_ADJUST') { 
-                handleQuantityAdjusterLookup(cleanToken); 
-            } else if (targetInputId === 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL') {
-                editModalActiveBarcodeString = cleanToken;
-                updateEditModalHardwareButtonsUI();
-            } else if (targetInputId === 'assignItemBarcodeTunnel') {
-                const match = tempLocationsAdmin.find(t => (t.barcode && t.barcode.trim().toLowerCase() === cleanToken.toLowerCase()));
-                if (match) { document.getElementById("assignItemSelect").value = match.id; }
-                else { customAlert("No assignee profile found matching that barcode.", "Not Found"); }
-            } else if (targetInputId === 'editItemLocationSelect') {
-                const lowerToken = cleanToken.toLowerCase();
-                const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
-                if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
-                else { customAlert("No location folder found matching that barcode.", "Not Found"); }
-            } else if (targetInputId) {
-                document.getElementById(targetInputId).value = cleanToken;
-                if (targetInputId === 'moveItemLocationBarcode') handleLocationBarcodeLookup(cleanToken);
-                if (targetInputId === 'assignItemBarcode') handleAssignBarcodeLookup(cleanToken);
-            } else { 
-                document.getElementById("globalSearchInput").value = cleanToken; 
-                const typeFilter = document.getElementById("searchTypeFilter"); 
-                if (typeFilter) typeFilter.value = "barcode"; 
-                handleGlobalSearch(cleanToken); 
-            }
+            if (isProcessingUnifiedScan) return; 
+            isProcessingUnifiedScan = true; 
+            executeUnifiedScannerRouting(decodedText.trim(), targetInputId);
         }, 
         () => {}
     ).then(() => {
-        if (typeof applyHardwareZoomToContainer === 'function') applyHardwareZoomToContainer("scannerReaderContainer");
+        // Automatically apply the default zoom setting when the camera boots
+        if (typeof applyDynamicZoom === 'function') applyDynamicZoom(defaultZoom);
     }).catch(err => {
         console.error("Camera Init Error:", err);
     });
 };
 
+// --- DYNAMIC ZOOM (Does NOT overwrite Master Settings) ---
+window.applyDynamicZoom = function(val) {
+    const display = document.getElementById('liveZoomValDisplay');
+    if (display) display.textContent = val + 'x';
+
+    const container = document.getElementById("scannerReaderContainer");
+    if (!container) return;
+    const videoEl = container.querySelector("video");
+    if (videoEl && videoEl.srcObject) {
+        const track = videoEl.srcObject.getVideoTracks()[0];
+        if (track && typeof track.getCapabilities === "function") {
+            const caps = track.getCapabilities();
+            if ("zoom" in caps) {
+                let target = parseFloat(val);
+                if (target < caps.zoom.min) target = caps.zoom.min;
+                if (target > caps.zoom.max) target = caps.zoom.max;
+                track.applyConstraints({ advanced: [{ zoom: target }] }).catch(()=>{});
+            }
+        }
+    }
+};
+
+// --- THE MASTER ROUTER (Handles both Barcode & NFC perfectly) ---
+window.executeUnifiedScannerRouting = function(scannedToken, targetInputId) {
+    const cleanToken = scannedToken.trim();
+    const lowerToken = cleanToken.toLowerCase();
+    closeBarcodeScannerModal();
+
+    console.log("🚨 UNIFIED ROUTER TRIGGERED! Target ID is:", targetInputId, "| Scanned Code:", cleanToken);
+
+    if (targetInputId === 'FAST_RETURN') { 
+        executeFastReturnLookup(cleanToken); 
+
+    } else if (targetInputId === 'FAST_QTY_ADJUST') { 
+        handleQuantityAdjusterLookup(cleanToken); 
+
+    } else if (targetInputId === 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL' || targetInputId === 'EDIT_MODAL_NFC_INTERNAL_TUNNEL') {
+        // Smart Routing: If it has colons, it's an NFC tag. Otherwise, Barcode.
+        if (cleanToken.includes(':')) {
+            editModalActiveNfcTagString = cleanToken;
+        } else {
+            editModalActiveBarcodeString = cleanToken;
+        }
+        updateEditModalHardwareButtonsUI();
+
+    } else if (targetInputId === 'assignItemBarcodeTunnel' || targetInputId === 'assignItemNfcTunnel') {
+        const match = tempLocationsAdmin.find(t => (t.barcode && t.barcode.trim().toLowerCase() === lowerToken) || (t.nfc_tag && t.nfc_tag.trim().toLowerCase() === lowerToken));
+        if (match) { document.getElementById("assignItemSelect").value = match.id; }
+        else { customAlert("No assignee profile found matching that tag.", "Not Found"); }
+
+    } else if (targetInputId === 'itemLocationSelect' || targetInputId === 'addItemLocationTunnel') {
+        const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
+        if (match) { 
+            window.updateLocationDropdownUI("itemLocationSelect", match); 
+        } else { 
+            customAlert("No location folder found matching that tag.", "Not Found"); 
+        }
+
+    } else if (targetInputId === 'editItemLocationSelect') {
+        const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
+        if (match) { window.updateLocationDropdownUI("editItemLocationSelect", match); } 
+        else { customAlert("No location folder found matching that tag.", "Not Found"); }
+
+    } else if (targetInputId) {
+        // Fallback for raw input fields
+        const targetEl = document.getElementById(targetInputId);
+        if (targetEl) targetEl.value = cleanToken;
+
+        if (targetInputId === 'moveItemLocationBarcode') handleLocationBarcodeLookup(cleanToken);
+        if (targetInputId === 'assignItemBarcode') handleAssignBarcodeLookup(cleanToken);
+
+    } else { 
+        document.getElementById("globalSearchInput").value = cleanToken; 
+        const typeFilter = document.getElementById("searchTypeFilter"); 
+        if (typeFilter) typeFilter.value = "barcode"; 
+        handleGlobalSearch(cleanToken); 
+    }
+};
+
 function closeBarcodeScannerModal() { 
     document.getElementById("barcodeScannerModal").style.display = "none"; 
+    
+    // Kill Camera
     if (html5QrcodeScannerInstance) { 
         html5QrcodeScannerInstance.stop().then(() => { 
             html5QrcodeScannerInstance = null; 
             document.getElementById("scannerReaderContainer").innerHTML = ""; 
-            isProcessingScan = false; 
+            isProcessingUnifiedScan = false; 
         }).catch(err => { 
             html5QrcodeScannerInstance = null; 
-            isProcessingScan = false; 
+            isProcessingUnifiedScan = false; 
         }); 
+    }
+    
+    // Kill NFC
+    if (unifiedNfcAbortController) { 
+        unifiedNfcAbortController.abort(); 
+        unifiedNfcAbortController = null; 
     } 
 }
 
-window.openNfcScannerModal = async function(targetInputId = null) {
-    if (!("NDEFReader" in window)) { 
-        await customAlert("NFC scanning requires a secure HTTPS connection.", "Connection Error"); 
-        return; 
-    }
-    
-    window.activeNfcTargetInputId = targetInputId; 
-    document.getElementById("nfcScannerModal").style.display = "flex"; 
-    isProcessingNfcScan = false;
-    
-    try {
-        const ndef = new NDEFReader(); 
-        if (nfcAbortController) nfcAbortController.abort();
-        nfcAbortController = new AbortController();
-        
-        await ndef.scan({ signal: nfcAbortController.signal });
-        
-        ndef.onreading = (event) => {
-            if (isProcessingNfcScan) return;
-            isProcessingNfcScan = true; 
-            const token = event.serialNumber;
-            closeNfcScannerModal();
-            
-            // MASTER ROUTING
-            if (targetInputId === 'FAST_RETURN') { 
-                executeFastReturnLookup(token); 
-            } else if (targetInputId === 'FAST_QTY_ADJUST') { 
-                handleQuantityAdjusterLookup(token); 
-            } else if (targetInputId === 'EDIT_MODAL_NFC_INTERNAL_TUNNEL') {
-                editModalActiveNfcTagString = token;
-                updateEditModalHardwareButtonsUI();
-            } else if (targetInputId === 'assignItemNfcTunnel') {
-                const match = tempLocationsAdmin.find(t => (t.nfc_tag && t.nfc_tag.trim().toLowerCase() === token.toLowerCase()));
-                if (match) { document.getElementById("assignItemSelect").value = match.id; }
-                else { customAlert("No assignee profile found matching that NFC tag.", "Not Found"); }
-            } else if (targetInputId === 'editItemLocationSelect') {
-                const lowerToken = token.toLowerCase();
-                const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
-                if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
-                else { customAlert("No location folder found matching that NFC tag.", "Not Found"); }
-            } else if (targetInputId) {
-                document.getElementById(targetInputId).value = token;
-            } else {
-                document.getElementById("globalSearchInput").value = token; 
-                const typeFilter = document.getElementById("searchTypeFilter"); 
-                if (typeFilter) typeFilter.value = "barcode";
-                handleGlobalSearch(token); 
-            }
-        };
-    } catch (error) { 
-        closeNfcScannerModal(); 
-        await customAlert("NFC Scan failed: " + error.message, "System Error"); 
-    }
-};
+// Dummy close function for legacy NFC buttons that haven't been deleted yet
+window.closeNfcScannerModal = function() { closeBarcodeScannerModal(); };
+window.openNfcScannerModal = function(target) { openBarcodeScannerModal(target); };
 
-function closeNfcScannerModal() { 
-    document.getElementById("nfcScannerModal").style.display = "none"; 
-    if (nfcAbortController) { nfcAbortController.abort(); nfcAbortController = null; } 
-    isProcessingNfcScan = false; 
-}
 
-function closeBarcodeScannerModal() { document.getElementById("barcodeScannerModal").style.display = "none"; if (html5QrcodeScannerInstance) { html5QrcodeScannerInstance.stop().then(() => { html5QrcodeScannerInstance = null; document.getElementById("scannerReaderContainer").innerHTML = ""; isProcessingScan = false; }).catch(err => { html5QrcodeScannerInstance = null; isProcessingScan = false; }); } }
+
 
 function initFabScrollFade() {
     window.addEventListener('scroll', () => {
@@ -3023,999 +3116,7 @@ async function determineActiveTargetLens() {
     }
 }
 
-// 2. ROBUST BARCODE MODAL LAUNCHER
-function openBarcodeScannerModal(targetInputId = null) {
-    // FORCE CLEAR: Ensure no hidden scanner instance is locking the hardware
-    if (html5QrcodeScannerInstance) {
-        try { html5QrcodeScannerInstance.stop(); html5QrcodeScannerInstance.clear(); } catch(e) {}
-    }
-
-    document.getElementById("barcodeScannerModal").style.display = "flex"; 
-    window.activeBarcodeTargetInputId = targetInputId;
-    isProcessingScan = false;
-    
-    // Clear container before init
-    document.getElementById("scannerReaderContainer").innerHTML = "";
-    html5QrcodeScannerInstance = new Html5Qrcode("scannerReaderContainer");
-    
-    // Get the lens configuration
-    determineActiveTargetLens().then(lensConfig => {
-        html5QrcodeScannerInstance.start(
-            lensConfig, 
-            { fps: 10, qrbox: { width: 260, height: 160 }, aspectRatio: 1.333333 },
-            (decodedText) => {
-                if (isProcessingScan) return; 
-                isProcessingScan = true; 
-                
-                // Route the data
-                if (window.activeBarcodeTargetInputId === 'FAST_RETURN') { 
-                    closeBarcodeScannerModal(); executeFastReturnLookup(decodedText); 
-                } else if (window.activeBarcodeTargetInputId === 'FAST_QTY_ADJUST') { 
-                    closeBarcodeScannerModal(); handleQuantityAdjusterLookup(decodedText); 
-                } else if (window.activeBarcodeTargetInputId === 'EDIT_MODAL_BARCODE_INTERNAL_TUNNEL') {
-                    editModalActiveBarcodeString = decodedText;
-                    updateEditModalHardwareButtonsUI();
-                    closeBarcodeScannerModal();
-                } else if (window.activeBarcodeTargetInputId === 'editItemLocationSelect') {
-                    closeBarcodeScannerModal();
-                    const cleanToken = decodedText.trim().toLowerCase();
-                    const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === cleanToken) || (l.nfc && l.nfc.trim().toLowerCase() === cleanToken));
-                    if (match) { document.getElementById("editItemLocationSelect").value = match.id; } 
-                    else { customAlert("No location folder found matching that barcode.", "Not Found"); }
-                } else if (window.activeBarcodeTargetInputId) {
-                    document.getElementById(window.activeBarcodeTargetInputId).value = decodedText;
-                    closeBarcodeScannerModal();
-                } else { 
-                    document.getElementById("globalSearchInput").value = decodedText; 
-                    const typeFilter = document.getElementById("searchTypeFilter"); 
-                    if (typeFilter) typeFilter.value = "barcode"; 
-                    closeBarcodeScannerModal(); 
-                    handleGlobalSearch(decodedText); 
-                }
-            }, 
-            (errorMessage) => { /* Ignore frequent scanning noise */ }
-        ).then(() => {
-            if (typeof applyHardwareZoomToContainer === 'function') {
-                applyHardwareZoomToContainer("scannerReaderContainer");
-            }
-        }).catch(err => {
-            console.error("Scanner failed to start:", err);
-            customAlert("Camera could not start. Ensure you have granted camera permissions.", "Scanner Error");
-        });
-    });
-}
-
-// --- GLOBAL ATOMIC SHARED QUANTITY HANDLERS ---
-function adjustInlineQty(prefix, amount) {
-    const input = document.getElementById(prefix + "InlineQtyInput"); if (!input) return;
-    let val = parseInt(input.value) || 1; val += amount; if (val < 1) val = 1;
-    const max = parseInt(input.getAttribute("max")); if (max && val > max) val = max;
-    input.value = val;
-}
-
-function setupInlineQtyPicker(prefix, itemMatch, onConfirmCallback) {
-    document.getElementById(prefix + "ScannerReader").style.display = "none";
-    const section = document.getElementById(prefix + "QtyPickerSection");
-    const label = document.getElementById(prefix + "QtyMaxLabel");
-    const input = document.getElementById(prefix + "InlineQtyInput");
-    
-    label.innerHTML = `Item: <b>${itemMatch.name}</b><br>Available Warehouse Stock: <b>${itemMatch.quantity}</b>`;
-    input.value = 1; input.setAttribute("max", itemMatch.quantity);
-    section.style.display = "block";
-    
-    const buttons = section.getElementsByTagName("button");
-    const confirmBtn = buttons[buttons.length - 1];
-    
-    confirmBtn.onclick = () => {
-        const chosenQty = parseInt(input.value) || 1;
-        if (chosenQty < 1 || chosenQty > itemMatch.quantity) {
-            alert(`Please specify a valid quantity between 1 and ${itemMatch.quantity}`); return;
-        }
-        section.style.display = "none";
-        document.getElementById(prefix + "ScannerReader").style.display = "flex";
-        onConfirmCallback(chosenQty);
-    };
-}
-
-async function openQuickAssignModal() {
-    document.getElementById('quickActionsStack').classList.remove('open');
-    document.getElementById('fabOverlay').classList.remove('open');
-    document.getElementById("quickAssignModal").style.display = "flex";
-    document.getElementById("qaBatchToggle").checked = false;
-    qaBatchMode = false; qaQueue = [];
-    restartQuickAssignProcess();
-}
-
-function resetQuickAssignUI() {
-    qaCurrentStep = 1; qaIsProcessing = false;
-    document.getElementById("qaTitle").textContent = "Quick Assign: Step 1";
-    document.getElementById("qaInstruction").innerHTML = "Scan <b>Item</b> Barcode or Tap NFC";
-    document.getElementById("qaMainContent").style.display = "block";
-    document.getElementById("qaAssigneesList").style.display = "none";
-    document.getElementById("qaSuccessContent").style.display = "none";
-    document.getElementById("qaCancelContainer").style.display = "block";
-    document.getElementById("qaSplashOverlay").classList.remove("active");
-    document.getElementById("qaQtyPickerSection").style.display = "none";
-    document.getElementById("qaScannerReader").style.display = "flex";
-    toggleQaBatchMode(qaBatchMode);
-}
-
-function closeQuickAssignModal() {
-    document.getElementById("quickAssignModal").style.display = "none";
-    stopQuickAssignScanner(); stopQuickAssignNFC();
-    qaIsProcessing = false;
-}
-
-function toggleQaBatchMode(isChecked) {
-    qaBatchMode = isChecked;
-    const qContainer = document.getElementById("qaBatchQueueContainer");
-    if (qaCurrentStep === 1) {
-        qContainer.style.display = isChecked ? "block" : "none";
-        renderQaQueueUI();
-    }
-}
-
-function clearQaQueue() { qaQueue = []; renderQaQueueUI(); }
-
-function renderQaQueueUI() {
-    document.getElementById("qaQueueCount").textContent = qaQueue.length;
-    const list = document.getElementById("qaQueueList"); list.innerHTML = "";
-    qaQueue.forEach((entry, idx) => {
-        const span = document.createElement("span"); span.className = "tag-pill";
-        span.style.cssText = "background:#e0f2fe; color:#0369a1; border-color:#bae6fd; font-size:11px; display:inline-flex; align-items:center; gap:5px;";
-        span.innerHTML = `${entry.item.name} (${entry.qty}) <b style="color:#ef4444; cursor:pointer;">&times;</b>`;
-        span.querySelector("b").onclick = () => { qaQueue.splice(idx, 1); renderQaQueueUI(); };
-        list.appendChild(span);
-    });
-    document.getElementById("qaProceedBatchBtn").disabled = (qaQueue.length === 0);
-}
-
-function proceedQaToStep2() {
-    if (qaQueue.length === 0) return;
-    qaCurrentStep = 2;
-    document.getElementById("qaTitle").textContent = "Quick Assign: Step 2";
-    document.getElementById("qaInstruction").innerHTML = `Target: <b style='color:#004a99;'>${qaQueue.length} Unique Records Selected</b><br><span style='font-size:13px; color:#64748b;'>Scan Assignee ID or Select Below</span>`;
-    document.getElementById("qaBatchQueueContainer").style.display = "none";
-    document.getElementById("qaAssigneesList").style.display = "block";
-    renderQuickAssignees();
-}
-
-async function startQuickAssignScanner() {
-    if (qaScannerInstance) return;
-    qaScannerInstance = new Html5Qrcode("qaScannerReader");
-    const lensIdConfig = await determineActiveTargetLens();
-
-    qaScannerInstance.start(lensIdConfig, { fps: 10, qrbox: { width: 250, height: 160 } },
-        (txt) => { handleQuickAssignScan(txt); }, (err) => {}
-    ).then(() => {
-        applyHardwareZoomToContainer("qaScannerReader");
-    }).catch(e => console.warn(e));
-}
-function stopQuickAssignScanner() { if (qaScannerInstance) { qaScannerInstance.stop().then(() => { qaScannerInstance.clear(); qaScannerInstance = null; }).catch(() => qaScannerInstance = null); } }
-
-async function startQuickAssignNFC() {
-    if (!('NDEFReader' in window)) return;
-    try {
-        qaNfcAbort = new AbortController(); const ndef = new NDEFReader();
-        await ndef.scan({ signal: qaNfcAbort.signal });
-        ndef.onreading = ev => { if (ev.serialNumber && qaCurrentStep !== 3 && !qaIsProcessing) handleQuickAssignScan(ev.serialNumber); };
-    } catch (e) {}
-}
-function stopQuickAssignNFC() { if (qaNfcAbort) { qaNfcAbort.abort(); qaNfcAbort = null; } }
-
-async function triggerQaSplash(msg, dur = 900) {
-    return new Promise(res => {
-        document.getElementById("qaSplashText").textContent = msg;
-        document.getElementById("qaSplashOverlay").classList.add("active");
-        setTimeout(() => { document.getElementById("qaSplashOverlay").classList.remove("active"); res(); }, dur);
-    });
-}
-
-async function handleQuickAssignScan(text) {
-    if (qaIsProcessing || qaCurrentStep === 3 || !text) return;
-    qaIsProcessing = true; const token = text.trim().toLowerCase();
-    try {
-        if (qaCurrentStep === 1) {
-            const items = await localDB.items.toArray();
-            const match = items.find(i => {
-                const assigned = String(i.assigned_to || '').trim().toLowerCase();
-                if (assigned !== '' && assigned !== 'null' && assigned !== 'undefined') return false;
-                return (i.barcode && i.barcode.trim().toLowerCase() === token) || (i.nfc_tag && i.nfc_tag.trim().toLowerCase() === token);
-            });
-            if (!match) { await customAlert("No warehouse item found matching that asset token.", "Not Found"); qaIsProcessing = false; return; }
-            if (parseInt(match.quantity) <= 0) { await customAlert(`Item <b>[${match.name}]</b> is completely out of stock.`, "Empty Pool"); qaIsProcessing = false; return; }
-
-            const captureRouting = (qty) => {
-                if (qaBatchMode) {
-                    const existingIdx = qaQueue.findIndex(q => q.item.id === match.id);
-                    if (existingIdx > -1) qaQueue[existingIdx].qty = qty;
-                    else qaQueue.push({ item: match, qty: qty });
-                    triggerQaSplash("Item Added!").then(() => { qaIsProcessing = false; renderQaQueueUI(); });
-                } else {
-                    qaQueue = [{ item: match, qty: qty }];
-                    triggerQaSplash("Item Captured!").then(() => { proceedQaToStep2(); qaIsProcessing = false; });
-                }
-            };
-
-            if (match.quantity > 1) {
-                stopQuickAssignScanner(); stopQuickAssignNFC();
-                setupInlineQtyPicker('qa', match, (chosenQty) => {
-                    startQuickAssignScanner(); startQuickAssignNFC(); captureRouting(chosenQty);
-                });
-            } else {
-                captureRouting(1);
-            }
-        } else if (qaCurrentStep === 2) {
-            const assignees = await localDB.temp_locations.toArray();
-            const match = assignees.find(a => (a.barcode && a.barcode.trim().toLowerCase() === token) || (a.nfc_tag && a.nfc_tag.trim().toLowerCase() === token));
-            if (!match) { await customAlert("No assignee found matching that profile code.", "Not Found"); qaIsProcessing = false; return; }
-            await triggerQaSplash("ID Verified!", 700);
-            executeQuickAssignment(match.id, match.name);
-        }
-    } catch (e) { qaIsProcessing = false; }
-}
-
-async function renderQuickAssignees() {
-    const assignees = await localDB.temp_locations.toArray();
-    const grid = document.getElementById("qaAssigneesGrid"); grid.innerHTML = "";
-    assignees.forEach(a => {
-        const btn = document.createElement("button"); btn.className = "qa-assignee-btn"; btn.textContent = a.name;
-        btn.onclick = () => { if (qaCurrentStep === 2 && !qaIsProcessing) executeQuickAssignment(a.id, a.name); };
-        grid.appendChild(btn);
-    });
-}
-
-async function executeQuickAssignment(assigneeId, assigneeName) {
-    if (qaQueue.length === 0 || !assigneeId || qaCurrentStep === 3) return;
-    qaIsProcessing = true; qaCurrentStep = 3;
-    stopQuickAssignScanner(); stopQuickAssignNFC();
-
-    let successCount = 0;
-    for (let entry of qaQueue) {
-        const item = entry.item; const qtyToAssign = entry.qty;
-        const originalQty = parseInt(item.quantity) || 0;
-        const newWarehouseQty = originalQty - qtyToAssign;
-
-        const response = await window.offlineSafeWrite('UPDATE', 'items', { quantity: newWarehouseQty }, item.id);
-        if (response.success) {
-            const allItems = await localDB.items.toArray();
-            
-            const existingAssigneeRow = allItems.find(i => {
-                if (String(i.assigned_to || '') !== String(assigneeId)) return false;
-                if (String(i.location_id || '') !== String(item.location_id || '')) return false;
-                if (i.barcode && item.barcode && i.barcode.trim().toLowerCase() === item.barcode.trim().toLowerCase()) return true;
-                if (i.nfc_tag && item.nfc_tag && i.nfc_tag.trim().toLowerCase() === item.nfc_tag.trim().toLowerCase()) return true;
-                return i.name.trim().toLowerCase() === item.name.trim().toLowerCase();
-            });
-
-            if (existingAssigneeRow) {
-                const currentAssigneeQty = parseInt(existingAssigneeRow.quantity) || 0;
-                await window.offlineSafeWrite('UPDATE', 'items', { quantity: currentAssigneeQty + qtyToAssign }, existingAssigneeRow.id);
-            } else {
-                const newId = crypto.randomUUID();
-                const originalPhotos = item.photos || [];
-
-                const newAssigneeRow = {
-                    ...item, id: newId, quantity: qtyToAssign, assigned_to: assigneeId
-                };
-                
-                const databasePayload = { ...newAssigneeRow };
-                delete databasePayload.photos;
-
-                await localDB.items.put(newAssigneeRow);
-                await localDB.sync_queue.add({ action: 'CREATE', table: 'items', payload: databasePayload, record_id: newId, created_at: new Date().toISOString(), status: 'pending' });
-
-                for (let p of originalPhotos) {
-                    await localDB.sync_queue.add({
-                        action: 'CREATE', table: 'photos', payload: { item_id: newId, file_path: p.file_path, is_primary: p.is_primary }, record_id: null, created_at: new Date().toISOString(), status: 'pending'
-                    });
-                }
-            }
-            successCount++; logAction("CHECKOUT", "Item", item.name, `Assigned ${qtyToAssign} unit(s) to ${assigneeName}`);
-        }
-    }
-
-    if (successCount > 0) {
-        document.getElementById("qaMainContent").style.display = "none";
-        document.getElementById("qaCancelContainer").style.display = "none";
-        document.getElementById("qaSuccessContent").style.display = "block";
-        
-        const textLines = qaQueue.map(e => `• <b>${e.item.name}</b> (${e.qty} units)`).join("<br>");
-        document.getElementById("qaSuccessMessage").innerHTML = `Successfully checked out <b>${successCount} records</b> to <b>${assigneeName}</b>:<br><div style='margin-top:8px; line-height:1.4;'>${textLines}</div>`;
-        await refreshAllDataFromLocal(); window.processSyncQueue();
-    } else {
-        await customAlert("Failed to clear system assignment updates.", "Transaction Error"); qaCurrentStep = 2;
-    }
-    qaIsProcessing = false;
-}
-function restartQuickAssignProcess() { resetQuickAssignUI(); startQuickAssignScanner(); startQuickAssignNFC(); }
-
-
-async function openQuickMoveModal() {
-    document.getElementById('quickActionsStack').classList.remove('open');
-    document.getElementById('fabOverlay').classList.remove('open');
-    document.getElementById("quickMoveModal").style.display = "flex";
-    document.getElementById("qmBatchToggle").checked = false;
-    qmBatchMode = false; qmQueue = [];
-    restartQuickMoveProcess();
-}
-
-function resetQuickMoveUI() {
-    qmCurrentStep = 1; qmIsProcessing = false;
-    document.getElementById("qmTitle").textContent = "Quick Move: Step 1";
-    document.getElementById("qmInstruction").innerHTML = "Scan <b>Item</b> Barcode or Tap NFC";
-    document.getElementById("qmMainContent").style.display = "block";
-    document.getElementById("qmSuccessContent").style.display = "none";
-    document.getElementById("qmCancelContainer").style.display = "block";
-    document.getElementById("qmSplashOverlay").classList.remove("active");
-    document.getElementById("qmQtyPickerSection").style.display = "none";
-    document.getElementById("qmScannerReader").style.display = "flex";
-    toggleQmBatchMode(qmBatchMode);
-}
-
-function closeQuickMoveModal() {
-    document.getElementById("quickMoveModal").style.display = "none";
-    stopQuickMoveScanner(); stopQuickMoveNFC();
-    qmIsProcessing = false;
-}
-
-function toggleQmBatchMode(isChecked) {
-    qmBatchMode = isChecked;
-    const qContainer = document.getElementById("qmBatchQueueContainer");
-    if (qmCurrentStep === 1) {
-        qContainer.style.display = isChecked ? "block" : "none";
-        renderQmQueueUI();
-    }
-}
-
-function clearQmQueue() { qmQueue = []; renderQmQueueUI(); }
-
-function renderQmQueueUI() {
-    document.getElementById("qmQueueCount").textContent = qmQueue.length;
-    const list = document.getElementById("qmQueueList"); list.innerHTML = "";
-    qmQueue.forEach((entry, idx) => {
-        const span = document.createElement("span"); span.className = "tag-pill";
-        span.style.cssText = "background:#e0f2fe; color:#0369a1; border-color:#bae6fd; font-size:11px; display:inline-flex; align-items:center; gap:5px;";
-        span.innerHTML = `${entry.item.name} (${entry.qty}) <b style="color:#ef4444; cursor:pointer;">&times;</b>`;
-        span.querySelector("b").onclick = () => { qmQueue.splice(idx, 1); renderQmQueueUI(); };
-        list.appendChild(span);
-    });
-    document.getElementById("qmProceedBatchBtn").disabled = (qmQueue.length === 0);
-}
-
-function proceedQmToStep2() {
-    if (qmQueue.length === 0) return;
-    qmCurrentStep = 2;
-    document.getElementById("qmTitle").textContent = "Quick Move: Step 2";
-    document.getElementById("qmInstruction").innerHTML = `Target: <b style='color:#004a99;'>${qmQueue.length} Items Selected</b><br><span style='font-size:13px; color:#64748b;'>Scan Destination Bin or Shelf Code</span>`;
-    document.getElementById("qmBatchQueueContainer").style.display = "none";
-}
-
-async function startQuickMoveScanner() {
-    if (qmScannerInstance) return;
-    qmScannerInstance = new Html5Qrcode("qmScannerReader");
-    const lensIdConfig = await determineActiveTargetLens();
-
-    qmScannerInstance.start(lensIdConfig, { fps: 10, qrbox: { width: 250, height: 160 } },
-        (txt) => { handleQuickMoveScan(txt); }, (err) => {}
-    ).then(() => {
-        applyHardwareZoomToContainer("qmScannerReader");
-    }).catch(e => console.warn(e));
-}
-function stopQuickMoveScanner() { if (qmScannerInstance) { qmScannerInstance.stop().then(() => { qmScannerInstance.clear(); qmScannerInstance = null; }).catch(() => qmScannerInstance = null); } }
-
-async function startQuickMoveNFC() {
-    if (!('NDEFReader' in window)) return;
-    try {
-        qmNfcAbort = new AbortController(); const ndef = new NDEFReader();
-        await ndef.scan({ signal: qmNfcAbort.signal });
-        ndef.onreading = ev => { if (ev.serialNumber && qmCurrentStep !== 3 && !qmIsProcessing) handleQuickMoveScan(ev.serialNumber); };
-    } catch (e) {}
-}
-function stopQuickMoveNFC() { if (qmNfcAbort) { qmNfcAbort.abort(); qmNfcAbort = null; } }
-
-async function triggerQmSplash(msg, dur = 900) {
-    return new Promise(res => {
-        document.getElementById("qmSplashText").textContent = msg;
-        document.getElementById("qmSplashOverlay").classList.add("active");
-        setTimeout(() => { document.getElementById("qmSplashOverlay").classList.remove("active"); res(); }, dur);
-    });
-}
-
-async function handleQuickMoveScan(text) {
-    if (qmIsProcessing || qmCurrentStep === 3 || !text) return;
-    qmIsProcessing = true; const token = text.trim().toLowerCase();
-    try {
-        if (qmCurrentStep === 1) {
-            const items = await localDB.items.toArray();
-            const match = items.find(i => {
-                const assigned = String(i.assigned_to || '').trim().toLowerCase();
-                if (assigned !== '' && assigned !== 'null' && assigned !== 'undefined') return false;
-                return (i.barcode && i.barcode.trim().toLowerCase() === token) || (i.nfc_tag && i.nfc_tag.trim().toLowerCase() === token);
-            });
-            if (!match) { await customAlert("No warehouse asset record matches that code pattern.", "Not Found"); qmIsProcessing = false; return; }
-            
-            const totalItemQty = parseInt(match.quantity) || 0;
-
-            if (qmBatchMode) {
-                const existingIdx = qmQueue.findIndex(q => q.item.id === match.id);
-                if (existingIdx > -1) qmQueue[existingIdx].qty = totalItemQty;
-                else qmQueue.push({ item: match, qty: totalItemQty });
-                triggerQmSplash("Item Added!").then(() => { qmIsProcessing = false; renderQmQueueUI(); });
-            } else {
-                qmQueue = [{ item: match, qty: totalItemQty }];
-                triggerQmSplash("Item Captured!").then(() => { proceedQmToStep2(); qmIsProcessing = false; });
-            }
-        } else if (qmCurrentStep === 2) {
-            const locations = await localDB.locations.toArray();
-            const match = locations.find(l => (l.barcode && l.barcode.trim().toLowerCase() === token) || (l.nfc_tag && l.nfc_tag.trim().toLowerCase() === token));
-            if (!match) { await customAlert("No destination location folder found matching that code.", "Not Found"); qmIsProcessing = false; return; }
-            await triggerQmSplash("Location Verified!", 700);
-            executeQuickMoveAssignment(match.id, match.name);
-        }
-    } catch (e) { qmIsProcessing = false; }
-}
-
-async function executeQuickMoveAssignment(destId, destName) {
-    if (qmQueue.length === 0 || !destId || qmCurrentStep === 3) return;
-    qmIsProcessing = true; qmCurrentStep = 3;
-    stopQuickMoveScanner(); stopQuickMoveNFC();
-
-    let successCount = 0;
-    for (let entry of qmQueue) {
-        const item = entry.item; const qtyToMove = entry.qty;
-
-        const allItems = await localDB.items.toArray();
-        
-        const existingDestRow = allItems.find(i => {
-            const assigned = String(i.assigned_to || '').trim().toLowerCase();
-            if (assigned !== '' && assigned !== 'null' && assigned !== 'undefined') return false;
-            if (String(i.location_id || '') !== String(destId)) return false;
-            if (i.barcode && item.barcode && i.barcode.trim().toLowerCase() === item.barcode.trim().toLowerCase()) return true;
-            if (i.nfc_tag && item.nfc_tag && i.nfc_tag.trim().toLowerCase() === item.nfc_tag.trim().toLowerCase()) return true;
-            return i.name.trim().toLowerCase() === item.name.trim().toLowerCase();
-        });
-
-        if (existingDestRow) {
-            const currentDestQty = parseInt(existingDestRow.quantity) || 0;
-            const response = await window.offlineSafeWrite('UPDATE', 'items', { quantity: currentDestQty + qtyToMove }, existingDestRow.id);
-            if (response.success) {
-                await window.offlineSafeWrite('DELETE', 'items', null, item.id);
-                successCount++;
-            }
-        } else {
-            const response = await window.offlineSafeWrite('UPDATE', 'items', { location_id: destId }, item.id);
-            if (response.success) {
-                successCount++;
-            }
-        }
-        logAction("MOVE", "Item", item.name, `Relocated entire block (${qtyToMove} units) to ${destName}`);
-    }
-
-    if (successCount > 0) {
-        document.getElementById("qmMainContent").style.display = "none";
-        document.getElementById("qmCancelContainer").style.display = "none";
-        document.getElementById("qmSuccessContent").style.display = "block";
-        
-        const path = typeof buildLocationPath === 'function' ? buildLocationPath(destId) : destName;
-        const namesBreakdown = qmQueue.map(e => `• ${e.item.name} (${e.qty} units)`).join("<br>");
-        document.getElementById("qmSuccessMessage").innerHTML = `Successfully relocated <b>${successCount} items</b> to:<br><span style="color:#004a99; font-weight:bold; font-size:14px; display:block; margin:6px 0;">📍 ${path}</span><div style='font-size:13px; color:#475569; max-height:80px; overflow-y:auto;'>${namesBreakdown}</div>`;
-        await refreshAllDataFromLocal(); window.processSyncQueue();
-    } else {
-        await customAlert("Failed to complete system relocation records.", "Error"); qmCurrentStep = 2;
-    }
-    qmIsProcessing = false;
-}
-function restartQuickMoveProcess() { resetQuickMoveUI(); startQuickMoveScanner(); startQuickMoveNFC(); }
-
-
-async function openQuickReturnModal() {
-    document.getElementById('quickActionsStack').classList.remove('open');
-    document.getElementById('fabOverlay').classList.remove('open');
-    document.getElementById("quickReturnModal").style.display = "flex";
-    document.getElementById("qrBatchToggle").checked = false;
-    qrBatchMode = false; qrQueue = []; qrIsProcessing = false;
-    
-    document.getElementById("qrMainContent").style.display = "block";
-    document.getElementById("qrCancelContainer").style.display = "block";
-    document.getElementById("qrSplashOverlay").classList.remove("active");
-    document.getElementById("qrAssigneeSelectSection").style.display = "none";
-    document.getElementById("qrQtyPickerSection").style.display = "none";
-    document.getElementById("qrScannerReader").style.display = "flex";
-    
-    toggleQrBatchMode(false); startQuickReturnScanner(); startQuickReturnNFC();
-}
-
-function closeQuickReturnModal() {
-    document.getElementById("quickReturnModal").style.display = "none";
-    stopQuickReturnScanner(); stopQuickReturnNFC();
-    qrIsProcessing = false;
-}
-
-function toggleQrBatchMode(isChecked) {
-    qrBatchMode = isChecked;
-    const qContainer = document.getElementById("qrBatchQueueContainer");
-    qContainer.style.display = isChecked ? "block" : "none";
-    renderQrQueueUI();
-}
-
-function clearQrQueue() { qrQueue = []; renderQrQueueUI(); }
-
-function renderQrQueueUI() {
-    document.getElementById("qrQueueCount").textContent = qrQueue.length;
-    const list = document.getElementById("qrQueueList"); list.innerHTML = "";
-    qrQueue.forEach((entry, idx) => {
-        const span = document.createElement("span"); span.className = "tag-pill";
-        span.style.cssText = "background:#fee2e2; color:#991b1b; border-color:#fecaca; font-size:11px; display:inline-flex; align-items:center; gap:5px;";
-        span.innerHTML = `${entry.loanItem.name} (${entry.qty}) <b style="color:#ef4444; cursor:pointer;">&times;</b>`;
-        span.querySelector("b").onclick = () => { qrQueue.splice(idx, 1); renderQrQueueUI(); };
-        list.appendChild(span);
-    });
-    document.getElementById("qrProceedBatchBtn").disabled = (qrQueue.length === 0);
-}
-
-async function startQuickReturnScanner() {
-    if (qrScannerInstance) return;
-    qrScannerInstance = new Html5Qrcode("qrScannerReader");
-    const lensIdConfig = await determineActiveTargetLens();
-
-    qrScannerInstance.start(lensIdConfig, { fps: 10, qrbox: { width: 250, height: 160 } },
-        (txt) => { handleQuickReturnScan(txt); }, (err) => {}
-    ).then(() => {
-        applyHardwareZoomToContainer("qrScannerReader");
-    }).catch(e => console.warn(e));
-}
-function stopQuickReturnScanner() { if (qrScannerInstance) { qrScannerInstance.stop().then(() => { qrScannerInstance.clear(); qrScannerInstance = null; }).catch(() => qrScannerInstance = null); } }
-
-async function startQuickReturnNFC() {
-    if (!('NDEFReader' in window)) return;
-    try {
-        qrNfcAbort = new AbortController(); const ndef = new NDEFReader();
-        await ndef.scan({ signal: qrNfcAbort.signal });
-        ndef.onreading = ev => { if (ev.serialNumber && !qrIsProcessing) handleQuickReturnScan(ev.serialNumber); };
-    } catch (e) {}
-}
-function stopQuickReturnNFC() { if (qrNfcAbort) { qrNfcAbort.abort(); qrNfcAbort = null; } }
-
-async function triggerQrSplash(msg, dur = 900) {
-    return new Promise(res => {
-        document.getElementById("qrSplashText").textContent = msg;
-        document.getElementById("qrSplashOverlay").classList.add("active");
-        setTimeout(() => { document.getElementById("qrSplashOverlay").classList.remove("active"); res(); }, dur);
-    });
-}
-
-async function handleQuickReturnScan(text) {
-    if (qrIsProcessing || !text) return; qrIsProcessing = true;
-    const token = text.trim().toLowerCase();
-    try {
-        const allItems = await localDB.items.toArray();
-        const matchingLoans = allItems.filter(i => {
-            const assigned = String(i.assigned_to || '').trim().toLowerCase();
-            if (assigned === '' || assigned === 'null' || assigned === 'undefined') return false;
-            return (i.barcode && i.barcode.trim().toLowerCase() === token) || (i.nfc_tag && i.nfc_tag.trim().toLowerCase() === token);
-        });
-        
-        if (matchingLoans.length === 0) {
-            await customAlert("This asset category is already logged as in-stock within the warehouse.", "Scan Aborted");
-            qrIsProcessing = false; return;
-        }
-
-        stopQuickReturnScanner(); stopQuickReturnNFC();
-
-        if (matchingLoans.length === 1) {
-            processSelectedReturnLoan(matchingLoans[0]);
-        } else {
-            document.getElementById("qrScannerReader").style.display = "none";
-            const panel = document.getElementById("qrAssigneeSelectSection");
-            const grid = document.getElementById("qrAssigneeListGrid"); grid.innerHTML = "";
-            panel.style.display = "block";
-
-            const assignees = await localDB.temp_locations.toArray();
-            matchingLoans.forEach(loanItem => {
-                const assignee = assignees.find(a => a.id === loanItem.assigned_to);
-                const name = assignee ? assignee.name : "Unknown Assignee";
-                
-                const btn = document.createElement("button"); btn.className = "qa-assignee-btn";
-                btn.style.cssText = "text-align: left; padding: 12px; display: flex; justify-content: space-between; align-items: center; width:100%; border: 1px solid #ffedd5;";
-                btn.innerHTML = `<span>👤 <b>${name}</b></span> <span class='tag-pill' style='background:#ff8c00; color:white; margin:0;'>Out: ${loanItem.quantity}</span>`;
-                
-                btn.onclick = () => {
-                    panel.style.display = "none"; document.getElementById("qrScannerReader").style.display = "flex";
-                    processSelectedReturnLoan(loanItem);
-                };
-                grid.appendChild(btn);
-            });
-        }
-    } catch (e) { qrIsProcessing = false; startQuickReturnScanner(); startQuickReturnNFC(); }
-}
-
-async function processSelectedReturnLoan(loanItem) {
-    const routingHandler = (chosenQty) => {
-        if (qrBatchMode) {
-            const existingIdx = qrQueue.findIndex(q => q.loanItem.id === loanItem.id);
-            if (existingIdx > -1) qrQueue[existingIdx].qty = chosenQty;
-            else qrQueue.push({ loanItem: loanItem, qty: chosenQty });
-            triggerQrSplash("Item Added!").then(() => {
-                startQuickReturnScanner(); startQuickReturnNFC(); renderQrQueueUI(); qrIsProcessing = false;
-            });
-        } else {
-            qrQueue = [{ loanItem: loanItem, qty: chosenQty }];
-            executeBatchReturn();
-        }
-    };
-
-    if (parseInt(loanItem.quantity) > 1) {
-        document.getElementById("qrScannerReader").style.display = "none";
-        const section = document.getElementById("qrQtyPickerSection");
-        const label = document.getElementById("qrQtyMaxLabel");
-        const input = document.getElementById("qrInlineQtyInput");
-        
-        label.innerHTML = `Item: <b>${loanItem.name}</b><br>Active Accountable Loan Balance: <b>${loanItem.quantity}</b>`;
-        input.value = 1; input.setAttribute("max", loanItem.quantity);
-        section.style.display = "block";
-        
-        const buttons = section.getElementsByTagName("button");
-        const confirmBtn = buttons[buttons.length - 1];
-
-        confirmBtn.onclick = () => {
-            const chosenQty = parseInt(input.value) || 1;
-            if (chosenQty < 1 || chosenQty > loanItem.quantity) { alert("Invalid quantity range."); return; }
-            section.style.display = "none"; document.getElementById("qrScannerReader").style.display = "flex";
-            routingHandler(chosenQty);
-        };
-    } else {
-        routingHandler(1);
-    }
-}
-
-async function executeBatchReturn() {
-    if (qrQueue.length === 0) return;
-    qrIsProcessing = true;
-    stopQuickReturnScanner(); stopQuickReturnNFC();
-
-    let textBreakdown = ""; let processedCount = 0;
-    for (let entry of qrQueue) {
-        const loanItem = entry.loanItem; const qtyToReturn = entry.qty;
-        const currentLoanQty = parseInt(loanItem.quantity) || 0;
-        const newLoanQty = currentLoanQty - qtyToReturn;
-
-        if (newLoanQty <= 0) {
-            await window.offlineSafeWrite('DELETE', 'items', null, loanItem.id);
-        } else {
-            await window.offlineSafeWrite('UPDATE', 'items', { quantity: newLoanQty }, loanItem.id);
-        }
-
-        const allItems = await localDB.items.toArray();
-        
-        const warehouseRow = allItems.find(i => {
-            const assigned = String(i.assigned_to || '').trim().toLowerCase();
-            if (assigned !== '' && assigned !== 'null' && assigned !== 'undefined') return false;
-            if (String(i.location_id || '') !== String(loanItem.location_id || '')) return false;
-            if (i.barcode && loanItem.barcode && i.barcode.trim().toLowerCase() === loanItem.barcode.trim().toLowerCase()) return true;
-            if (i.nfc_tag && loanItem.nfc_tag && i.nfc_tag.trim().toLowerCase() === loanItem.nfc_tag.trim().toLowerCase()) return true;
-            return i.name.trim().toLowerCase() === loanItem.name.trim().toLowerCase();
-        });
-
-        if (warehouseRow) {
-            const currentWhQty = parseInt(warehouseRow.quantity) || 0;
-            await window.offlineSafeWrite('UPDATE', 'items', { quantity: currentWhQty + qtyToReturn }, warehouseRow.id);
-        } else {
-            const newId = crypto.randomUUID();
-            const restoredRow = {
-                ...loanItem, id: newId, quantity: qtyToReturn, assigned_to: null
-            };
-            delete restoredRow.photos; 
-            
-            await localDB.items.put(restoredRow);
-            await localDB.sync_queue.add({ action: 'CREATE', table: 'items', payload: restoredRow, record_id: newId, created_at: new Date().toISOString(), status: 'pending' });
-        }
-        processedCount++;
-        const locPath = loanItem.location_id ? buildLocationPath(loanItem.location_id) : "Unallocated Items";
-        textBreakdown += `• <b>${loanItem.name}</b> (${qtyToReturn} units) ➔ Return to: <span style='color:#004a99; font-weight:600;'>${locPath}</span><br>`;
-    }
-
-    if (processedCount > 0) {
-        closeQuickReturnModal();
-        const alertHtml = `🎉 Success! Logged check-in for <b>${processedCount} asset(s)</b> back into stock.<br><br><b>📍 STORAGE RE-ALLOCATION MATRIX:</b><br><div style='text-align:left; font-size:13px; margin-top:8px; line-height:1.5; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; max-height:150px; overflow-y:auto;'>${textBreakdown}</div>`;
-        await customAlert(alertHtml, "Batch Processing Complete");
-        await refreshAllDataFromLocal(); window.processSyncQueue();
-    } else {
-        await customAlert("Transaction error compilation failure.", "Write Error");
-    }
-    qrIsProcessing = false;
-}
-
-/* =========================================================
-   ASSIGNEE STOCK CONSUMPTION & DEPLOYMENT MANAGEMENT ENGINE
-========================================================= */
-
-let isStockUsageModeActive = false;
-let stockUsageChangesMap = {}; // Maps itemId -> { originalQty, currentQty }
-
-if (typeof window.loadTempLocationDetails === "function") {
-    const originalLoadTempLocationDetails = window.loadTempLocationDetails;
-    window.loadTempLocationDetails = async function(tempLocId) {
-        currentTempLocationId = tempLocId;
-        isStockUsageModeActive = false;
-        stockUsageChangesMap = {};
-        updateStockUsageToolbarButtons();
-        await renderTempLocationItems(tempLocId);
-    };
-} else {
-    window.loadTempLocationDetails = async function(tempLocId) {
-        currentTempLocationId = tempLocId;
-        isStockUsageModeActive = false;
-        stockUsageChangesMap = {};
-        updateStockUsageToolbarButtons();
-        await renderTempLocationItems(tempLocId);
-    };
-}
-
-async function renderTempLocationItems(tempLocId) {
-    currentTempLocationId = tempLocId;
-    const tempLocs = await localDB.temp_locations.toArray();
-    const activeLoc = tempLocs.find(t => String(t.id) === String(tempLocId));
-    if (!activeLoc) return;
-    
-    const toolbar = document.getElementById("tempLocationItemActionsToolbar");
-    if (toolbar) {
-        toolbar.style.display = "flex";
-    }
-    
-    const items = await localDB.items.toArray();
-    const assigneeItems = items.filter(i => String(i.assigned_to) === String(tempLocId));
-    
-    const grid = document.getElementById("tempLocationItemsGrid");
-    if (!grid) return;
-    grid.innerHTML = "";
-    grid.style.display = "grid";
-    
-    const mainTiles = document.getElementById("tempLocationTilesAdmin");
-    if (mainTiles) mainTiles.style.display = "none";
-    
-    const breadcrumb = document.getElementById("breadcrumbTempLocations");
-    if (breadcrumb) {
-        breadcrumb.innerHTML = `<span class="breadcrumb-link" onclick="resetTempLocationView()" style="cursor:pointer; color:#004a99; text-decoration:underline; font-weight:normal;">Assigned Log</span> ➔ <b>${activeLoc.name}</b>`;
-    }
-    
-    if (assigneeItems.length === 0) {
-        grid.innerHTML = `<div style="grid-column:1/-1; padding:40px; text-align:center; color:#64748b; font-size:15px; font-style:italic; background:#f8fafc; border-radius:12px; border:2px dashed #cbd5e1;">👤 This assignee profile currently holds no stock allocations.</div>`;
-        if (toolbar) toolbar.style.display = "none";
-        return;
-    }
-    
-    assigneeItems.forEach(item => {
-        const card = document.createElement("div");
-        card.className = "item-card";
-        let isItemEquipment = (String(item.quantity).trim() === "-");
-        
-        if (!stockUsageChangesMap[item.id]) {
-            stockUsageChangesMap[item.id] = { originalQty: isItemEquipment ? "-" : (parseInt(item.quantity) || 0), currentQty: isItemEquipment ? "-" : (parseInt(item.quantity) || 0) };
-        }
-        const state = stockUsageChangesMap[item.id];
-        
-        let interactiveControlsHtml = `<div class="item-card-qty-badge" style="background:#10b981;">Qty: ${state.currentQty}</div>`;
-        if (isItemEquipment) {
-            interactiveControlsHtml = `<div class="item-card-qty-badge" style="background:#8b5cf6; font-weight:bold;">Equipment</div>`;
-        }
-        
-        if (isStockUsageModeActive) {
-            if (isItemEquipment) {
-                interactiveControlsHtml = `
-                    <div style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; background: #fee2e2; padding: 6px 12px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 20; border: 1px solid #fca5a5; font-size:11px; font-weight:bold; color:#991b1b; white-space:nowrap; pointer-events:none;">
-                        🛠️ Tool: Qty Locked
-                    </div>
-                    <div class="item-card-qty-badge" style="background: #8b5cf6; top: 10px; right: 10px; left: auto;">Equipment</div>
-                `;
-            } else {
-                const showPlusBtn = state.currentQty < state.originalQty;
-                interactiveControlsHtml = `
-                    <div style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: white; padding: 6px 12px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 20; border: 1px solid #cbd5e1;">
-                        <button onclick="stepAssigneeItemQty('${item.id}', -1); event.stopPropagation();" style="width: 26px; height: 26px; border-radius: 50%; font-size: 16px; font-weight: bold; border: none; background: #fee2e2; color: #ef4444; cursor: pointer; display:flex; align-items:center; justify-content:center; padding:0;">-</button>
-                        <span style="font-weight: bold; font-size: 16px; color: #0f172a; min-width: 18px; text-align: center;">${state.currentQty}</span>
-                        <button onclick="stepAssigneeItemQty('${item.id}', 1); event.stopPropagation();" style="width: 26px; height: 26px; border-radius: 50%; font-size: 14px; font-weight: bold; border: none; background: #dbeafe; color: #2563eb; cursor: pointer; display:flex; align-items:center; justify-content:center; padding:0; visibility: ${showPlusBtn ? 'visible' : 'hidden'};">+</button>
-                    </div>
-                    <div class="item-card-qty-badge" style="background: #334155; top: 10px; right: 10px; left: auto;">Max: ${state.originalQty}</div>
-                `;
-            }
-        }
-
-        let imgUrl = "../assets/images/no-image.jpg";
-        if (item.photos?.length) {
-            const defP = item.photos.find(p => p.is_primary) || item.photos[0];
-            imgUrl = window.db.storage.from("item-photos").getPublicUrl(defP.file_path).data.publicUrl;
-        }
-        
-        let opacityStyle = "";
-        let bannerHtml = "";
-        if (isStockUsageModeActive && !isItemEquipment && state.currentQty === 0) {
-            opacityStyle = "filter: grayscale(90%) opacity(0.5);";
-            bannerHtml = `<div class="assigned-overlay" style="background: rgba(239, 68, 68, 0.85); border-radius: 12px;"><div class="assigned-icon" style="font-size:20px;">📉</div><div class="assigned-label" style="color: white; font-weight: bold;">Fully Used</div></div>`;
-        } else if (isStockUsageModeActive && !isItemEquipment && state.currentQty < state.originalQty) {
-            bannerHtml = `<div class="assigned-overlay" style="background: rgba(37, 99, 235, 0.25); border-radius: 12px;"><div class="assigned-label" style="color: white; font-weight: bold; background: #2563eb; padding: 2px 8px; border-radius: 4px; font-size:11px;">Reduced (-${state.originalQty - state.currentQty})</div></div>`;
-        }
-        
-        card.innerHTML = `
-            <div class="item-card-photo-wrapper" style="${opacityStyle}">
-                ${bannerHtml}
-                <img src="${imgUrl}">
-            </div>
-            ${interactiveControlsHtml}
-            <div class="item-card-name" style="margin-bottom: 8px;">${item.name}</div>
-        `;
-        
-        card.onclick = () => { if(!isStockUsageModeActive) openItemDetails(item); };
-        grid.appendChild(card);
-    });
-}
-
-window.stepAssigneeItemQty = function(itemId, amount) {
-    const state = stockUsageChangesMap[itemId];
-    if (!state) return;
-    let targetValue = state.currentQty + amount;
-    if (targetValue >= 0 && targetValue <= state.originalQty) {
-        state.currentQty = targetValue;
-        updateStockUsageToolbarButtons();
-        renderTempLocationItems(currentTempLocationId);
-    }
-};
-
-window.toggleStockUsageMode = function() {
-    isStockUsageModeActive = !isStockUsageModeActive;
-    if (!isStockUsageModeActive) {
-        for (let id in stockUsageChangesMap) {
-            stockUsageChangesMap[id].currentQty = stockUsageChangesMap[id].originalQty;
-        }
-    }
-    updateStockUsageToolbarButtons();
-    renderTempLocationItems(currentTempLocationId);
-};
-
-function updateStockUsageToolbarButtons() {
-    const modeBtn = document.getElementById("btnToggleStockUsageMode");
-    const cancelBtn = document.getElementById("btnCancelStockUsage");
-    const confirmBtn = document.getElementById("btnConfirmStockUsage");
-    if (!modeBtn) return;
-    
-    if (isStockUsageModeActive) {
-        modeBtn.textContent = "🛡️ Close Usage Mode";
-        modeBtn.style.background = "#475569";
-        modeBtn.style.borderColor = "#475569";
-        modeBtn.style.color = "white";
-    } else {
-        modeBtn.textContent = "🛠️ Use Stock Mode";
-        modeBtn.style.background = "transparent";
-        modeBtn.style.borderColor = "#ef4444";
-        modeBtn.style.color = "#ef4444";
-    }
-    
-    let alterationsDetected = false;
-    for (let id in stockUsageChangesMap) {
-        if (stockUsageChangesMap[id].currentQty !== stockUsageChangesMap[id].originalQty) {
-            alterationsDetected = true;
-            break;
-        }
-    }
-    
-    if (alterationsDetected) {
-        if (cancelBtn) cancelBtn.style.display = "inline-block";
-        if (confirmBtn) confirmBtn.style.display = "inline-block";
-    } else {
-        if (cancelBtn) cancelBtn.style.display = "none";
-        if (confirmBtn) confirmBtn.style.display = "none";
-    }
-}
-
-window.cancelStockUsageChanges = function() {
-    isStockUsageModeActive = false;
-    stockUsageChangesMap = {};
-    updateStockUsageToolbarButtons();
-    renderTempLocationItems(currentTempLocationId);
-};
-
-window.confirmStockUsageChanges = async function() {
-    let processedRecordsCount = 0;
-    const items = await localDB.items.toArray();
-    const tempLocs = await localDB.temp_locations.toArray();
-    const activeLoc = tempLocs.find(t => String(t.id) === String(currentTempLocationId));
-    const locationLabelName = activeLoc ? activeLoc.name : "Assignee Profile";
-
-    for (let id in stockUsageChangesMap) {
-        const state = stockUsageChangesMap[id];
-        if (state.currentQty !== state.originalQty) {
-            const itemRecord = items.find(i => String(i.id) === String(id));
-            if (!itemRecord) continue;
-            
-            const totalUnitsUsed = state.originalQty - state.currentQty;
-            
-            if (state.currentQty === 0) {
-                await window.offlineSafeWrite('DELETE', 'items', null, itemRecord.id);
-            } else {
-                await window.offlineSafeWrite('UPDATE', 'items', { quantity: state.currentQty }, itemRecord.id);
-            }
-            
-            logAction("UPDATE", "Item", itemRecord.name, `Stock Deployment: ${totalUnitsUsed} unit(s) consumed/used from [${locationLabelName}] inventory allocation portfolio. New Balance: ${state.currentQty}`);
-            processedRecordsCount++;
-        }
-    }
-    
-    if (processedRecordsCount > 0) {
-        isStockUsageModeActive = false;
-        stockUsageChangesMap = {};
-        updateStockUsageToolbarButtons();
-        
-        await refreshAllDataFromLocal();
-        window.processSyncQueue();
-        
-        await renderTempLocationItems(currentTempLocationId);
-    }
-};
-
-window.resetTempLocationView = function() {
-    isStockUsageModeActive = false;
-    stockUsageChangesMap = {};
-    
-    const toolbar = document.getElementById("tempLocationItemActionsToolbar");
-    if (toolbar) toolbar.style.display = "none";
-    
-    const grid = document.getElementById("tempLocationItemsGrid");
-    if (grid) { grid.innerHTML = ""; grid.style.display = "none"; }
-    
-    const mainTiles = document.getElementById("tempLocationTilesAdmin");
-    if (mainTiles) mainTiles.style.display = "grid";
-    
-    const breadcrumb = document.getElementById("breadcrumbTempLocations");
-    if (breadcrumb) breadcrumb.innerHTML = `<span class="breadcrumb-link active">Assigned Log</span>`;
-    
-    currentTempLocationId = null;
-};
-
-// --- NEW OPERATIONAL ROUTINES MATCHING CUSTOM FORM WIREFRAMES ---
-
-function adjustEditModalQty(amount) {
-    const isEquipment = document.getElementById("editItemIsEquipment").checked;
-    if (isEquipment) return;
-    
-    const input = document.getElementById("editItemQuantity");
-    let currentVal = parseInt(input.value) || 0;
-    let targetVal = currentVal + amount;
-    if (targetVal < 0) targetVal = 0;
-    input.value = targetVal;
-}
-
-function handleEquipmentCheckboxToggle(isChecked) {
-    const qtyWrapper = document.getElementById("editItemQtyWrapper");
-    const qtyInput = document.getElementById("editItemQuantity");
-    
-    if (isChecked) {
-        if (qtyWrapper) {
-            qtyWrapper.style.opacity = "0.35";
-            qtyWrapper.style.filter = "grayscale(100%)";
-            qtyWrapper.style.pointerEvents = "none";
-        }
-        if (qtyInput) {
-            qtyInput.value = "-";
-            qtyInput.disabled = true;
-            qtyInput.style.background = "#e2e8f0";
-        }
-    } else {
-        if (qtyWrapper) {
-            qtyWrapper.style.opacity = "1";
-            qtyWrapper.style.filter = "none";
-            qtyWrapper.style.pointerEvents = "auto";
-        }
-        if (qtyInput) {
-            qtyInput.value = "1";
-            qtyInput.disabled = false;
-            qtyInput.style.background = "#ffffff";
-        }
-    }
-}
-
-// Safely requests permission before overriding barcode data indices
-window.triggerEditModalBarcodeScan = async function() {
-    // --- 1. OVERRIDE SEARCH FOR INSTANT LOCATION NAVIGATION ---
+// --- 1. OVERRIDE SEARCH FOR INSTANT LOCATION NAVIGATION ---
 if (typeof handleGlobalSearch === "function" && !window.searchInterceptApplied) {
     window.searchInterceptApplied = true;
     const originalGlobalSearch = handleGlobalSearch;
@@ -4023,12 +3124,11 @@ if (typeof handleGlobalSearch === "function" && !window.searchInterceptApplied) 
         const filterType = document.getElementById("searchTypeFilter")?.value || "all";
         const lowerTerm = term.toLowerCase().trim();
         
-        // Intercept: If the search term is an exact match for a Location Barcode/NFC, navigate directly to that folder
         if (lowerTerm && filterType !== "tag" && filterType !== "category") {
             const locMatch = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerTerm) || (l.nfc && l.nfc.trim().toLowerCase() === lowerTerm));
             if (locMatch) {
                 document.getElementById('globalSearchInput').value = '';
-                navigateToLocation(locMatch.id); // Inherently builds and displays the breadcrumb!
+                navigateToLocation(locMatch.id); 
                 return; 
             }
         }
@@ -4076,114 +3176,14 @@ window.triggerEditModalNfcClearanceRequest = async function() {
             updateEditModalHardwareButtonsUI();
         }
     } else {
-        // Force the scanner modal open specifically for this tunnel
         window.openNfcScannerModal('EDIT_MODAL_NFC_INTERNAL_TUNNEL');
     }
 };
 
-async function switchToItemEdit() {
-    if (!currentItemForActions) return;
-    closeModal('itemDetailsModal');
-    const item = currentItemForActions;
-
-    try {
-        if (document.getElementById("editItemName")) document.getElementById("editItemName").value = item.name || "";
-        if (document.getElementById("editItemDescription")) document.getElementById("editItemDescription").value = item.description || "";
-        if (document.getElementById("editItemCategory")) document.getElementById("editItemCategory").value = item.category || "tools";
-        if (document.getElementById("editItemLocationSelect")) document.getElementById("editItemLocationSelect").value = item.location_id || "";
-
-        editModalActiveBarcodeString = item.barcode || "";
-        editModalActiveNfcTagString = item.nfc_tag || "";
-        updateEditModalHardwareButtonsUI();
-
-        const isEquipment = (String(item.quantity).trim() === "-");
-        const checkbox = document.getElementById("editItemIsEquipment");
-        if (checkbox) {
-            checkbox.checked = isEquipment;
-            handleEquipmentCheckboxToggle(isEquipment);
-        }
-        
-        if (!isEquipment) {
-            document.getElementById("editItemQuantity").value = item.quantity || 0;
-        }
-
-        let parsedTags = [];
-        if (Array.isArray(item.tags)) { parsedTags = [...item.tags]; } 
-        else if (typeof item.tags === 'string' && item.tags.trim()) { parsedTags = item.tags.split(',').map(t => t.trim()); }
-        activeSelectedEditTags = parsedTags;
-        renderActiveTagPills('edit');
-
-        currentEditItemFiles = []; existingItemPhotosToDelete = []; primaryPhotoIdentifier = null;
-        const photos = item.photos || [];
-        const existingPrimary = photos.find(p => p.is_primary);
-        primaryPhotoIdentifier = existingPrimary ? existingPrimary.file_path : (photos.length > 0 ? photos[0].file_path : null);
-        
-        renderMultipleFilesPreviews('editItemPreviewsRow', currentEditItemFiles, 'edit-item', photos);
-        document.getElementById("itemEditModal").style.display = "flex";
-
-        // NEW: Auto-start silent NFC background listener
-        if ("NDEFReader" in window) {
-            try {
-                if (nfcAbortController) nfcAbortController.abort();
-                nfcAbortController = new AbortController();
-                const ndef = new NDEFReader();
-                await ndef.scan({ signal: nfcAbortController.signal });
-                ndef.onreading = async (event) => {
-                    if (editModalActiveNfcTagString.trim() !== "") {
-                        await customAlert("An NFC tag is already assigned to this item. Please delete the old tag first by clicking the 'NFC Assigned' button.", "Tag Exists");
-                        return;
-                    }
-                    editModalActiveNfcTagString = event.serialNumber;
-                    updateEditModalHardwareButtonsUI();
-                };
-            } catch(e) { console.log("Background NFC unavailable:", e); }
-        }
-        
-    } catch (error) {
-        console.error("Critical Error opening edit modal:", error);
-    }
-}
-
-// Synchronize button layouts, text options, and colors dynamically based on variable values
-function updateEditModalHardwareButtonsUI() {
-    const barBtn = document.getElementById("btnEditModalBarcodeAction");
-    const nfcBtn = document.getElementById("btnEditModalNfcAction");
-    
-    if (barBtn) {
-        if (editModalActiveBarcodeString.trim() !== "") {
-            barBtn.textContent = `📷 ${editModalActiveBarcodeString}`;
-            barBtn.style.background = "#e0f2fe";
-            barBtn.style.color = "#0369a1";
-            barBtn.style.borderColor = "#7dd3fc";
-        } else {
-            barBtn.textContent = "📷 No Barcode Found";
-            barBtn.style.background = "#f8fafc";
-            barBtn.style.color = "#1e293b";
-            barBtn.style.borderColor = "#cbd5e1";
-        }
-    }
-    
-    if (nfcBtn) {
-        if (editModalActiveNfcTagString.trim() !== "") {
-            nfcBtn.textContent = "📡 NFC Tag Assigned";
-            nfcBtn.style.background = "#dcfce7";
-            nfcBtn.style.color = "#15803d";
-            nfcBtn.style.borderColor = "#86efac";
-        } else {
-            nfcBtn.textContent = "📡 NFC Ready (Tap)";
-            nfcBtn.style.background = "#f8fafc";
-            nfcBtn.style.color = "#1e293b";
-            nfcBtn.style.borderColor = "#cbd5e1";
-        }
-    }
-}
-}
-
-
 /* =========================================================
    DYNAMIC UNIFIED FILTER SURFACE MENU
 ========================================================= */
-window.toggleFilterToolbar = function() {
+function toggleFilterToolbar() {
     const panel = document.getElementById("mobileFilterPanel");
     if (!panel) return;
     
@@ -4196,9 +3196,8 @@ window.toggleFilterToolbar = function() {
             if (!panel.classList.contains("visible")) panel.style.display = "none";
         }, 260); 
     }
-};
+}
 
-// Auto-close if clicking outside the panel
 document.addEventListener('click', function(event) {
     const panel = document.getElementById("mobileFilterPanel");
     if (!panel || !panel.classList.contains("visible")) return;
@@ -4206,41 +3205,30 @@ document.addEventListener('click', function(event) {
     const clickedInside = panel.contains(event.target);
     const clickedToggleBtn = event.target.closest('[onclick*="toggleFilterToolbar"]') || event.target.textContent.includes('👁️');
     
-    if (!clickedInside && !clickedToggleBtn) {
-        window.toggleFilterToolbar();
-    }
+    if (!clickedInside && !clickedToggleBtn) toggleFilterToolbar();
 });
+
 /* =========================================================
-   CUSTOM ROUNDED DROPDOWN LOGIC (REPLACES NATIVE SELECTS)
+   CUSTOM ROUNDED DROPDOWN LOGIC
 ========================================================= */
-window.toggleCustomSelect = function(triggerElement) {
-    // Close any other open custom dropdowns first
+function toggleCustomSelect(triggerElement) {
     document.querySelectorAll('.custom-select-options').forEach(ul => {
         if (ul !== triggerElement.nextElementSibling) ul.classList.remove('open');
     });
-    // Toggle the clicked one
     triggerElement.nextElementSibling.classList.toggle('open');
-};
+}
 
-window.handleCustomSelect = function(liElement, functionName, value) {
+function handleCustomSelect(liElement, functionName, value) {
     const trigger = liElement.parentElement.previousElementSibling;
     const textSpan = trigger.querySelector('.trigger-text');
     
-    // Safely update the text while preserving the down arrow
-    if (textSpan) {
-        textSpan.textContent = liElement.textContent;
-    } else {
-        trigger.innerHTML = `<span class="trigger-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${liElement.textContent}</span> <span class="caret" style="font-size:9px; color:#94a3b8; margin-left:2px;">▼</span>`;
-    }
+    if (textSpan) textSpan.textContent = liElement.textContent;
+    else trigger.innerHTML = `<span class="trigger-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${liElement.textContent}</span> <span class="caret" style="font-size:9px; color:#94a3b8; margin-left:2px;">▼</span>`;
     
-    // Manage visual selection styling
     Array.from(liElement.parentElement.children).forEach(sibling => sibling.classList.remove('selected'));
     liElement.classList.add('selected');
-
-    // Close the dropdown list
     liElement.parentElement.classList.remove('open');
 
-    // Route the logic back to your original App functions
     if (functionName === 'changeItemsView') {
         changeItemsView(value);
         if(typeof changeLocationsView === 'function') changeLocationsView(value);
@@ -4251,9 +3239,73 @@ window.handleCustomSelect = function(liElement, functionName, value) {
         changeSortOrder(value);
         if(typeof changeSortOrderLocations === 'function') changeSortOrderLocations(value);
     }
+}
+
+function updateCustomSelectUI(functionName, value) {
+    const options = document.querySelectorAll(`li[onclick*="${functionName}"]`);
+    options.forEach(li => {
+        if (li.getAttribute('onclick').includes(`'${value}'`) || li.getAttribute('onclick').includes(`"${value}"`)) {
+            const trigger = li.parentElement.previousElementSibling;
+            if (trigger) {
+                const textSpan = trigger.querySelector('.trigger-text');
+                if (textSpan) textSpan.textContent = li.textContent;
+            }
+            Array.from(li.parentElement.children).forEach(sibling => sibling.classList.remove('selected'));
+            li.classList.add('selected');
+        }
+    });
+}
+window.updateLocationDropdownUI = function(selectId, match) {
+    // 1. Log to the console so we know the scanner actually found it
+    console.log("✅ Scanner matched location:", match.name, "| ID:", match.id);
+    
+    const selectEl = document.getElementById(selectId);
+    if (!selectEl) {
+        console.error("❌ Could not find dropdown with ID:", selectId);
+        return;
+    }
+
+    // 2. Determine the full path name to display (e.g., "Warehouse > Shelf A")
+    const fullPathName = typeof buildLocationPath === 'function' ? buildLocationPath(match.id) : match.name;
+    
+    // 3. Set the standard background value
+    selectEl.value = match.id;
+    
+    // 4. AGGRESSIVE OVERRIDE: If it's a standard <select>, force the <option> selection
+    if (selectEl.tagName === 'SELECT') {
+        for (let i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].value === match.id) {
+                selectEl.selectedIndex = i; // Force the browser to show this specific item
+                console.log("🎯 Successfully locked <select> to:", fullPathName);
+                break;
+            }
+        }
+    }
+
+    // 5. AGGRESSIVE OVERRIDE: If you are using a custom text wrapper, force the text to change
+    const customTrigger = selectEl.parentElement?.querySelector('.trigger-text') || selectEl.querySelector('.trigger-text');
+    if (customTrigger) {
+        customTrigger.textContent = fullPathName;
+        console.log("🎯 Successfully updated custom <span class='trigger-text'> to:", fullPathName);
+    }
+
+    // 6. Fire the change event so the rest of the app knows it was modified
+    selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // 7. Visual Feedback (Flash Green)
+    const targetVisual = customTrigger ? customTrigger.parentElement : selectEl;
+    const originalBg = targetVisual.style.backgroundColor;
+    const originalTransition = targetVisual.style.transition;
+    
+    targetVisual.style.transition = "background-color 0.4s ease";
+    targetVisual.style.backgroundColor = "#dcfce7"; // Flash green
+    
+    setTimeout(() => {
+        targetVisual.style.backgroundColor = originalBg;
+        targetVisual.style.transition = originalTransition;
+    }, 1000);
 };
 
-// Global intercept: Close custom dropdowns if the user clicks anywhere else on the screen
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.custom-select-wrapper')) {
         document.querySelectorAll('.custom-select-options').forEach(ul => ul.classList.remove('open'));
@@ -4263,55 +3315,40 @@ document.addEventListener('click', function(e) {
 /* =========================================================
    COLUMN PICKER TOGGLE ENGINE
 ========================================================= */
-window.toggleColumnMenu = function(event, menuId) {
-    event.stopPropagation(); // Prevents the click-away listener from closing it instantly
+function toggleColumnMenu(event, menuId) {
+    event.stopPropagation(); 
     const menu = document.getElementById(menuId);
     const btn = event.currentTarget;
-    
-    if (!menu) {
-        console.error("Column menu element not found:", menuId);
-        return;
-    }
+    if (!menu) return;
 
-    // Get position of the button so we can place the menu directly underneath
     const rect = btn.getBoundingClientRect();
-    
-    // Toggle display
-    const isHidden = (window.getComputedStyle(menu).display === "none");
-    
-    if (isHidden) {
-        menu.style.display = "block"; // Use block or flex based on your CSS
+    if (window.getComputedStyle(menu).display === "none") {
+        menu.style.display = "block"; 
         menu.style.position = "absolute";
         menu.style.top = (rect.bottom + window.scrollY + 5) + "px";
         menu.style.left = (rect.left + window.scrollX) + "px";
     } else {
         menu.style.display = "none";
     }
-};
+}
 
-// Global listener to close the menu if you click anywhere else
 document.addEventListener('click', function(e) {
-    const menus = document.querySelectorAll('.col-picker-menu');
-    menus.forEach(menu => {
-        if (!menu.contains(e.target)) {
-            menu.style.display = 'none';
-        }
+    document.querySelectorAll('.col-picker-menu').forEach(menu => {
+        if (!menu.contains(e.target)) menu.style.display = 'none';
     });
 });
 
-window.showSettingsTab = function(tabId, btn) {
-    // Hide all
+function showSettingsTab(tabId, btn) {
     document.querySelectorAll('.settings-tab-content').forEach(el => el.style.display = 'none');
     document.querySelectorAll('.s-tab').forEach(b => b.classList.remove('active'));
-    
-    // Show target
     document.getElementById(tabId).style.display = 'block';
     btn.classList.add('active');
-    
-    // Trigger load if it's the logs tab
     if (tabId === 'settings-logs') loadAuditLogs();
-};
+}
 
+/* =========================================================
+   IMPORT ENGINE
+========================================================= */
 let pendingImportData = null;
 
 function handleImportFile(input) {
@@ -4325,68 +3362,33 @@ function handleImportFile(input) {
         } catch (err) { customAlert("Invalid JSON file provided.", "Import Error"); }
     };
     reader.readAsText(file);
-    input.value = ""; // Reset input
+    input.value = ""; 
 }
-
-// Add this flag at the top of your inventory.js variables
-let isImportingSyncLock = false;
 
 async function executeImport() {
     const confirmText = document.getElementById('importConfirmText').value;
-    if (confirmText !== "CONFIRMIMPORT") {
-        await customAlert("You must type CONFIRMIMPORT exactly as shown.", "Access Denied");
-        return;
-    }
-
-    if (!pendingImportData || !pendingImportData.tables) {
-        await customAlert("Invalid backup file.", "Error"); return;
-    }
+    if (confirmText !== "CONFIRMIMPORT") return await customAlert("You must type CONFIRMIMPORT exactly as shown.", "Access Denied");
+    if (!pendingImportData || !pendingImportData.tables) return await customAlert("Invalid backup file.", "Error");
 
     isImportingSyncLock = true;
     window.setStatus("syncing", "Wiping and Importing...");
 
     try {
         const tables = [
-            { db: 'items', json: 'items' },
-            { db: 'locations', json: 'locations' },
-            { db: 'temp_locations', json: 'temp_locations' },
-            { db: 'tags', json: 'tags' },
+            { db: 'items', json: 'items' }, { db: 'locations', json: 'locations' },
+            { db: 'temp_locations', json: 'temp_locations' }, { db: 'tags', json: 'tags' },
             { db: 'item_categories', json: 'categories' }
         ];
 
-        // 1. Wipe Supabase (Delete everything)
-        // We delete in reverse order of dependencies
-        for (let t of tables.reverse()) {
-            await window.db.from(t.db).delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        }
-
-        // 2. Wipe Local DB
-        for (let t of tables) {
-            await localDB[t.db].clear();
-        }
-
-        // 3. Import into Supabase (Use simple insert now because DB is empty)
-        for (let t of tables) {
-            const data = pendingImportData.tables[t.json];
-            if (data && data.length > 0) {
-                await window.db.from(t.db).insert(data);
-            }
-        }
-
-        // 4. Import into Local DB
-        for (let t of tables) {
-            await localDB[t.db].bulkPut(pendingImportData.tables[t.json]);
-        }
-
-        // 5. Clear Sync Queue to prevent old conflicts
+        for (let t of tables.reverse()) await window.db.from(t.db).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        for (let t of tables) await localDB[t.db].clear();
+        for (let t of tables) { if (pendingImportData.tables[t.json]?.length > 0) await window.db.from(t.db).insert(pendingImportData.tables[t.json]); }
+        for (let t of tables) await localDB[t.db].bulkPut(pendingImportData.tables[t.json]);
+        
         await localDB.sync_queue.clear();
-
         closeModal('importWarningModal');
         await customAlert("System Overwritten Successfully!", "Success");
-        
-        // Final Reload
         window.location.reload();
-
     } catch (e) {
         console.error("Critical Import Error:", e);
         await customAlert("Import Failed: " + e.message, "Critical Error");
@@ -4396,15 +3398,11 @@ async function executeImport() {
     }
 }
 
-window.setImportMode = function(mode, element) {
-    // 1. Update all radios logic (browser handles the 'checked' state automatically)
+function setImportMode(mode, element) {
     document.querySelector(`input[name="importMode"][value="${mode}"]`).checked = true;
-
-    // 2. Update Visuals
     document.querySelectorAll('.radio-card').forEach(card => card.classList.remove('active'));
     element.classList.add('active');
 
-    // 3. Update Text Labels dynamically
     const appendCard = document.getElementById('card-append');
     const eraseCard = document.getElementById('card-erase');
 
@@ -4415,4 +3413,4 @@ window.setImportMode = function(mode, element) {
         appendCard.querySelector('.card-label').textContent = 'MERGE';
         eraseCard.querySelector('.card-label').textContent = 'SELECTED - REPLACE';
     }
-};
+}
