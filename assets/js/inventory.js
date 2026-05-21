@@ -774,26 +774,40 @@ function showPage(pageId) {
     if (pageId === "pageSettings") {
         populateHardwareSettingsDropdowns();
     }
-    
+
     // Control Mobile FAB visibility
     // Control Mobile FAB visibility
     const fabItem = document.getElementById("fabItemBtn"); 
     const fabLoc = document.getElementById("fabLocationBtn");
+    const fabFilter = document.getElementById("fabFilterBtn");
     const fabContainer = document.getElementById("mobileFabContainer");
     
     if (window.innerWidth <= 768 && fabContainer) {
         // Keep container active so the ⚡ quick actions button stays operational across tabs
         fabContainer.style.display = "flex";
+        fabContainer.style.position = "fixed";
+        fabContainer.style.left = "16px";
+        fabContainer.style.right = "auto";
+        fabContainer.style.bottom = "16px";
+        fabContainer.style.top = "auto";
+        fabContainer.style.transform = "none";
+        fabContainer.style.zIndex = "13000";
+        fabContainer.style.visibility = "visible";
+        fabContainer.style.opacity = "1";
+        fabContainer.style.pointerEvents = "auto";
         
         if (pageId === "pageItems") {
             if (fabItem) fabItem.style.display = "flex";
             if (fabLoc) fabLoc.style.display = "none";  // Hidden on Items Browser
+            if (fabFilter) fabFilter.style.display = "flex";
         } else if (pageId === "pageLocations") {
             if (fabItem) fabItem.style.display = "none";
             if (fabLoc) fabLoc.style.display = "flex";  // Only show on Locations tab
+            if (fabFilter) fabFilter.style.display = "flex";
         } else {
             if (fabItem) fabItem.style.display = "none";
             if (fabLoc) fabLoc.style.display = "none";  // Hidden on all utility tabs
+            if (fabFilter) fabFilter.style.display = "flex";
         }
     }
 }
@@ -1143,6 +1157,8 @@ function initResizableColumns(table) {
         });
     });
 }
+
+
 
 function toggleTableColumn(tableId, colIndex, isVisible) {
     const table = document.getElementById(tableId);
@@ -2868,7 +2884,7 @@ function initFabScrollFade() {
         if (!fabContainer) return;
         const scrollPosition = window.scrollY + window.innerHeight;
         const bottomPosition = document.documentElement.scrollHeight;
-        if (scrollPosition >= bottomPosition - 30) fabContainer.classList.add('fab-faded');
+        if (scrollPosition >= bottomPosition - 30) fabContainer.classList.remove('fab-faded');
         else fabContainer.classList.remove('fab-faded');
     }, { passive: true });
 }
@@ -2888,6 +2904,110 @@ let qaQueue = [], qmQueue = [], qrQueue = [];
 
 let globalCamerasList = [];
 let currentCameraIndex = 0;
+
+let isStockUsageModeActive = false;
+let stockUsageDraft = new Map();
+
+function setDisplay(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = value;
+}
+
+function resetQuickQueue(prefix) {
+    const queueMap = { qa: qaQueue, qm: qmQueue, qr: qrQueue };
+    queueMap[prefix].length = 0;
+    const count = document.getElementById(`${prefix}QueueCount`);
+    const list = document.getElementById(`${prefix}QueueList`);
+    const proceed = document.getElementById(prefix === 'qr' ? 'qrProceedBatchBtn' : `${prefix}ProceedBatchBtn`);
+    if (count) count.textContent = "0";
+    if (list) list.innerHTML = "";
+    if (proceed) proceed.disabled = true;
+}
+
+function setBatchMode(prefix, checked) {
+    const batchMap = { qa: 'qaBatchQueueContainer', qm: 'qmBatchQueueContainer', qr: 'qrBatchQueueContainer' };
+    if (prefix === 'qa') qaBatchMode = checked;
+    if (prefix === 'qm') qmBatchMode = checked;
+    if (prefix === 'qr') qrBatchMode = checked;
+    setDisplay(batchMap[prefix], checked ? 'block' : 'none');
+    if (!checked) resetQuickQueue(prefix);
+}
+
+function toggleQaBatchMode(checked) { setBatchMode('qa', checked); }
+function toggleQmBatchMode(checked) { setBatchMode('qm', checked); }
+function toggleQrBatchMode(checked) { setBatchMode('qr', checked); }
+function clearQaQueue() { resetQuickQueue('qa'); }
+function clearQmQueue() { resetQuickQueue('qm'); }
+function clearQrQueue() { resetQuickQueue('qr'); }
+
+function adjustInlineQty(prefix, amount) {
+    const input = document.getElementById(`${prefix}InlineQtyInput`);
+    if (!input) return;
+    const max = parseInt(input.max, 10);
+    let value = (parseInt(input.value, 10) || 1) + amount;
+    if (value < 1) value = 1;
+    if (!Number.isNaN(max) && value > max) value = max;
+    input.value = value;
+}
+
+function closeQuickAssignModal() { closeModal('quickAssignModal'); }
+function closeQuickMoveModal() { closeModal('quickMoveModal'); }
+function closeQuickReturnModal() { closeModal('quickReturnModal'); }
+
+function restartQuickAssignProcess() { closeQuickAssignModal(); openQuickAssignModal(); }
+function restartQuickMoveProcess() { closeQuickMoveModal(); openQuickMoveModal(); }
+function restartQuickReturnProcess() { closeQuickReturnModal(); openQuickReturnModal(); }
+
+function openQuickAssignModal() {
+    customAlert("Quick Assign is not fully wired yet. For now, open an item card and use the Assign button.", "Quick Assign");
+}
+
+function openQuickMoveModal() {
+    customAlert("Quick Move is not fully wired yet. For now, open an item card and use the Move button.", "Quick Move");
+}
+
+function openQuickReturnModal() {
+    window.openBarcodeScannerModal('FAST_RETURN');
+}
+
+function proceedQaToStep2() {
+    customAlert("Batch Quick Assign needs a full workflow pass before it can safely change stock.", "Quick Assign");
+}
+
+function proceedQmToStep2() {
+    customAlert("Batch Quick Move needs a full workflow pass before it can safely relocate stock.", "Quick Move");
+}
+
+function executeBatchReturn() {
+    customAlert("Batch Quick Return needs a full workflow pass before it can safely check in multiple items.", "Quick Return");
+}
+
+function toggleStockUsageMode() {
+    isStockUsageModeActive = !isStockUsageModeActive;
+    stockUsageDraft.clear();
+
+    const toggleBtn = document.getElementById("btnToggleStockUsageMode");
+    const confirmBtn = document.getElementById("btnConfirmStockUsage");
+    const cancelBtn = document.getElementById("btnCancelStockUsage");
+
+    if (toggleBtn) {
+        toggleBtn.textContent = isStockUsageModeActive ? "Stock Usage Active" : "Use Stock Mode";
+        toggleBtn.style.background = isStockUsageModeActive ? "#fee2e2" : "";
+    }
+    if (confirmBtn) confirmBtn.style.display = isStockUsageModeActive ? "inline-flex" : "none";
+    if (cancelBtn) cancelBtn.style.display = isStockUsageModeActive ? "inline-flex" : "none";
+}
+
+function cancelStockUsageChanges() {
+    if (isStockUsageModeActive) toggleStockUsageMode();
+}
+
+async function confirmStockUsageChanges() {
+    if (stockUsageDraft.size === 0) {
+        await customAlert("No stock usage changes have been selected yet.", "Use Stock Mode");
+        return;
+    }
+}
 
 /* =========================================================
    RICH ITEM MODALS: VIEWER & ASSIGNMENT LOGIC
@@ -3414,3 +3534,4 @@ function setImportMode(mode, element) {
         eraseCard.querySelector('.card-label').textContent = 'SELECTED - REPLACE';
     }
 }
+

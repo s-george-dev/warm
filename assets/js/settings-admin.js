@@ -1,4 +1,6 @@
 async function loadUserManagement() {
+    if (!window.db) return;
+
     // 1. Fetch data from our custom view
     const { data: users, error } = await window.db
         .from('view_user_roles')
@@ -7,6 +9,7 @@ async function loadUserManagement() {
     if (error) return console.error(error);
 
     const tbody = document.getElementById('userTableBody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     users.forEach(user => {
@@ -40,5 +43,4 @@ async function updateUserRole(userId, newRole) {
     }
 }
 
-// Initialize on load
-document.addEventListener('DOMContentLoaded', loadUserManagement);
+window.loadUserManagement = loadUserManagement;
