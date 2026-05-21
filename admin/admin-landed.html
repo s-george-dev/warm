@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard | Warm Right Ltd</title>
-      <link rel="icon" href="../assets/images/favicon.png">
-<link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../assets/images/favicon.png">
+  <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../assets/css/admin.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
@@ -27,14 +27,75 @@
       margin: -40px -40px 30px -40px; 
     }
 
+    /* Tab Interface Styling */
+    .tab-buttons {
+     display: flex !important;
+        flex-wrap: nowrap !important; /* Absolutely prevents wrapping */
+        overflow-x: auto !important;  /* Enables scrolling */
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important; /* Smooth scrolling on iOS */
+        justify-content: flex-start !important;
+        padding-bottom: 2px !important;
+        width: 100% !important;
+    }
+    
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      transition: all 0.2s ease;
+    }
+    
+    .tab-btn:hover {
+      color: #004a99;
+      background: #e9ecef;
+    }
+    
+    .tab-btn.active {
+      color: #004a99;
+      background: transparent;
+      border-bottom: 3px solid #004a99;
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Dashboard Grid Styling */
     /* Dashboard Grid Styling */
     .menu-grid { 
       display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+      /* Default to 2 columns for mobile */
+      grid-template-columns: repeat(2, 1fr); 
       gap: 25px; 
       margin-top: 30px; 
+      /* Constrain the maximum width so it doesn't stretch infinitely on huge monitors */
+      max-width: 1000px; 
     }
-    
+
+    /* Override for Desktop (screens wider than 768px) */
+    @media (min-width: 768px) {
+      .menu-grid {
+        /* Force exactly 3 columns on desktop */
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
     .card { 
       background: white; 
       padding: 30px; 
@@ -45,6 +106,10 @@
       border: 1px solid #ddd; 
       box-shadow: 0 4px 15px rgba(0,0,0,0.05);
       transition: 0.3s; 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
     
     .card:hover { 
@@ -55,47 +120,170 @@
     
     .card h3 { color: #004a99; margin-bottom: 10px; }
     .card p { color: #666; font-size: 14px; margin: 0; }
+
+    /* --- MOBILE RESPONSIVENESS (< 768px) --- */
+    /* --- MOBILE RESPONSIVENESS (< 768px) --- */
+    @media (max-width: 768px) {
+      /* 1. Page & Header Spacing - Add top padding to clear the fixed 65px header */
+      body { 
+        padding: 45px 15px 15px 15px !important; 
+      }
+      
+      /* Remove the negative top margin so the container doesn't pull content back up */
+      #admin-header-container {
+        margin: 0 -15px 20px -15px !important; 
+      }
+
+      /* ... keep the rest of your .tabs-wrapper and .menu-grid CSS below this ... */
+
+      /* 2. Scrollable Tabs with Arrow Indicator */
+      .tabs-wrapper {
+        position: relative;
+        margin-top: 10px;
+      }
+    
+      
+      .tab-btn {
+        padding: 10px 15px; /* Slimmer tab buttons */
+        font-size: 14px;
+      }
+
+      /* 3. Card Layout (2 columns for phone) */
+      .menu-grid { 
+        grid-template-columns: repeat(2, 1fr) !important; 
+        gap: 12px; /* Tighter spacing between cards */
+        margin-top: 20px; 
+      }
+      
+      .card { 
+        padding: 15px 10px; /* Less padding so text fits */
+      }
+      
+      .card div {
+        font-size: 30px !important; /* Smaller emoji icons */
+        margin-bottom: 5px !important;
+      }
+      
+      .card h3 { 
+        font-size: 14px; /* Scaled down titles */
+        margin-bottom: 4px; 
+      }
+      
+      .card p { 
+        font-size: 11px; /* Scaled down descriptions */
+      }
+      
+    }
+    
   </style>
 </head>
 <body>
 
   <div id="admin-header-container"></div>
 
-  <div class="menu-grid">
-    <a href="inventory.html" class="card">
-  <div style="font-size: 40px; margin-bottom: 10px;">📦</div>
-  <h3>Inventory System</h3>
-  <p>Manage locations, items, and stock levels</p>
-</a>
-    <a href="rates.html" class="card">
-      <div style="font-size: 40px; margin-bottom: 10px;">💰</div>
-      <h3>Manage Rates</h3>
-      <p>Edit scheduled pricing</p>
-    </a>
+  <div class="tabs-wrapper">
+    <div class="tab-buttons">
+      <button class="tab-btn active" onclick="openTab(event, 'tab-jobs')">Jobs</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-engineers')">Engineers</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-inventory')">Inventory</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-website')">Website Management</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-general')">General Management</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-settings')">Settings</button>
+    </div>
+  </div>
 
-    <a href="testimonials-admin.html" class="card">
-      <div style="font-size: 40px; margin-bottom: 10px;">👤</div>
-      <h3>Manage Testimonials</h3>
-      <p>Manage reviews from customers</p>
-    </a>
+  <div id="tab-jobs" class="tab-content active">
+    <div class="menu-grid">
+      <a href="../admin/jobs/sed_importer.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">📥</div>
+        <h3>Sedgwick Import</h3>
+        <p>Import and process Sedgwick jobs</p>
+      </a>
+      <a href="../admin/jobs/res_importer.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">📥</div>
+        <h3>Resolving Import</h3>
+        <p>Import and process Resolving jobs</p>
+      </a>
+      <a href="../admin/jobs/home_import.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">📥</div>
+        <h3>HomeServe Import</h3>
+        <p>Import and process HomeServe jobs</p>
+      </a>
+    </div>
+  </div>
 
-    <a href="settings-admin.html" class="card">
-      <div style="font-size: 40px; margin-bottom: 10px;">⚙️</div>
-      <h3>Account Settings</h3>
-      <p>Change your admin password & update your security preferences</p>
-    </a>
-    
-    <a href="opening-hours.html" class="card">
-      <div style="font-size: 40px; margin-bottom: 10px;">⏰</div>
-      <h3>Opening Hours</h3>
-      <p>Change Warm Right's Business Hours</p>
-    </a>
-    
+  <div id="tab-engineers" class="tab-content">
+    <div class="menu-grid">
+      <p style="color: #666; margin-top: 20px;">No engineer tools configured yet.</p>
+    </div>
+  </div>
+
+  <div id="tab-inventory" class="tab-content">
+    <div class="menu-grid">
+      <a href="inventory.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">📦</div>
+        <h3>Inventory System</h3>
+        <p>Manage locations, items, and stock levels</p>
+      </a>
+    </div>
+  </div>
+
+  <div id="tab-website" class="tab-content">
+    <div class="menu-grid">
+      <a href="rates.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">💰</div>
+        <h3>Manage Rates</h3>
+        <p>Edit scheduled pricing</p>
+      </a>
+      <a href="testimonials-admin.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">👤</div>
+        <h3>Manage Testimonials</h3>
+        <p>Manage reviews from customers</p>
+      </a>
+    </div>
+  </div>
+
+  <div id="tab-general" class="tab-content">
+    <div class="menu-grid">
+      <a href="opening-hours.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">⏰</div>
+        <h3>Opening Hours</h3>
+        <p>Change Warm Right's Business Hours</p>
+      </a>
+    </div>
+  </div>
+
+  <div id="tab-settings" class="tab-content">
+    <div class="menu-grid">
+      <a href="settings-admin.html" class="card">
+        <div style="font-size: 40px; margin-bottom: 10px;">⚙️</div>
+        <h3>Account Settings</h3>
+        <p>Change your admin password & update your security preferences</p>
+      </a>
+    </div>
   </div>
 
   <script>
+    /* TAB LOGIC */
+    function openTab(evt, tabId) {
+      // Hide all tab content
+      const tabContents = document.getElementsByClassName("tab-content");
+      for (let i = 0; i < tabContents.length; i++) {
+        tabContents[i].classList.remove("active");
+      }
+
+      // Remove active class from all buttons
+      const tabBtns = document.getElementsByClassName("tab-btn");
+      for (let i = 0; i < tabBtns.length; i++) {
+        tabBtns[i].classList.remove("active");
+      }
+
+      // Show the current tab and add active class to the button
+      document.getElementById(tabId).classList.add("active");
+      evt.currentTarget.classList.add("active");
+    }
+
     /* SECURITY & INITIALIZATION */
-    
     async function checkSecurity() {
       const lib = window.supabase || window.Supabase;
 
@@ -118,7 +306,6 @@
         console.log("Session active:", session.user.email);
         
         // --- TRIGGER THE HEADER LOAD ---
-        // This pushes the user session into the nav bar logic
         await window.loadAdminHeader(session); 
         
         // Final reveal of the page content

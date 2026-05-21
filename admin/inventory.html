@@ -400,8 +400,8 @@
     </div>
 
     <div id="addItemModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <h3>Add New Item</h3>
+        <div class="modal-content item-form-modal-content" style="max-width: 500px;">
+            <h3 class="item-form-title">Add New Item</h3>
             <label>Item Photos</label>
             <div id="addItemPreviewsRow" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 80px; align-items: center;"></div>
             <div style="display: flex; gap: 8px; margin-bottom: 15px;">
@@ -440,9 +440,9 @@
     </div>
 
    <div id="itemEditModal" class="modal" style="z-index: 3500;">
-        <div class="modal-content" style="max-width: 440px; width: 92%; padding: 20px; border-radius: 16px; overflow-y: auto; max-height: 92vh; text-align: left; box-sizing: border-box;">
+        <div class="modal-content item-form-modal-content" style="max-width: 440px; width: 92%; padding: 20px; border-radius: 16px; overflow-y: auto; max-height: 92vh; text-align: left; box-sizing: border-box;">
             
-            <h3 style="margin: 0 0 15px 0; color: #004a99; font-size: 19px; font-weight: 700; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Edit Item Details</h3>
+            <h3 class="item-form-title" style="margin: 0 0 15px 0; color: #004a99; font-size: 19px; font-weight: 700; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Edit Item Details</h3>
 
             <div style="margin-bottom: 15px;">
                 <div id="editItemPreviewsRow" style="display: flex; flex-direction: row; gap: 8px; overflow-x: auto; padding: 4px 2px; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; min-height: 80px; align-items: center;"></div>
@@ -650,7 +650,7 @@
     </div>
 
     <div id="itemDetailsModal" class="modal">
-        <div class="modal-content" style="max-width: 500px; padding: 0; overflow-y: auto; max-height: 90vh; border-radius: 16px;">
+        <div class="modal-content item-detail-modal-content" style="max-width: 500px; padding: 0; overflow-y: auto; max-height: 90vh; border-radius: 16px;">
             <div style="width: 100%; aspect-ratio: 16/10; background: #f0f2f5; position: relative;">
                 <img id="detailItemImage" src="../assets/images/no-image.jpg" style="width: 100%; height: 100%; object-fit: contain; padding: 15px; box-sizing: border-box;">
                 <div id="detailItemQtyBadge" class="item-card-qty-badge" style="top: 15px; left: 15px; font-size: 13px; padding: 4px 12px; border-radius: 6px;">Qty: 0</div>
@@ -661,13 +661,14 @@
                 <span>👤 Checked Out To:</span> <span id="detailAssignedTargetName" style="color: #047857;">---</span>
             </div>
 
-            <div style="padding: 0 25px; margin-top: 10px;"><div id="detailItemThumbsRow" class="view-thumb-strip"></div></div>
+            <div class="item-detail-thumbs" style="padding: 0 25px; margin-top: 10px;"><div id="detailItemThumbsRow" class="view-thumb-strip"></div></div>
             
-            <div style="padding: 25px; display: flex; gap: 20px; text-align: left;">
+            <div class="item-detail-body" style="padding: 25px; display: flex; gap: 20px; text-align: left;">
                 
-                <div style="flex: 1; min-width: 0;">
+                <div class="item-detail-main" style="flex: 1; min-width: 0;">
                     <h2 id="detailItemName" style="margin: 0 0 5px 0; color: #004a99; font-size: 22px; font-weight: 700; line-height: 1.2;">Item Name</h2>
-                    <div id="detailItemLocation" style="font-size: 13px; color: #ff8c00; font-weight: 600; margin-bottom: 15px;">📍 Location Path</div>
+                    <div id="detailItemLocation" class="item-detail-location" style="font-size: 13px; color: #ff8c00; font-weight: 600; margin-bottom: 8px;">📍 Location Path</div>
+                    <div id="detailItemCategory" class="item-detail-category">Category</div>
                     
                     <label style="margin-top: 12px; display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Description</label>
                     <p id="detailItemDescription" style="margin: 4px 0 15px 0; font-size: 14px; color: #334155; line-height: 1.5; white-space: pre-wrap;">No description provided.</p>
@@ -687,7 +688,7 @@
                     </div>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 10px; width: 115px; flex-shrink: 0; justify-content: flex-start; padding-top: 4px;">
+                <div class="item-detail-actions" style="display: flex; flex-direction: column; gap: 10px; width: 115px; flex-shrink: 0; justify-content: flex-start; padding-top: 4px;">
                     <button class="btn-primary" style="width: 100%; padding: 10px 5px; background: #10b981; border-color: #10b981; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; height: 38px;" id="btnAssignReturnToggle" onclick="handleAssignReturnToggle()">👤 Assign</button>
                     <button class="btn-primary" style="width: 100%; padding: 10px 5px; background: #ff8c00; border-color: #ff8c00; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; height: 38px;" onclick="openMoveItemModal()">📦 Move</button>
                     <button class="btn-primary" style="width: 100%; padding: 10px 5px; font-size: 13px; font-weight: 600; text-align: center; white-space: nowrap; height: 38px;" onclick="switchToItemEdit()">Edit</button>

@@ -1252,7 +1252,87 @@ function previewTempLocationImage(input, previewId, mode) {
 /* =========================================================
    ITEM ACTIONS (CRUD)
 ========================================================= */
+function wrapItemFormField(label, field) {
+    const wrap = document.createElement("div");
+    wrap.className = "item-form-field";
+    if (label) wrap.append(label);
+    if (field) wrap.append(field);
+    return wrap;
+}
+
+function ensureAddItemLayout() {
+    const content = document.querySelector("#addItemModal .item-form-modal-content");
+    if (!content || content.dataset.layoutReady === "true") return;
+
+    const title = content.querySelector(".item-form-title");
+    const preview = document.getElementById("addItemPreviewsRow");
+    const photoLabel = preview?.previousElementSibling;
+    const photoButtons = preview?.nextElementSibling;
+    const name = document.getElementById("itemName");
+    const qty = document.getElementById("itemQuantity");
+    const location = document.getElementById("itemLocationSelect");
+    const description = document.getElementById("itemDescription");
+    const barcodeRow = document.getElementById("addItemBarcode")?.closest("div[style*='align-items: flex-end']");
+    const nfcRow = document.getElementById("addItemNFC")?.closest("div[style*='align-items: flex-end']");
+    const category = document.getElementById("itemCategorySelect");
+    const tagSelect = document.getElementById("itemTagSelect");
+    const tagPills = document.getElementById("addItemTagsPillsRow");
+    const buttons = content.querySelector(".modal-buttons");
+
+    if (!title || !preview || !photoLabel || !photoButtons || !name || !qty || !location || !description || !category || !tagSelect || !tagPills || !buttons) return;
+
+    const nameLabel = name.previousElementSibling;
+    const qtyLabel = qty.previousElementSibling;
+    const locationLabel = location.previousElementSibling;
+    const descriptionLabel = description.previousElementSibling;
+    const categoryRow = category.parentElement;
+    const categoryLabel = categoryRow?.previousElementSibling;
+    const tagRow = tagSelect.parentElement;
+    const tagLabel = tagRow?.previousElementSibling;
+    const locationBarcodeBtn = document.querySelector("button[onclick=\"openBarcodeScannerModal('itemLocationTunnel')\"]");
+    const locationNfcBtn = document.querySelector("button[onclick=\"openNfcScannerModal('itemLocationTunnel')\"]");
+
+    const media = document.createElement("div");
+    media.className = "item-form-media";
+    media.append(photoLabel, preview, photoButtons);
+
+    const workRow = document.createElement("div");
+    workRow.className = "item-form-work-row";
+
+    const fieldStack = document.createElement("div");
+    fieldStack.className = "item-form-fields-stack";
+    fieldStack.append(wrapItemFormField(qtyLabel, qty), wrapItemFormField(categoryLabel, categoryRow));
+
+    const actionStack = document.createElement("div");
+    actionStack.className = "item-form-action-stack";
+    Array.from(buttons.children).reverse().forEach(btn => actionStack.append(btn));
+    workRow.append(fieldStack, actionStack);
+
+    const locationRow = document.createElement("div");
+    locationRow.className = "item-form-location-row";
+    locationRow.append(location);
+    if (locationBarcodeBtn) locationRow.append(locationBarcodeBtn);
+    if (locationNfcBtn) locationRow.append(locationNfcBtn);
+
+    const tagsBlock = document.createElement("div");
+    tagsBlock.className = "item-form-tags-block";
+    tagsBlock.append(tagLabel, tagRow, tagPills);
+
+    content.append(
+        media,
+        wrapItemFormField(nameLabel, name),
+        wrapItemFormField(descriptionLabel, description),
+        workRow
+    );
+    if (barcodeRow) content.append(barcodeRow);
+    if (nfcRow) content.append(nfcRow);
+    content.append(wrapItemFormField(locationLabel, locationRow), tagsBlock);
+    buttons.remove();
+    content.dataset.layoutReady = "true";
+}
+
 function openAddItemModal() { 
+    ensureAddItemLayout();
     document.getElementById("itemName").value = ""; document.getElementById("itemQuantity").value = ""; document.getElementById("itemDescription").value = ""; document.getElementById("addItemBarcode").value = ""; document.getElementById("addItemNFC").value = ""; document.getElementById("addItemPhotoInput").value = ""; document.getElementById("addItemCameraInput").value = "";
     currentAddItemFiles = []; primaryPhotoIdentifier = null; renderMultipleFilesPreviews('addItemPreviewsRow', currentAddItemFiles, 'add-item');
     activeSelectedAddTags = []; renderActiveTagPills('add');
@@ -3012,7 +3092,51 @@ async function confirmStockUsageChanges() {
 /* =========================================================
    RICH ITEM MODALS: VIEWER & ASSIGNMENT LOGIC
 ========================================================= */
+function ensureItemDetailsLayout() {
+    const body = document.querySelector("#itemDetailsModal .item-detail-body");
+    if (!body || body.dataset.layoutReady === "true") return;
+
+    const main = body.querySelector(".item-detail-main");
+    const actions = body.querySelector(".item-detail-actions");
+    const name = document.getElementById("detailItemName");
+    const location = document.getElementById("detailItemLocation");
+    const category = document.getElementById("detailItemCategory");
+    const description = document.getElementById("detailItemDescription");
+    const tags = document.getElementById("detailItemTagsContainer");
+    const barcode = document.getElementById("detailItemBarcode");
+
+    if (!main || !actions || !name || !location || !category || !description || !tags || !barcode) return;
+
+    const descriptionLabel = description.previousElementSibling;
+    const tagsLabel = tags.previousElementSibling;
+    const identityBlock = barcode.closest("div[style*='flex-direction: column']") || barcode.parentElement?.parentElement;
+
+    const heading = document.createElement("div");
+    heading.className = "item-detail-heading";
+    heading.append(name, location, category);
+
+    const info = document.createElement("div");
+    info.className = "item-detail-info";
+    if (descriptionLabel) info.append(descriptionLabel);
+    info.append(description);
+    if (identityBlock) info.append(identityBlock);
+
+    const lower = document.createElement("div");
+    lower.className = "item-detail-lower";
+    lower.append(info, actions);
+
+    const tagsBlock = document.createElement("div");
+    tagsBlock.className = "item-detail-tags-block";
+    if (tagsLabel) tagsBlock.append(tagsLabel);
+    tagsBlock.append(tags);
+
+    main.remove();
+    body.append(heading, lower, tagsBlock);
+    body.dataset.layoutReady = "true";
+}
+
 function openItemDetails(item) {
+    ensureItemDetailsLayout();
     currentItemForActions = item;
     document.getElementById("detailItemName").textContent = item.name;
     
@@ -3031,6 +3155,8 @@ function openItemDetails(item) {
     document.getElementById("detailItemBarcode").textContent = item.barcode || "—";
     document.getElementById("detailItemNFC").textContent = item.nfc_tag || "—";
     document.getElementById("detailItemLocation").textContent = item.location_id ? "📍 " + buildLocationPath(item.location_id) : "📍 Unallocated Items";
+    const categoryEl = document.getElementById("detailItemCategory");
+    if (categoryEl) categoryEl.textContent = item.category || "Uncategorised";
 
     const imgEl = document.getElementById("detailItemImage"); 
     const thumbsContainer = document.getElementById("detailItemThumbsRow"); 

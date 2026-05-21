@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sedgwick Job Sheet Extractor & Calendar Sync</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background-color: #fafafa; }
+        
+        .app-container { display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; align-items: flex-start; }
+        .left-panel { flex: 1; max-width: 50%; }
+        .right-panel { flex: 1; position: sticky; top: 20px; height: 90vh; }
+        
+        .drop-zone { border: 2px dashed #0066cc; padding: 30px; text-align: center; margin-bottom: 20px; background: #f0f7ff; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .drop-zone.dragover { background: #cce5ff; border-color: #004c99; }
+        #pdfInput { display: none; }
+        .drop-zone label { cursor: pointer; color: #0066cc; font-weight: bold; text-decoration: underline; }
+        #status { color: #555; font-size: 0.9em; margin-top: 10px; font-weight: bold; }
+        
+        .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 1em; font-weight: bold; color: #666; border-bottom: 3px solid transparent; transition: color 0.2s; }
+        .tab-btn:hover { color: #0066cc; }
+        .tab-btn.active { border-bottom-color: #0066cc; color: #0066cc; }
+        .tab-content { display: none; background: white; padding: 20px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 5px; }
+        .form-group.full-width { grid-column: 1 / -1 !important; }
+        
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.85em; color: #555; }
+        .input-wrapper { display: flex; gap: 5px; align-items: center; }
+        
+        input[type="text"], input[type="datetime-local"], textarea { flex: 1; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.9em; font-family: inherit; }
+        textarea { height: 150px; resize: vertical; }
+        input:focus, textarea:focus { border-color: #0066cc; outline: none; }
+        
+        input.failed { border: 2px solid #e74c3c !important; background-color: #fadbd8 !important; color: #c0392b !important; font-weight: bold; }
+        input.amber-warning { border: 2px solid #f39c12 !important; background-color: #fef5e7 !important; color: #b9770e !important; font-weight: bold; }
+        
+        .btn-paste { background: #e0e0e0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 0 10px; height: 35px; font-size: 0.9em; transition: background 0.2s; font-weight: bold; }
+        .btn-paste:hover { background: #d0d0d0; }
+        
+        .btn-calendar { display: block; width: 100%; padding: 15px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
+        .btn-calendar:hover { background: #219a52; }
+        .btn-calendar:disabled { background: #95a5a6; cursor: not-allowed; }
+
+        #pdfPreview { width: 100%; height: 100%; border: none; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: white; }
+        .preview-placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border: 2px dashed #ccc; border-radius: 8px; color: #999; font-weight: bold; background: #fff; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="left-panel">
+            <div class="drop-zone" id="dropZone">
+                <h3>Drag & Drop Sedgwick Job Sheet PDF Here</h3>
+                <p>or <label for="pdfInput">click to browse</label></p>
+                <input type="file" id="pdfInput" accept="application/pdf">
+                <div id="status">Waiting for file...</div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab(event, 'tab-admin')">Admin Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-customer')">Customer Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-job')">Job Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-calendar')" style="margin-left: auto; color: #27ae60;">📅 Event Preview</button>
+            </div>
+
+            <form id="extractedForm">
+                <div id="tab-admin" class="tab-content active">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Claim Ref:</label><div class="input-wrapper"><input type="text" id="claim_ref"><button type="button" class="btn-paste" onclick="pasteClipboard('claim_ref')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Visit Ref:</label><div class="input-wrapper"><input type="text" id="visit_ref"><button type="button" class="btn-paste" onclick="pasteClipboard('visit_ref')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Date:</label><div class="input-wrapper"><input type="text" id="visit_date"><button type="button" class="btn-paste" onclick="pasteClipboard('visit_date')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Type of Loss:</label><div class="input-wrapper"><input type="text" id="type_of_loss"><button type="button" class="btn-paste" onclick="pasteClipboard('type_of_loss')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Job Limit:</label><div class="input-wrapper"><input type="text" id="job_limit"><button type="button" class="btn-paste" onclick="pasteClipboard('job_limit')" title="Paste">📋</button></div></div>
+                    </div>
+                </div>
+
+                <div id="tab-customer" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>Customer Name:</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="customer_name">
+                                <button type="button" class="btn-paste" onclick="pasteClipboard('customer_name')" title="Paste">📋</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Property Address:</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="customer_address">
+                                <button type="button" class="btn-paste" onclick="pasteClipboard('customer_address')" title="Paste">📋</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width"><label>Phone Number(s):</label><div class="input-wrapper"><input type="text" id="customer_phone"><button type="button" class="btn-paste" onclick="pasteClipboard('customer_phone')" title="Paste">📋</button></div></div>
+                    </div>
+                </div>
+
+                <div id="tab-job" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Vulnerability / Fault Description:</label><div class="input-wrapper"><textarea id="fault_desc"></textarea><button type="button" class="btn-paste" onclick="pasteClipboard('fault_desc')" title="Paste" style="height: auto;">📋</button></div></div>
+                    </div>
+                </div>
+            </form>
+
+            <div id="tab-calendar" class="tab-content">
+                <div class="form-grid" id="calendarForm">
+                    <div class="form-group full-width">
+                        <label>Event Title:</label>
+                        <input type="text" id="cal_title">
+                    </div>
+                    <div class="form-group">
+                        <label>Start Time:</label>
+                        <div class="input-wrapper">
+                            <button type="button" class="btn-paste" onclick="adjustStartTime(-30)">-30m</button>
+                            <input type="datetime-local" id="cal_start" onchange="syncEndTime()">
+                            <button type="button" class="btn-paste" onclick="adjustStartTime(30)">+30m</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>End Time (Locked to 30m):</label>
+                        <input type="datetime-local" id="cal_end" readonly style="background: #eee;">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Location:</label>
+                        <input type="text" id="cal_location" placeholder="Leave blank if unknown">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Event Description:</label>
+                        <textarea id="cal_desc"></textarea>
+                    </div>
+                </div>
+                <button id="addCalendarBtn" class="btn-calendar" disabled onclick="exportToICal()">Generate & Open in Outlook (iCal)</button>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div id="placeholder" class="preview-placeholder">PDF Preview will appear here</div>
+            <iframe id="pdfPreview" style="display: none;"></iframe>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        const pdfInput = document.getElementById('pdfInput');
+        const dropZone = document.getElementById('dropZone');
+        const statusText = document.getElementById('status');
+        const addCalendarBtn = document.getElementById('addCalendarBtn');
+        const pdfPreview = document.getElementById('pdfPreview');
+        const placeholder = document.getElementById('placeholder');
+        
+        document.querySelectorAll('input[type="text"], textarea').forEach(input => {
+            input.addEventListener('input', function() {
+                if (this.classList.contains('failed')) {
+                    this.classList.remove('failed');
+                    this.classList.add('amber-warning');
+                    if (this.value === "Failed to read") this.value = ""; 
+                }
+            });
+            input.addEventListener('change', buildCalendarPreview);
+        });
+
+        dropZone.addEventListener('click', () => pdfInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                pdfInput.files = e.dataTransfer.files;
+                pdfInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        function switchTab(event, tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        async function pasteClipboard(targetId) {
+            try {
+                const text = await navigator.clipboard.readText();
+                const inputElement = document.getElementById(targetId);
+                inputElement.value = text.trim();
+                
+                if (inputElement.classList.contains('failed')) {
+                    inputElement.classList.remove('failed');
+                    inputElement.classList.add('amber-warning');
+                }
+                
+                buildCalendarPreview();
+            } catch (err) {
+                console.error('Failed to read clipboard: ', err);
+                alert("Could not paste. Ensure you copied text and allowed permissions.");
+            }
+        }
+
+        pdfInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            pdfPreview.src = URL.createObjectURL(file);
+            pdfPreview.style.display = "block";
+            placeholder.style.display = "none";
+            statusText.innerText = "Extracting text... please wait.";
+            addCalendarBtn.disabled = true;
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let fullText = "";
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                }
+
+                parseTextAndFillForm(fullText);
+                buildCalendarPreview(); 
+                statusText.innerText = "Extraction complete! Check tabs to review details.";
+                statusText.style.color = "#27ae60";
+                addCalendarBtn.disabled = false;
+
+            } catch (error) {
+                console.error("Error reading PDF:", error);
+                statusText.innerText = "Error reading PDF. Please check the console.";
+                statusText.style.color = "#e74c3c";
+            }
+        });
+
+        function parseTextAndFillForm(text) {
+            // Cut off all text after the Sedgwick ETA warning flag
+            const stopPhrase = "*** ETA TO BE PROVIDED";
+            const stopIndex = text.indexOf(stopPhrase);
+            if (stopIndex !== -1) {
+                text = text.substring(0, stopIndex);
+            }
+
+            const extractAndSet = (id, matchArray) => {
+                const input = document.getElementById(id);
+                input.classList.remove('failed', 'amber-warning');
+
+                if (!matchArray || matchArray.length < 2) {
+                    input.value = "Failed to read";
+                    input.classList.add('failed');
+                    return matchArray;
+                }
+
+                let extractedStr = matchArray[1].replace(/["']/g, '').trim();
+
+                if (!extractedStr || extractedStr === ',' || extractedStr === ',,' || extractedStr.toLowerCase() === 'null') {
+                    input.value = "Empty";
+                } else if (extractedStr.toUpperCase() === 'N/A' || extractedStr.toUpperCase() === '$N/A$') {
+                    input.value = "N/A";
+                } else {
+                    input.value = extractedStr;
+                }
+                return extractedStr;
+            };
+
+            // Admin Matchers
+            extractAndSet('claim_ref', text.match(/Claim Ref[\s:]*([A-Za-z0-9-]+)/i));
+            extractAndSet('visit_ref', text.match(/Visit Ref[\s:]*([A-Za-z0-9-]+)/i));
+            extractAndSet('visit_date', text.match(/Date[\s:]*(.*?)(?=Type of loss)/i));
+            extractAndSet('type_of_loss', text.match(/Type of loss[\s:]*(.*?)(?=Job Limit)/i));
+            extractAndSet('job_limit', text.match(/Job Limit[\s:]*(.*?)(?=Job Details|Name)/i));
+
+            // Customer Matchers
+            extractAndSet('customer_name', text.match(/Name[\s:]*(.*?)(?=Address)/i));
+            extractAndSet('customer_address', text.match(/Address[\s:]*(.*?)(?=Phone|Contacts)/i));
+            extractAndSet('customer_phone', text.match(/Phone[\s:]*([0-9/\s]+)/i));
+
+            // Fault Description (Everything left after Vulnerability to the end of our chopped string)
+            extractAndSet('fault_desc', text.match(/Vulnerability[\s:]*(.*)/i));
+        }
+
+        function toLocalISO(dateObj) {
+            const offset = dateObj.getTimezoneOffset() * 60000;
+            return new Date(dateObj.getTime() - offset).toISOString().slice(0,16);
+        }
+
+        function syncEndTime() {
+            const startInput = document.getElementById('cal_start');
+            const endInput = document.getElementById('cal_end');
+            if (startInput.value) {
+                const startDate = new Date(startInput.value);
+                const endDate = new Date(startDate.getTime() + (30 * 60000));
+                endInput.value = toLocalISO(endDate);
+            }
+        }
+
+        function adjustStartTime(minutes) {
+            const startInput = document.getElementById('cal_start');
+            if (startInput.value) {
+                const currentDate = new Date(startInput.value);
+                currentDate.setMinutes(currentDate.getMinutes() + minutes);
+                startInput.value = toLocalISO(currentDate);
+                syncEndTime();
+            }
+        }
+
+        function buildCalendarPreview() {
+            const getVal = (id) => document.getElementById(id).value;
+            const valid = (v) => v && v !== "Failed to read" && v !== "Empty" && v !== "N/A";
+
+            let tol = getVal('type_of_loss');
+            let cr = getVal('claim_ref');
+            let vr = getVal('visit_ref');
+            let cn = getVal('customer_name');
+            let address = getVal('customer_address');
+            let phone = getVal('customer_phone');
+
+            // Format Title
+            let titleStr = "";
+            if (valid(tol)) titleStr += `[${tol}] - `;
+            titleStr += `CR: ${valid(cr)?cr:'_'} - VR: ${valid(vr)?vr:'_'}`;
+            if (valid(cn)) titleStr += ` - ${cn}`;
+            if (valid(address)) titleStr += ` - ${address}`;
+            if (valid(phone)) titleStr += ` - ${phone}`;
+            
+            document.getElementById('cal_title').value = titleStr;
+            document.getElementById('cal_location').value = valid(address) ? address : '';
+
+            // Format Description
+            const lines = ["Job Sheet Details:", "------------------", ""];
+            const addField = (label, value) => {
+                if (valid(value)) lines.push(`${label}: ${value}`);
+            };
+            const addBlankLine = () => {
+                if (lines[lines.length - 1] !== "") lines.push("");
+            };
+
+            addField("Claim Ref", cr);
+            addField("Visit Ref", vr);
+            addBlankLine();
+
+            addField("Date", getVal('visit_date'));
+            addField("Type of Loss", tol);
+            addField("Job Limit", getVal('job_limit'));
+            addBlankLine();
+
+            addField("Customer Name", cn);
+            addField("Property Address", address);
+            addField("Phone Number(s)", phone);
+            addBlankLine();
+
+            addField("Vulnerability / Fault Description", getVal('fault_desc'));
+            document.getElementById('cal_desc').value = lines.join('\n').trim();
+
+            // Format Date (e.g., "Fri 15th May 2026")
+            let dateStr = getVal('visit_date');
+            let dateMatched = false;
+            
+            if (valid(dateStr)) {
+                // Strip out "st", "nd", "rd", "th" to make it digestible by native JS Date parsing
+                let cleanDate = dateStr.replace(/(st|nd|rd|th)/i, '');
+                let parsedDate = new Date(cleanDate);
+                
+                if (!isNaN(parsedDate.getTime())) {
+                    // Default to Midday if the PDF only provided a date and no time
+                    parsedDate.setHours(12, 0, 0, 0);
+                    document.getElementById('cal_start').value = toLocalISO(parsedDate);
+                    dateMatched = true;
+                }
+            }
+
+            if (!dateMatched) {
+                const now = new Date();
+                now.setMinutes(now.getMinutes() < 30 ? 30 : 60, 0, 0); 
+                document.getElementById('cal_start').value = toLocalISO(now);
+            }
+            
+            syncEndTime(); 
+        }
+
+        function exportToICal() {
+            const title = document.getElementById('cal_title').value;
+            const location = document.getElementById('cal_location').value;
+            let description = document.getElementById('cal_desc').value;
+            
+            // iCal requires specific newline encoding (\n) for the description property
+            description = description.replace(/\n/g, '\\n');
+
+            const startInput = document.getElementById('cal_start').value;
+            const endInput = document.getElementById('cal_end').value;
+
+            // Format dates into UTC required by iCal standard (YYYYMMDDTHHMMSSZ)
+            const formatForICal = (dateString) => {
+                const d = new Date(dateString);
+                return d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+            };
+
+            const icsContent = [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//VisitSheetApp//EN",
+                "BEGIN:VEVENT",
+                `DTSTART:${formatForICal(startInput)}`,
+                `DTEND:${formatForICal(endInput)}`,
+                `SUMMARY:${title}`,
+                `DESCRIPTION:${description}`,
+                `LOCATION:${location}`,
+                "END:VEVENT",
+                "END:VCALENDAR"
+            ].join('\r\n');
+
+            // Generate Blob and trigger download
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'appointment.ics';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

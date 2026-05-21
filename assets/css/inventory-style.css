@@ -252,6 +252,123 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
 .expand-gallery-trigger { position: absolute; bottom: 15px; right: 15px; background: rgba(0, 0, 0, 0.65); color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; z-index: 20; backdrop-filter: blur(4px); transition: background 0.15s; }
 .expand-gallery-trigger:hover { background: rgba(0, 0, 0, 0.85); }
 
+.item-detail-modal-content {
+    width: min(92vw, 500px) !important;
+    text-align: left;
+}
+.item-detail-thumbs {
+    box-sizing: border-box;
+}
+.item-detail-body {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 118px;
+    gap: 12px 16px !important;
+    align-items: start;
+}
+.item-detail-main {
+    display: contents;
+    min-width: 0;
+}
+.item-detail-main #detailItemName {
+    grid-column: 1 / -1;
+    order: 1;
+    width: 100%;
+    overflow-wrap: anywhere;
+}
+.item-detail-location {
+    grid-column: 1 / -1;
+    order: 2;
+    width: 100%;
+    overflow-wrap: anywhere;
+}
+.item-detail-category {
+    grid-column: 1 / -1;
+    order: 3;
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+    border-radius: 999px;
+    color: #0369a1;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0 0 10px 0;
+    padding: 6px 12px;
+    overflow-wrap: anywhere;
+}
+.item-detail-token {
+    overflow-wrap: anywhere;
+}
+.item-detail-main > label:nth-of-type(1) {
+    grid-column: 1;
+    order: 4;
+}
+.item-detail-main > #detailItemDescription {
+    grid-column: 1;
+    order: 5;
+}
+.item-detail-main > div[style*="flex-direction: column"] {
+    grid-column: 1;
+    order: 6;
+    min-width: 0;
+}
+.item-detail-main > label:nth-of-type(2) {
+    grid-column: 1 / -1;
+    order: 8;
+    margin-top: 4px !important;
+}
+.item-detail-main > #detailItemTagsContainer {
+    grid-column: 1 / -1;
+    order: 9;
+}
+.item-detail-actions {
+    grid-column: 2;
+    grid-row: 4 / span 3;
+    order: 7;
+    position: sticky;
+    top: 10px;
+}
+.item-form-modal-content {
+    width: min(92vw, 440px) !important;
+    padding: 20px !important;
+    border-radius: 16px !important;
+    text-align: left;
+}
+.item-form-title {
+    margin: 0 0 15px 0;
+    color: #004a99;
+    font-size: 19px;
+    font-weight: 700;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 10px;
+}
+.item-form-modal-content label {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.item-form-modal-content #itemLocationSelect,
+.item-form-modal-content #editItemLocationSelect {
+    width: 100% !important;
+}
+@media (max-width: 360px) {
+    .item-detail-body {
+        grid-template-columns: 1fr;
+    }
+    .item-detail-actions {
+        position: static;
+        width: 100% !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+    }
+    .item-detail-actions button {
+        width: 100% !important;
+    }
+}
+
 @keyframes itemDropPulse {
     0% { transform: translateY(-60px); opacity: 0; box-shadow: 0 0 0 rgba(255, 140, 0, 0); background-color: #fff; }
     10% { transform: translateY(0); opacity: 1; box-shadow: 0 0 20px rgba(255, 140, 0, 0.8); background-color: #fffaf0; outline: 3px solid #ff8c00; outline-offset: -1px; }
@@ -764,5 +881,179 @@ body:has(.modal[style*="display:block"]) {
                 top: 100%; bottom: auto; margin-top: 6px; margin-bottom: 0;
             }
         }
+
+
+/* =========================================================
+   ITEM MODALS: FINAL OVERRIDES
+   Keep this at the end so it wins over legacy inline-oriented
+   mobile modal rules and generic .modal-content styling.
+========================================================= */
+#itemDetailsModal .item-detail-modal-content {
+    width: min(92vw, 500px) !important;
+    max-width: 500px !important;
+    padding: 0 !important;
+    border-radius: 16px !important;
+    overflow-y: auto !important;
+    text-align: left !important;
+}
+
+#itemDetailsModal .item-detail-thumbs {
+    padding: 0 25px !important;
+    margin-top: 10px !important;
+}
+
+#itemDetailsModal .item-detail-body {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 20px 25px 24px !important;
+    text-align: left !important;
+    align-items: start !important;
+}
+
+#itemDetailsModal .item-detail-heading,
+#itemDetailsModal .item-detail-tags-block {
+    min-width: 0 !important;
+    width: 100% !important;
+}
+
+#itemDetailsModal #detailItemName {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    overflow-wrap: anywhere !important;
+}
+
+#itemDetailsModal #detailItemLocation {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    overflow-wrap: anywhere !important;
+}
+
+#itemDetailsModal #detailItemCategory {
+    justify-self: start !important;
+    margin: 0 0 8px !important;
+}
+
+#itemDetailsModal .item-detail-lower {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 115px !important;
+    gap: 16px !important;
+    align-items: start !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+#itemDetailsModal .item-detail-info {
+    min-width: 0 !important;
+}
+
+#itemDetailsModal .item-detail-info label:first-child {
+    margin-top: 0 !important;
+}
+
+#itemDetailsModal #detailItemDescription {
+    margin: 4px 0 14px !important;
+}
+
+#itemDetailsModal .item-detail-actions {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    align-self: start !important;
+    position: static !important;
+    width: 115px !important;
+    padding-top: 0 !important;
+}
+
+#itemDetailsModal .item-detail-tags-block label {
+    margin-top: 0 !important;
+}
+
+#itemDetailsModal #detailItemTagsContainer {
+    margin-top: 4px !important;
+    margin-bottom: 0 !important;
+}
+
+#addItemModal .item-form-modal-content,
+#itemEditModal .item-form-modal-content {
+    width: min(92vw, 440px) !important;
+    max-width: 440px !important;
+    padding: 20px !important;
+    border-radius: 16px !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+}
+
+#addItemModal .item-form-title,
+#itemEditModal .item-form-title {
+    margin: 0 0 15px 0 !important;
+    color: #004a99 !important;
+    font-size: 19px !important;
+    font-weight: 700 !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    padding-bottom: 10px !important;
+}
+
+#addItemModal .item-form-media,
+#addItemModal .item-form-field,
+#addItemModal .item-form-tags-block {
+    margin-bottom: 12px !important;
+}
+
+#addItemModal #addItemPreviewsRow {
+    min-height: 72px !important;
+    margin-bottom: 10px !important;
+}
+
+#addItemModal .item-form-work-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 110px !important;
+    gap: 15px !important;
+    align-items: start !important;
+    margin-bottom: 14px !important;
+}
+
+#addItemModal .item-form-fields-stack,
+#addItemModal .item-form-action-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+}
+
+#addItemModal .item-form-action-stack {
+    padding-top: 18px !important;
+}
+
+#addItemModal .item-form-action-stack button {
+    width: 100% !important;
+    height: 36px !important;
+    padding: 8px 4px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+}
+
+#addItemModal .item-form-location-row {
+    display: flex !important;
+    gap: 6px !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+
+#addItemModal .item-form-location-row select {
+    flex: 1 1 auto !important;
+    margin-bottom: 0 !important;
+    min-width: 0 !important;
+}
+
+#addItemModal .item-form-location-row .icon-btn,
+#addItemModal .item-form-location-row button {
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    flex: 0 0 38px !important;
+}
 
 

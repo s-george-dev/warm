@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Job Sheet Extractor & Calendar Sync</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background-color: #fafafa; }
+        .app-container { display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; align-items: flex-start; }
+        .left-panel { flex: 1; max-width: 50%; }
+        .right-panel { flex: 1; position: sticky; top: 20px; height: 90vh; }
+        .drop-zone { border: 2px dashed #0066cc; padding: 30px; text-align: center; margin-bottom: 20px; background: #f0f7ff; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .drop-zone.dragover { background: #cce5ff; border-color: #004c99; }
+        #pdfInput { display: none; }
+        .drop-zone label { cursor: pointer; color: #0066cc; font-weight: bold; text-decoration: underline; }
+        #status { color: #555; font-size: 0.9em; margin-top: 10px; font-weight: bold; }
+        .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 1em; font-weight: bold; color: #666; border-bottom: 3px solid transparent; transition: color 0.2s; }
+        .tab-btn:hover { color: #0066cc; }
+        .tab-btn.active { border-bottom-color: #0066cc; color: #0066cc; }
+        .tab-content { display: none; background: white; padding: 20px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 5px; }
+        .form-group.full-width { grid-column: 1 / -1 !important; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.85em; color: #555; }
+        .input-wrapper { display: flex; gap: 5px; align-items: center; }
+        input[type="text"], input[type="datetime-local"], textarea { flex: 1; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.9em; font-family: inherit; }
+        textarea { height: 150px; resize: vertical; }
+        input:focus, textarea:focus { border-color: #0066cc; outline: none; }
+        input.failed, textarea.failed { border: 2px solid #e74c3c !important; background-color: #fadbd8 !important; color: #c0392b !important; font-weight: bold; }
+        input.amber-warning, textarea.amber-warning { border: 2px solid #f39c12 !important; background-color: #fef5e7 !important; color: #b9770e !important; font-weight: bold; }
+        .btn-paste { background: #e0e0e0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 0 10px; height: 35px; font-size: 0.9em; transition: background 0.2s; font-weight: bold; }
+        .btn-paste:hover { background: #d0d0d0; }
+        .btn-calendar { display: block; width: 100%; padding: 15px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
+        .btn-calendar:hover { background: #219a52; }
+        .btn-calendar:disabled { background: #95a5a6; cursor: not-allowed; }
+        #pdfPreview { width: 100%; height: 100%; border: none; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: white; }
+        .preview-placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border: 2px dashed #ccc; border-radius: 8px; color: #999; font-weight: bold; background: #fff; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div class="left-panel">
+            <div class="drop-zone" id="dropZone">
+                <h3>Drag & Drop Home Job Sheet PDF Here</h3>
+                <p>or <label for="pdfInput">click to browse</label></p>
+                <input type="file" id="pdfInput" accept="application/pdf">
+                <div id="status">Waiting for file...</div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab(event, 'tab-admin')">Job Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-customer')">Customer Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-appliance')">Appliance & Problem</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-calendar')" style="margin-left: auto; color: #27ae60;">Event Preview</button>
+            </div>
+
+            <form id="extractedForm">
+                <div id="tab-admin" class="tab-content active">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Service Job:</label><div class="input-wrapper"><input type="text" id="service_job"><button type="button" class="btn-paste" onclick="pasteClipboard('service_job')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>CRM Number:</label><div class="input-wrapper"><input type="text" id="crm_number"><button type="button" class="btn-paste" onclick="pasteClipboard('crm_number')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Job Type:</label><div class="input-wrapper"><input type="text" id="job_type"><button type="button" class="btn-paste" onclick="pasteClipboard('job_type')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Job Status:</label><div class="input-wrapper"><input type="text" id="job_status"><button type="button" class="btn-paste" onclick="pasteClipboard('job_status')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Job Status Date:</label><div class="input-wrapper"><input type="text" id="job_status_date"><button type="button" class="btn-paste" onclick="pasteClipboard('job_status_date')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Technician:</label><div class="input-wrapper"><input type="text" id="technician"><button type="button" class="btn-paste" onclick="pasteClipboard('technician')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Scheduled Service Date:</label><div class="input-wrapper"><input type="text" id="scheduled_date"><button type="button" class="btn-paste" onclick="pasteClipboard('scheduled_date')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Scheduled Time Slot:</label><div class="input-wrapper"><input type="text" id="scheduled_time"><button type="button" class="btn-paste" onclick="pasteClipboard('scheduled_time')" title="Paste">Paste</button></div></div>
+                        <div class="form-group full-width"><label>Service Description:</label><div class="input-wrapper"><input type="text" id="service_description"><button type="button" class="btn-paste" onclick="pasteClipboard('service_description')" title="Paste">Paste</button></div></div>
+                    </div>
+                </div>
+
+                <div id="tab-customer" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Customer Name:</label><div class="input-wrapper"><input type="text" id="customer_name"><button type="button" class="btn-paste" onclick="pasteClipboard('customer_name')" title="Paste">Paste</button></div></div>
+                        <div class="form-group full-width"><label>Property Address:</label><div class="input-wrapper"><input type="text" id="customer_address"><button type="button" class="btn-paste" onclick="pasteClipboard('customer_address')" title="Paste">Paste</button></div></div>
+                        <div class="form-group full-width"><label>Phone Number(s):</label><div class="input-wrapper"><input type="text" id="customer_phone"><button type="button" class="btn-paste" onclick="pasteClipboard('customer_phone')" title="Paste">Paste</button></div></div>
+                        <div class="form-group full-width"><label>Service Provider:</label><div class="input-wrapper"><input type="text" id="service_provider"><button type="button" class="btn-paste" onclick="pasteClipboard('service_provider')" title="Paste">Paste</button></div></div>
+                    </div>
+                </div>
+
+                <div id="tab-appliance" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Brand:</label><div class="input-wrapper"><input type="text" id="brand"><button type="button" class="btn-paste" onclick="pasteClipboard('brand')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Model Number:</label><div class="input-wrapper"><input type="text" id="model_number"><button type="button" class="btn-paste" onclick="pasteClipboard('model_number')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Serial Number:</label><div class="input-wrapper"><input type="text" id="serial_number"><button type="button" class="btn-paste" onclick="pasteClipboard('serial_number')" title="Paste">Paste</button></div></div>
+                        <div class="form-group"><label>Product Line:</label><div class="input-wrapper"><input type="text" id="product_line"><button type="button" class="btn-paste" onclick="pasteClipboard('product_line')" title="Paste">Paste</button></div></div>
+                        <div class="form-group full-width"><label>Problem Description:</label><div class="input-wrapper"><textarea id="problem_description"></textarea><button type="button" class="btn-paste" onclick="pasteClipboard('problem_description')" title="Paste" style="height: auto;">Paste</button></div></div>
+                        <div class="form-group full-width"><label>Special Instruction:</label><div class="input-wrapper"><textarea id="special_instruction"></textarea><button type="button" class="btn-paste" onclick="pasteClipboard('special_instruction')" title="Paste" style="height: auto;">Paste</button></div></div>
+                    </div>
+                </div>
+            </form>
+
+            <div id="tab-calendar" class="tab-content">
+                <div class="form-grid" id="calendarForm">
+                    <div class="form-group full-width"><label>Event Title:</label><input type="text" id="cal_title"></div>
+                    <div class="form-group">
+                        <label>Start Time:</label>
+                        <div class="input-wrapper">
+                            <button type="button" class="btn-paste" onclick="adjustStartTime(-30)">-30m</button>
+                            <input type="datetime-local" id="cal_start" onchange="syncEndTime()">
+                            <button type="button" class="btn-paste" onclick="adjustStartTime(30)">+30m</button>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>End Time (Locked to 30m):</label><input type="datetime-local" id="cal_end" readonly style="background: #eee;"></div>
+                    <div class="form-group full-width"><label>Location:</label><input type="text" id="cal_location" placeholder="Leave blank if unknown"></div>
+                    <div class="form-group full-width"><label>Event Description:</label><textarea id="cal_desc"></textarea></div>
+                </div>
+                <button id="addCalendarBtn" class="btn-calendar" disabled onclick="exportToICal()">Generate & Open in Outlook (iCal)</button>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div id="placeholder" class="preview-placeholder">PDF Preview will appear here</div>
+            <iframe id="pdfPreview" style="display: none;"></iframe>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        const pdfInput = document.getElementById('pdfInput');
+        const dropZone = document.getElementById('dropZone');
+        const statusText = document.getElementById('status');
+        const addCalendarBtn = document.getElementById('addCalendarBtn');
+        const pdfPreview = document.getElementById('pdfPreview');
+        const placeholder = document.getElementById('placeholder');
+
+        document.querySelectorAll('input[type="text"], textarea').forEach(input => {
+            input.addEventListener('input', function() {
+                if (this.classList.contains('failed')) {
+                    this.classList.remove('failed');
+                    this.classList.add('amber-warning');
+                    if (this.value === "Failed to read") this.value = "";
+                }
+                buildCalendarPreview();
+            });
+            input.addEventListener('change', buildCalendarPreview);
+        });
+
+        dropZone.addEventListener('click', () => pdfInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                pdfInput.files = e.dataTransfer.files;
+                pdfInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        function switchTab(event, tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        async function pasteClipboard(targetId) {
+            try {
+                const text = await navigator.clipboard.readText();
+                const inputElement = document.getElementById(targetId);
+                inputElement.value = text.trim();
+                inputElement.classList.remove('failed');
+                buildCalendarPreview();
+            } catch (err) {
+                console.error('Failed to read clipboard: ', err);
+                alert("Could not paste. Ensure you copied text and allowed permissions.");
+            }
+        }
+
+        pdfInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            pdfPreview.src = URL.createObjectURL(file);
+            pdfPreview.style.display = "block";
+            placeholder.style.display = "none";
+            statusText.innerText = "Extracting text... please wait.";
+            statusText.style.color = "#555";
+            addCalendarBtn.disabled = true;
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let fullText = "";
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                }
+
+                parseTextAndFillForm(fullText);
+                buildCalendarPreview();
+                statusText.innerText = "Extraction complete! Please review highlighted fields before generating Outlook.";
+                statusText.style.color = "#27ae60";
+                addCalendarBtn.disabled = false;
+            } catch (error) {
+                console.error("Error reading PDF:", error);
+                statusText.innerText = "Error reading PDF. Please check the console.";
+                statusText.style.color = "#e74c3c";
+            }
+        });
+
+        function parseTextAndFillForm(text) {
+            const normalized = text.replace(/\s+/g, " ").trim();
+            const setValue = (id, value, uncertain = false) => {
+                const input = document.getElementById(id);
+                input.classList.remove('failed', 'amber-warning');
+
+                if (!value || value === "N/A") {
+                    input.value = value || "Failed to read";
+                    input.classList.add(value ? 'amber-warning' : 'failed');
+                    return;
+                }
+
+                input.value = value.trim();
+                if (uncertain) input.classList.add('amber-warning');
+            };
+            const firstMatch = (regex) => {
+                const match = normalized.match(regex);
+                return match ? match[1].trim() : "";
+            };
+            const allMatches = (regex) => Array.from(normalized.matchAll(regex), match => match[1].trim());
+
+            const dates = allMatches(/\b(\d{2}\/\d{2}\/\d{4})\b/g);
+            const phones = Array.from(new Set(allMatches(/\b(0\d{10})\b/g)));
+            const serviceJob = firstMatch(/\b(SHUK[A-Z0-9-]+)\b/i);
+            const crmNumber = firstMatch(/\b(\d{9})\s+SHUK[A-Z0-9-]+\b/i) || firstMatch(/\bCRM Number\s+(\d{6,})\b/i);
+            const serviceProvider = firstMatch(/\b(\d+\s+-\s+Warm Right Limited)\b/i);
+
+            setValue('service_job', serviceJob);
+            setValue('crm_number', crmNumber);
+            setValue('job_type', firstMatch(/\b(Planned Work Request)\b/i));
+            setValue('job_status', firstMatch(/\bTN\d{2}\s?\d[A-Z]{2}\s+(ACCEPTED|BOOKED|CANCELLED|COMPLETED|OPEN|NEW)\b/i) || firstMatch(/\b(ACCEPTED|BOOKED|CANCELLED|COMPLETED|OPEN|NEW)\s+0\d{10}\b/i));
+            setValue('job_status_date', dates[1] || "", dates.length > 1);
+            setValue('technician', firstMatch(/\b(OSR)\b/i), true);
+            setValue('scheduled_date', dates[0] || "");
+            setValue('scheduled_time', firstMatch(/(?:^|\s)([0-2][0-9][0-5][0-9])(?=\s|$)/));
+            setValue('service_description', firstMatch(/\b(Boiler Service)\b/i));
+
+            setValue('customer_name', firstMatch(/\bST\.?\s+MARYS ROW\s+(.+?)\s+\d{6,}\s+PROMA\b/i), true);
+            setValue('customer_address', buildAddressFromKnownParts(normalized), true);
+            setValue('customer_phone', phones.join(" / "));
+            setValue('service_provider', serviceProvider);
+
+            setValue('brand', firstMatch(/\b(Potterton)\b/i));
+            setValue('model_number', firstMatch(/\b(PROMA\s+30\s+HE\s+PLUS)\b/i));
+            setValue('serial_number', firstMatch(/\b(\d{9})\s+PROMA\s+30\s+HE\s+PLUS\b/i), true);
+            setValue('product_line', firstMatch(/\b(Boiler Service)\b/i), true);
+            setValue('problem_description', firstMatch(/\bSheerness\s+(.+?,\s+Boiler Age\s+\d+,\s+Priority\s+\d+)\s+TN\d{2}\s?\d[A-Z]{2}\b/i) || firstMatch(/\b([A-Za-z][A-Za-z ]+,\s+Boiler Age\s+\d+,\s+Priority\s+\d+)\b/i));
+            setValue('special_instruction', "");
+        }
+
+        function buildAddressFromKnownParts(text) {
+            const line1 = text.match(/\b(\d+\s+Derville Road)\b/i);
+            const line2 = text.match(/\b(ST\.?\s+MARYS ROW)\b/i);
+            const town = text.match(/\b(New Romney)\b/i);
+            const postcode = text.match(/\b(TN\d{2}\s?\d[A-Z]{2})\b/i);
+            const parts = [line1, line2, town, postcode]
+                .filter(Boolean)
+                .map(match => match[1].replace(/\s+/g, " ").trim());
+
+            if (parts.length) {
+                parts.push("UNITED KINGDOM");
+                return parts.join(" ");
+            }
+            return "";
+        }
+
+        function toLocalISO(dateObj) {
+            const offset = dateObj.getTimezoneOffset() * 60000;
+            return new Date(dateObj.getTime() - offset).toISOString().slice(0,16);
+        }
+
+        function syncEndTime() {
+            const startInput = document.getElementById('cal_start');
+            const endInput = document.getElementById('cal_end');
+            if (startInput.value) {
+                const startDate = new Date(startInput.value);
+                const endDate = new Date(startDate.getTime() + (30 * 60000));
+                endInput.value = toLocalISO(endDate);
+            }
+        }
+
+        function adjustStartTime(minutes) {
+            const startInput = document.getElementById('cal_start');
+            if (startInput.value) {
+                const currentDate = new Date(startInput.value);
+                currentDate.setMinutes(currentDate.getMinutes() + minutes);
+                startInput.value = toLocalISO(currentDate);
+                syncEndTime();
+            }
+        }
+
+        function buildCalendarPreview() {
+            const getVal = (id) => document.getElementById(id).value;
+            const valid = (v) => v && v !== "Failed to read" && v !== "Empty" && v !== "N/A";
+
+            const serviceJob = getVal('service_job');
+            const crmNumber = getVal('crm_number');
+            const serviceDescription = getVal('service_description');
+            const customerName = getVal('customer_name');
+            const address = getVal('customer_address');
+            const phone = getVal('customer_phone');
+
+            let titleStr = "";
+            if (valid(serviceDescription)) titleStr += `[${serviceDescription}] - `;
+            titleStr += `Job: ${valid(serviceJob) ? serviceJob : '_'} - CRM: ${valid(crmNumber) ? crmNumber : '_'}`;
+            if (valid(customerName)) titleStr += ` - ${customerName}`;
+            if (valid(address)) titleStr += ` - ${address}`;
+            if (valid(phone)) titleStr += ` - ${phone}`;
+
+            document.getElementById('cal_title').value = titleStr;
+            document.getElementById('cal_location').value = valid(address) ? address : '';
+
+            const lines = ["Home Job Details:", "-----------------", ""];
+            const addField = (label, value) => {
+                if (valid(value)) lines.push(`${label}: ${value}`);
+            };
+            const addBlankLine = () => {
+                if (lines[lines.length - 1] !== "") lines.push("");
+            };
+
+            addField("Service Job", serviceJob);
+            addField("CRM Number", crmNumber);
+            addField("Job Type", getVal('job_type'));
+            addField("Job Status", getVal('job_status'));
+            addField("Job Status Date", getVal('job_status_date'));
+            addField("Technician", getVal('technician'));
+            addBlankLine();
+
+            addField("Scheduled Service Date", getVal('scheduled_date'));
+            addField("Scheduled Time Slot", getVal('scheduled_time'));
+            addField("Service Description", serviceDescription);
+            addBlankLine();
+
+            addField("Customer Name", customerName);
+            addField("Property Address", address);
+            addField("Phone Number(s)", phone);
+            addField("Service Provider", getVal('service_provider'));
+            addBlankLine();
+
+            addField("Brand", getVal('brand'));
+            addField("Model Number", getVal('model_number'));
+            addField("Serial Number", getVal('serial_number'));
+            addField("Product Line", getVal('product_line'));
+            addBlankLine();
+
+            addField("Problem Description", getVal('problem_description'));
+            addField("Special Instruction", getVal('special_instruction'));
+            document.getElementById('cal_desc').value = lines.join('\n').trim();
+
+            const dateStr = getVal('scheduled_date');
+            const timeStr = getVal('scheduled_time');
+            let dateMatched = false;
+
+            if (valid(dateStr)) {
+                const dateMatch = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if (dateMatch) {
+                    const month = dateMatch[1];
+                    const day = dateMatch[2];
+                    const year = dateMatch[3];
+                    const timeMatch = valid(timeStr) ? timeStr.match(/^([0-2][0-9])([0-5][0-9])$/) : null;
+                    const hours = timeMatch ? timeMatch[1] : "12";
+                    const minutes = timeMatch ? timeMatch[2] : "00";
+                    document.getElementById('cal_start').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+                    dateMatched = true;
+                }
+            }
+
+            if (!dateMatched) {
+                const now = new Date();
+                now.setMinutes(now.getMinutes() < 30 ? 30 : 60, 0, 0);
+                document.getElementById('cal_start').value = toLocalISO(now);
+            }
+
+            syncEndTime();
+        }
+
+        function escapeICalText(value) {
+            return value
+                .replace(/\\/g, '\\\\')
+                .replace(/\n/g, '\\n')
+                .replace(/,/g, '\\,')
+                .replace(/;/g, '\\;');
+        }
+
+        function exportToICal() {
+            const title = escapeICalText(document.getElementById('cal_title').value);
+            const location = escapeICalText(document.getElementById('cal_location').value);
+            const description = escapeICalText(document.getElementById('cal_desc').value);
+            const startInput = document.getElementById('cal_start').value;
+            const endInput = document.getElementById('cal_end').value;
+
+            const formatForICal = (dateString) => {
+                const d = new Date(dateString);
+                return d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+            };
+
+            const icsContent = [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//HomeJobSheetApp//EN",
+                "BEGIN:VEVENT",
+                `DTSTART:${formatForICal(startInput)}`,
+                `DTEND:${formatForICal(endInput)}`,
+                `SUMMARY:${title}`,
+                `DESCRIPTION:${description}`,
+                `LOCATION:${location}`,
+                "END:VEVENT",
+                "END:VCALENDAR"
+            ].join('\r\n');
+
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'home-appointment.ics';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

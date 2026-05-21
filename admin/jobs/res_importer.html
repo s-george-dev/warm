@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visit Sheet Auto-Fill & Calendar Sync</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background-color: #fafafa; }
+        
+        .app-container { display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; align-items: flex-start; }
+        .left-panel { flex: 1; max-width: 50%; }
+        .right-panel { flex: 1; position: sticky; top: 20px; height: 90vh; }
+        
+        .drop-zone { border: 2px dashed #0066cc; padding: 30px; text-align: center; margin-bottom: 20px; background: #f0f7ff; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .drop-zone.dragover { background: #cce5ff; border-color: #004c99; }
+        #pdfInput { display: none; }
+        .drop-zone label { cursor: pointer; color: #0066cc; font-weight: bold; text-decoration: underline; }
+        #status { color: #555; font-size: 0.9em; margin-top: 10px; font-weight: bold; }
+        
+        .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 1em; font-weight: bold; color: #666; border-bottom: 3px solid transparent; transition: color 0.2s; }
+        .tab-btn:hover { color: #0066cc; }
+        .tab-btn.active { border-bottom-color: #0066cc; color: #0066cc; }
+        .tab-content { display: none; background: white; padding: 20px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 5px; }
+        .form-group.full-width { grid-column: 1 / -1 !important; }
+        
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.85em; color: #555; }
+        .input-wrapper { display: flex; gap: 5px; align-items: center; }
+        
+        select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
+        input[type="text"], input[type="datetime-local"], textarea { flex: 1; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.9em; font-family: inherit; }
+        textarea { height: 150px; resize: vertical; }
+        input:focus, textarea:focus, select:focus { border-color: #0066cc; outline: none; }
+        
+        /* State Colors */
+        input.failed { border: 2px solid #e74c3c !important; background-color: #fadbd8 !important; color: #c0392b !important; font-weight: bold; }
+        input.amber-warning { border: 2px solid #f39c12 !important; background-color: #fef5e7 !important; color: #b9770e !important; font-weight: bold; }
+        
+        .btn-paste { background: #e0e0e0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 0 10px; height: 35px; font-size: 0.9em; transition: background 0.2s; font-weight: bold; }
+        .btn-paste:hover { background: #d0d0d0; }
+        
+        .btn-calendar { display: block; width: 100%; padding: 15px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
+        .btn-calendar:hover { background: #219a52; }
+        .btn-calendar:disabled { background: #95a5a6; cursor: not-allowed; }
+
+        #pdfPreview { width: 100%; height: 100%; border: none; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: white; }
+        .preview-placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border: 2px dashed #ccc; border-radius: 8px; color: #999; font-weight: bold; background: #fff; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="left-panel">
+            <div class="drop-zone" id="dropZone">
+                <h3>Drag & Drop Visit Sheet PDF Here</h3>
+                <p>or <label for="pdfInput">click to browse</label></p>
+                <input type="file" id="pdfInput" accept="application/pdf">
+                <div id="status">Waiting for file...</div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab(event, 'tab-admin')">Admin Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-customer')">Customer Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-job')">Job Details</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-calendar')" style="margin-left: auto; color: #27ae60;">📅 Event Preview</button>
+            </div>
+
+            <form id="extractedForm">
+                <div id="tab-admin" class="tab-content active">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Job Number:</label><div class="input-wrapper"><input type="text" id="job_number"><button type="button" class="btn-paste" onclick="pasteClipboard('job_number')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Visit Number:</label><div class="input-wrapper"><input type="text" id="visit_number"><button type="button" class="btn-paste" onclick="pasteClipboard('visit_number')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Claim Reference Number:</label><div class="input-wrapper"><input type="text" id="claim_ref"><button type="button" class="btn-paste" onclick="pasteClipboard('claim_ref')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Skill Set:</label><div class="input-wrapper"><input type="text" id="skill_set"><button type="button" class="btn-paste" onclick="pasteClipboard('skill_set')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Requested Date:</label><div class="input-wrapper"><input type="text" id="req_date"><button type="button" class="btn-paste" onclick="pasteClipboard('req_date')" title="Paste">📋</button></div></div>
+                    </div>
+                </div>
+
+                <div id="tab-customer" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>Customer Name (Auto-Trimmed):</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="customer_name">
+                                <button type="button" class="btn-paste" onclick="pasteClipboard('customer_name')" title="Paste">📋</button>
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Work Address:</label>
+                            <div class="input-wrapper">
+                                <select id="addr_parser" onchange="applyAddressParsing()" title="Choose how to split the name from the address">
+                                    <option value="number">Trim before 1st Number</option>
+                                    <option value="comma">Trim before 1st Comma</option>
+                                    <option value="original">Keep Original Text</option>
+                                </select>
+                                <input type="text" id="work_address">
+                                <button type="button" class="btn-paste" onclick="pasteClipboard('work_address')" title="Paste">📋</button>
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Telephone Number:</label><div class="input-wrapper"><input type="text" id="work_tel"><button type="button" class="btn-paste" onclick="pasteClipboard('work_tel')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Mobile Number:</label><div class="input-wrapper"><input type="text" id="work_mob"><button type="button" class="btn-paste" onclick="pasteClipboard('work_mob')" title="Paste">📋</button></div></div>
+                    </div>
+                    <h4 style="margin-bottom: 10px; margin-top: 20px; color: #666; font-size: 0.9em;">Contacts Table</h4>
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Contact Name:</label><div class="input-wrapper"><input type="text" id="contact_name"><button type="button" class="btn-paste" onclick="pasteClipboard('contact_name')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Contact Telephone:</label><div class="input-wrapper"><input type="text" id="contact_tel"><button type="button" class="btn-paste" onclick="pasteClipboard('contact_tel')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Contact Mobile:</label><div class="input-wrapper"><input type="text" id="contact_mob"><button type="button" class="btn-paste" onclick="pasteClipboard('contact_mob')" title="Paste">📋</button></div></div>
+                    </div>
+                </div>
+
+                <div id="tab-job" class="tab-content">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Boiler Make:</label><div class="input-wrapper"><input type="text" id="boiler_make"><button type="button" class="btn-paste" onclick="pasteClipboard('boiler_make')" title="Paste">📋</button></div></div>
+                        <div class="form-group"><label>Boiler Type:</label><div class="input-wrapper"><input type="text" id="boiler_type"><button type="button" class="btn-paste" onclick="pasteClipboard('boiler_type')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Boiler Age:</label><div class="input-wrapper"><input type="text" id="boiler_age"><button type="button" class="btn-paste" onclick="pasteClipboard('boiler_age')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Description of Fault:</label><div class="input-wrapper"><input type="text" id="fault_desc"><button type="button" class="btn-paste" onclick="pasteClipboard('fault_desc')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Boiler data badge picture and GC Number:</label><div class="input-wrapper"><input type="text" id="gc_number"><button type="button" class="btn-paste" onclick="pasteClipboard('gc_number')" title="Paste">📋</button></div></div>
+                        <div class="form-group full-width"><label>Classified as vulnerable?</label><div class="input-wrapper"><input type="text" id="vulnerable"><button type="button" class="btn-paste" onclick="pasteClipboard('vulnerable')" title="Paste">📋</button></div></div>
+                    </div>
+                </div>
+            </form>
+
+            <div id="tab-calendar" class="tab-content">
+                <div class="form-grid" id="calendarForm">
+                    <div class="form-group full-width">
+                        <label>Event Title:</label>
+                        <input type="text" id="cal_title">
+                    </div>
+                    <div class="form-group">
+                        <label>Start Time:</label>
+                        <div class="input-wrapper">
+                            <button type="button" class="btn-paste" onclick="adjustStartTime(-30)">-30m</button>
+                            <input type="datetime-local" id="cal_start" onchange="syncEndTime()">
+                            <button type="button" class="btn-paste" onclick="adjustStartTime(30)">+30m</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>End Time (Locked to 30m):</label>
+                        <input type="datetime-local" id="cal_end" readonly style="background: #eee;">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Location:</label>
+                        <input type="text" id="cal_location" placeholder="Leave blank if unknown">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Event Description:</label>
+                        <textarea id="cal_desc"></textarea>
+                    </div>
+                </div>
+                <button id="addCalendarBtn" class="btn-calendar" disabled onclick="exportToICal()">Generate & Open in Outlook (iCal)</button>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div id="placeholder" class="preview-placeholder">PDF Preview will appear here</div>
+            <iframe id="pdfPreview" style="display: none;"></iframe>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        let rawExtractedAddress = ""; 
+        const pdfInput = document.getElementById('pdfInput');
+        const dropZone = document.getElementById('dropZone');
+        const statusText = document.getElementById('status');
+        const addCalendarBtn = document.getElementById('addCalendarBtn');
+        const pdfPreview = document.getElementById('pdfPreview');
+        const placeholder = document.getElementById('placeholder');
+        
+        document.querySelectorAll('input[type="text"]').forEach(input => {
+            input.addEventListener('input', function() {
+                if (this.classList.contains('failed')) {
+                    this.classList.remove('failed');
+                    this.classList.add('amber-warning');
+                    if (this.value === "Failed to read") this.value = ""; 
+                }
+            });
+            input.addEventListener('change', buildCalendarPreview);
+        });
+
+        dropZone.addEventListener('click', () => pdfInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                pdfInput.files = e.dataTransfer.files;
+                pdfInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        function switchTab(event, tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        async function pasteClipboard(targetId) {
+            try {
+                const text = await navigator.clipboard.readText();
+                const inputElement = document.getElementById(targetId);
+                inputElement.value = text.trim();
+                
+                if (inputElement.classList.contains('failed')) {
+                    inputElement.classList.remove('failed');
+                    inputElement.classList.add('amber-warning');
+                }
+                
+                buildCalendarPreview();
+            } catch (err) {
+                console.error('Failed to read clipboard: ', err);
+                alert("Could not paste. Ensure you copied text and allowed permissions.");
+            }
+        }
+
+        pdfInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            pdfPreview.src = URL.createObjectURL(file);
+            pdfPreview.style.display = "block";
+            placeholder.style.display = "none";
+            statusText.innerText = "Extracting text... please wait.";
+            addCalendarBtn.disabled = true;
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let fullText = "";
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + " ";
+                }
+
+                parseTextAndFillForm(fullText);
+                buildCalendarPreview(); 
+                statusText.innerText = "Extraction complete! Check tabs to review details.";
+                statusText.style.color = "#27ae60";
+                addCalendarBtn.disabled = false;
+
+            } catch (error) {
+                console.error("Error reading PDF:", error);
+                statusText.innerText = "Error reading PDF. Please check the console.";
+                statusText.style.color = "#e74c3c";
+            }
+        });
+
+        function parseTextAndFillForm(text) {
+            const extractAndSet = (id, matchArray) => {
+                const input = document.getElementById(id);
+                input.classList.remove('failed', 'amber-warning');
+
+                if (!matchArray || matchArray.length < 2) {
+                    input.value = "Failed to read";
+                    input.classList.add('failed');
+                    return matchArray;
+                }
+
+                let extractedStr = matchArray[1].replace(/["']/g, '').trim();
+
+                if (!extractedStr || extractedStr === ',' || extractedStr === ',,' || extractedStr.toLowerCase() === 'null') {
+                    input.value = "Empty";
+                } else if (extractedStr.toUpperCase() === 'N/A' || extractedStr.toUpperCase() === '$N/A$') {
+                    input.value = "N/A";
+                } else {
+                    input.value = extractedStr;
+                }
+                return extractedStr;
+            };
+
+            extractAndSet('job_number', text.match(/Job Number[^0-9]*(\d+)/i));
+            extractAndSet('visit_number', text.match(/Visit Number[^0-9]*(\d+)/i));
+            extractAndSet('claim_ref', text.match(/Claim Reference Number[\s:]*([A-Z0-9-]+)/i));
+            extractAndSet('skill_set', text.match(/Skill Set[\s:]*(.*?)(?=Requested Date)/i));
+            extractAndSet('req_date', text.match(/Requested Date[\s:]*([\d/]+\s*[\d:-]+)/i));
+
+            const addressMatch = text.match(/Mobile Number[\s:]*(.*?)(?=\s0\d|Contacts)/i);
+            rawExtractedAddress = addressMatch && addressMatch[1] ? addressMatch[1].replace(/["']/g, '').trim() : "";
+            applyAddressParsing(); 
+
+            extractAndSet('work_tel', text.match(/(?:Work Address.*?Mobile Number[\s\S]*?[A-Z]{2}[\s,]*)(0\d{9,10})/i));
+            extractAndSet('work_mob', text.match(/(?:Work Address.*?Mobile Number[\s\S]*?[A-Z]{2}[\s,]*0\d{9,10}[\s,]*)((?:07)\d{8,9})/i));
+            extractAndSet('contact_name', text.match(/Contacts.*?Name.*?Mobile Number[\s,]*([A-Za-z\s]+)(?=0\d|$)/i));
+            extractAndSet('contact_tel', text.match(/Contacts.*?Name.*?Mobile Number[\s\S]*?(?:[A-Za-z\s]+)[\s,]*(0\d{9,10})/i));
+            extractAndSet('contact_mob', text.match(/Contacts.*?Name.*?Mobile Number[\s\S]*?(?:[A-Za-z\s]+)[\s,]*(?:0\d{9,10})?[\s,]*((?:07)\d{8,9})/i));
+            extractAndSet('boiler_age', text.match(/Boiler age[\s:]*(.*?)(?=Boiler Make)/i));
+            extractAndSet('boiler_make', text.match(/Boiler Make[\s:]*(.*?)(?=Boiler Type)/i));
+            extractAndSet('boiler_type', text.match(/Boiler Type[\s:]*(.*?)(?=Description of Fault)/i));
+            extractAndSet('fault_desc', text.match(/Description of Fault[\s:]*(.*?)(?=Please provide boiler data)/i));
+            extractAndSet('gc_number', text.match(/GC Number\.?[\s:]*(.*?)(?=Is there anyone at the property)/i));
+            extractAndSet('vulnerable', text.match(/classified as vulnerable\??[\s:]*(\S+)/i));
+        }
+
+        function applyAddressParsing() {
+            const mode = document.getElementById('addr_parser').value;
+            const addrInput = document.getElementById('work_address');
+            const nameInput = document.getElementById('customer_name');
+            
+            addrInput.classList.remove('failed', 'amber-warning');
+            nameInput.classList.remove('failed', 'amber-warning');
+
+            if (!rawExtractedAddress || rawExtractedAddress === "Failed to read") {
+                addrInput.value = "Failed to read";
+                addrInput.classList.add('failed');
+                nameInput.value = "";
+                return;
+            }
+
+            let addressResult = rawExtractedAddress;
+            let nameResult = "";
+
+            if (mode === 'number') {
+                const numIndex = rawExtractedAddress.search(/\d/);
+                if (numIndex !== -1) {
+                    nameResult = rawExtractedAddress.substring(0, numIndex).replace(/,\s*$/, '').trim();
+                    addressResult = rawExtractedAddress.substring(numIndex).trim();
+                } else {
+                    addrInput.classList.add('amber-warning'); 
+                }
+            } 
+            else if (mode === 'comma') {
+                const commaIndex = rawExtractedAddress.indexOf(',');
+                if (commaIndex !== -1) {
+                    nameResult = rawExtractedAddress.substring(0, commaIndex).trim();
+                    addressResult = rawExtractedAddress.substring(commaIndex + 1).trim();
+                } else {
+                    addrInput.classList.add('amber-warning'); 
+                }
+            } else {
+                nameResult = "";
+                addressResult = rawExtractedAddress;
+            }
+
+            addrInput.value = addressResult.replace(/^[\s,]+/, '');
+            nameInput.value = nameResult;
+            
+            if(nameResult) nameInput.classList.add('amber-warning');
+            buildCalendarPreview();
+        }
+
+        function toLocalISO(dateObj) {
+            const offset = dateObj.getTimezoneOffset() * 60000;
+            return new Date(dateObj.getTime() - offset).toISOString().slice(0,16);
+        }
+
+        function syncEndTime() {
+            const startInput = document.getElementById('cal_start');
+            const endInput = document.getElementById('cal_end');
+            if (startInput.value) {
+                const startDate = new Date(startInput.value);
+                const endDate = new Date(startDate.getTime() + (30 * 60000));
+                endInput.value = toLocalISO(endDate);
+            }
+        }
+
+        function adjustStartTime(minutes) {
+            const startInput = document.getElementById('cal_start');
+            if (startInput.value) {
+                const currentDate = new Date(startInput.value);
+                currentDate.setMinutes(currentDate.getMinutes() + minutes);
+                startInput.value = toLocalISO(currentDate);
+                syncEndTime();
+            }
+        }
+
+        function buildCalendarPreview() {
+            const getVal = (id) => document.getElementById(id).value;
+            const valid = (v) => v && v !== "Failed to read" && v !== "Empty" && v !== "N/A";
+
+            let fault = getVal('fault_desc');
+            let jn = getVal('job_number');
+            let vn = getVal('visit_number');
+            let cr = getVal('claim_ref');
+            let cn = getVal('customer_name');
+            let address = getVal('work_address');
+            let tel = getVal('work_mob') || getVal('work_tel');
+
+            let titleStr = "";
+            if (valid(fault)) titleStr += `${fault} - `;
+            titleStr += `JN: ${valid(jn)?jn:'_'} - VN: ${valid(vn)?vn:'_'} - CR: ${valid(cr)?cr:'_'}`;
+            if (valid(cn)) titleStr += ` - ${cn}`;
+            if (valid(address)) titleStr += ` - ${address}`;
+            if (valid(tel)) titleStr += ` - ${tel}`;
+            
+            document.getElementById('cal_title').value = titleStr;
+            document.getElementById('cal_location').value = valid(address) ? address : '';
+
+            let descStr = "Visit Details:\n------------------\n";
+            document.querySelectorAll('#extractedForm input[type="text"]').forEach(input => {
+                let val = input.value;
+                if (val !== "Failed to read" && val.trim() !== "") {
+                    let labelStr = input.previousElementSibling || input.parentElement.previousElementSibling;
+                    if(labelStr && labelStr.tagName === 'LABEL') {
+                        descStr += `${labelStr.innerText.replace(':', '')}: ${val}\n`;
+                    }
+                }
+            });
+            document.getElementById('cal_desc').value = descStr;
+
+            let reqDateStr = getVal('req_date');
+            let dateMatched = false;
+            
+            if (valid(reqDateStr)) {
+                const dateMatch = reqDateStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2})/);
+                if (dateMatch) {
+                    const [_, day, month, year, startT] = dateMatch;
+                    document.getElementById('cal_start').value = `${year}-${month}-${day}T${startT}`;
+                    dateMatched = true;
+                }
+            }
+
+            if (!dateMatched) {
+                const now = new Date();
+                now.setMinutes(now.getMinutes() < 30 ? 30 : 60, 0, 0); 
+                document.getElementById('cal_start').value = toLocalISO(now);
+            }
+            
+            syncEndTime(); 
+        }
+
+        function exportToICal() {
+    const title = document.getElementById('cal_title').value;
+    const location = document.getElementById('cal_location').value;
+    let description = document.getElementById('cal_desc').value;
+
+    description = description.replace(/\n/g, '\\n');
+
+    const startInput = document.getElementById('cal_start').value;
+    const endInput = document.getElementById('cal_end').value;
+
+    const formatForICal = (dateString) => {
+        const d = new Date(dateString);
+        return d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    };
+
+    const icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//VisitSheetApp//EN",
+        "BEGIN:VEVENT",
+        `DTSTART:${formatForICal(startInput)}`,
+        `DTEND:${formatForICal(endInput)}`,
+        `SUMMARY:${title}`,
+        `DESCRIPTION:${description}`,
+        `LOCATION:${location}`,
+        "END:VEVENT",
+        "END:VCALENDAR"
+    ].join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    // Open ICS in a new tab instead of forcing a download
+    window.open(url, '_blank');
+}
+
+    </script>
+</body>
+</html>
