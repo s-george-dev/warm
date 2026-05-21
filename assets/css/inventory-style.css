@@ -686,10 +686,10 @@ body:has(.modal[style*="display:block"]) {
     position: fixed;
     top: 0;
     left: 0;
-    width: 70vw; 
+    width: 100vw; 
     height: 100vh;
-    background: rgba(0, 0, 0, 0.5); /* Slightly darker backdrop */
-    backdrop-filter: blur(2px); /* Optional: Adds a premium blur effect */
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.5) 0 70vw, transparent 70vw 100vw);
+    backdrop-filter: none;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;

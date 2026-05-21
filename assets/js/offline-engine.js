@@ -46,6 +46,9 @@ function initOfflineEngine() {
 
     // Set initial state
     updateNetworkUI(navigator.onLine);
+    if (navigator.onLine) {
+        setTimeout(() => window.processSyncQueue(), 500);
+    }
 
     // Listen for connection drops
     window.addEventListener('offline', () => {
@@ -172,25 +175,41 @@ document.addEventListener('DOMContentLoaded', initOfflineEngine);
    MASTER OFFLINE WRITE & SYNC ENGINE
 ========================================================= */
 
+function sanitizeSyncPayload(table, payload) {
+    if (!payload || typeof payload !== "object") return payload;
+    const clean = { ...payload };
+
+    Object.keys(clean).forEach(key => {
+        if (key.startsWith("_")) delete clean[key];
+    });
+
+    if (table === "items") {
+        delete clean.photos;
+    }
+
+    return clean;
+}
+
 // 6. Universal Offline Writer (Upgraded with Client-Side UUIDs)
 window.offlineSafeWrite = async function(action, table, payload, recordId = null) {
     try {
         let finalId = recordId;
+        let localPayload = sanitizeSyncPayload(table, payload);
         
         // 1. Save to Local Dexie DB first (Optimistic UI)
         if (action === 'CREATE') {
             // Generate a real database UUID right here on the phone!
             finalId = crypto.randomUUID(); 
-            payload.id = finalId; // Inject it so Supabase accepts it later
-            await localDB[table].put(payload);
+            localPayload = { ...localPayload, id: finalId }; // Inject it so Supabase accepts it later
+            await localDB[table].put(localPayload);
         } else if (action === 'UPDATE') {
-            await localDB[table].update(recordId, payload);
+            await localDB[table].update(recordId, localPayload);
         } else if (action === 'DELETE') {
             await localDB[table].delete(recordId);
         }
 
         // 2. Add the action to the Sync Queue
-        await localDB.sync_queue.add({ action, table, payload, record_id: recordId, created_at: new Date().toISOString(), status: 'pending' });
+        await localDB.sync_queue.add({ action, table, payload: localPayload, record_id: finalId, created_at: new Date().toISOString(), status: 'pending' });
 
         // 3. Trigger Sync
         window.processSyncQueue();
@@ -213,13 +232,13 @@ window.processSyncQueue = async function() {
             window.setStatus("syncing", `Syncing ${pendingTasks.length} data changes...`);
             for (const task of pendingTasks) {
                 let error = null;
-                // FIND THIS in offline-engine.js
-if (task.action === 'CREATE') {
-    // CHANGE THIS LINE:
-    const { error: err } = await window.db.from(task.table).upsert([task.payload]);
-    error = err;
-}
-                else if (task.action === 'UPDATE') { const { error: err } = await window.db.from(task.table).update(task.payload).eq('id', task.record_id); error = err; } 
+                const syncPayload = sanitizeSyncPayload(task.table, task.payload);
+
+                if (task.action === 'CREATE') {
+                    const { error: err } = await window.db.from(task.table).upsert([syncPayload]);
+                    error = err;
+                }
+                else if (task.action === 'UPDATE') { const { error: err } = await window.db.from(task.table).update(syncPayload).eq('id', task.record_id); error = err; } 
                 else if (task.action === 'DELETE') { const { error: err } = await window.db.from(task.table).delete().eq('id', task.record_id); error = err; }
 
                 if (!error) await localDB.sync_queue.update(task.id, { status: 'completed' });
