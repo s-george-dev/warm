@@ -6,8 +6,7 @@ window.loadAdminHeader = async function(session) {
 
     try {
         // 1. Calculate the absolute site root path dynamically for GitHub Pages compatibility
-        const isGitHub = window.location.hostname.includes("github.io");
-        const siteRoot = isGitHub ? "/warm/" : "/";
+        const siteRoot = getAdminSiteRoot();
         const partialsPath = siteRoot + "partials/";
 
         // Fetch using the absolute root path to avoid relative directory errors
@@ -64,7 +63,7 @@ window.loadAdminHeader = async function(session) {
 
                 if (window.db) {
                     await window.db.auth.signOut();
-                    window.location.href = 'login.html';
+                    window.location.href = getAdminUrl('login.html');
                 }
             };
         }
@@ -79,8 +78,7 @@ window.loadAdminFooter = async function() {
     if (!container) return; 
 
     try {
-        const isGitHub = window.location.hostname.includes("github.io");
-        const siteRoot = isGitHub ? "/warm/" : "/";
+        const siteRoot = getAdminSiteRoot();
         const partialsPath = siteRoot + "partials/";
 
         const response = await fetch(partialsPath + 'admin-footer.html');
@@ -107,16 +105,38 @@ function fixAdminInjectedPaths(container, root) {
     });
 }
 
+function getAdminSiteRoot() {
+    return window.location.hostname.includes("github.io") ? "/warm/" : "/";
+}
+
+function getAdminUrl(page) {
+    return getAdminSiteRoot() + "admin/" + page;
+}
+
+async function waitForAdminDb(maxAttempts = 40) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (window.db && window.db.auth) return window.db;
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return null;
+}
 
 // Function to protect pages based on role
 window.requireRole = async function(allowedRoles) {
+    const db = await waitForAdminDb();
+    if (!db) {
+        console.error("Admin database client was not ready for role check.");
+        window.location.replace(getAdminUrl('login.html'));
+        return false;
+    }
+
     // 1. Get the current session
-   const { data: { session } } = await window.db.auth.getSession();
+   const { data: { session } } = await db.auth.getSession();
     
     // 2. If they aren't logged in at all, kick them to login
     if (!session) {
-        window.location.replace('/admin/login.html');
-        return;
+        window.location.replace(getAdminUrl('login.html'));
+        return false;
     }
 
     try {
@@ -133,10 +153,13 @@ window.requireRole = async function(allowedRoles) {
             alert("You do not have permission to view this page.");
             
             // Redirect them back to the Hub/Dashboard
-            window.location.replace('/admin/admin-landed.html'); 
+            window.location.replace(getAdminUrl('admin-landed.html'));
+            return false;
         }
+        return true;
     } catch (e) {
         console.error("Error reading token:", e);
-        window.location.replace('/admin/login.html');
+        window.location.replace(getAdminUrl('login.html'));
+        return false;
     }
 };

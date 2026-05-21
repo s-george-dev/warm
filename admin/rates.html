@@ -193,7 +193,7 @@
         </div>
 
         <div class="form-right">
-          <img id="imagePreview" src="../assets/images/placeholder.jpg" alt="Preview">
+          <img id="imagePreview" src="../assets/images/no-image.jpg" alt="Preview">
           <p style="color:#666; font-size: 14px;">Resolution looks best at 4:3 or 16:9 ratio</p>
           <input type="file" id="image" accept="image/*" style="display:none;">
           <button class="btn-accent" onclick="document.getElementById('image').click()">Change Picture</button>
@@ -228,6 +228,7 @@
     /* 1. DRAG & DROP LOGIC */
     function initSortable() {
       const el = document.getElementById('ratesBody');
+      if (!window.Sortable || !el) return;
       Sortable.create(el, {
         handle: '.drag-handle',
         animation: 150,
@@ -270,7 +271,7 @@
       document.getElementById('is_suspended').checked = false;
       document.getElementById('is_hidden').checked = false;
       document.getElementById('read_more_type').value = 'modal';
-      document.getElementById('imagePreview').src = '../assets/images/placeholder.jpg';
+      document.getElementById('imagePreview').src = '../assets/images/no-image.jpg';
       toggleReadMoreFields();
     };
 
@@ -278,10 +279,21 @@
     async function loadRates() {
       const { data, error } = await window.db.from('rates').select('*').order('sort_order', { ascending: true });
       const tbody = document.getElementById('ratesBody');
-      tbody.innerHTML = data.map(rate => `
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#ef4444;">Unable to load rates: ${error.message}</td></tr>`;
+        return;
+      }
+
+      const rates = data || [];
+      if (rates.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#666;">No rates have been added yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rates.map(rate => `
         <tr data-id="${rate.id}">
           <td class="drag-handle">☰</td>
-          <td><img src="${rate.image_url || '../assets/images/placeholder.jpg'}" class="table-img"></td>
+          <td><img src="${rate.image_url || '../assets/images/no-image.jpg'}" class="table-img" onerror="this.onerror=null;this.src='../assets/images/no-image.jpg';"></td>
           <td><strong>${rate.title}</strong></td>
           <td>
             ${rate.is_hidden ? '<span class="badge badge-hidden">Hidden</span>' : ''}
@@ -314,7 +326,7 @@
       document.getElementById('read_more_type').value = data.read_more_type || 'modal';
       document.getElementById('read_more_url').value = data.read_more_url || '';
       document.getElementById('read_more_content').value = data.read_more_content || '';
-      document.getElementById('imagePreview').src = data.image_url || '../assets/images/placeholder.jpg';
+      document.getElementById('imagePreview').src = data.image_url || '../assets/images/no-image.jpg';
       toggleReadMoreFields();
     };
 

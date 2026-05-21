@@ -1,4 +1,4 @@
-const CACHE_NAME = 'warm-right-cache-v1';
+const CACHE_NAME = 'warm-right-cache-v2';
 
 // These are the core files the app NEEDS to boot up offline.
 const urlsToCache = [

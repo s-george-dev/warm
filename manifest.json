@@ -9,13 +9,15 @@
   "icons": [
     {
       "src": "./assets/images/wrep-logo.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "./assets/images/wrep-logo.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "./assets/images/wrep-logo-maskable.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
