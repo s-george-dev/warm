@@ -880,8 +880,12 @@ async function buildBreadcrumb(location) {
 async function loadTempLocationsAdmin() {
     tempLocationsAdmin = await localDB.temp_locations.toArray();
     currentTempLocationId = null;
+    isStockUsageModeActive = false;
+    stockUsageDraft.clear();
     document.getElementById("tempLocationTilesAdmin").style.display = "grid";
     document.getElementById("tempLocationItemsGrid").style.display = "none";
+    const actionsToolbar = document.getElementById("tempLocationItemActionsToolbar");
+    if (actionsToolbar) actionsToolbar.style.display = "none";
     const breadcrumb = document.getElementById("breadcrumbTempLocations");
     if (breadcrumb) breadcrumb.innerHTML = `<span class="breadcrumb-link active">Assigned Log</span>`;
     renderTempLocationTilesAdmin();
@@ -895,6 +899,8 @@ async function loadTempLocationDetails(tempId) {
     if (breadcrumb) breadcrumb.innerHTML = `<span class="breadcrumb-link" onclick="loadTempLocationsAdmin()">Assigned Log</span><span class="breadcrumb-separator"> > </span><span class="breadcrumb-link active">👤 ${tempLoc ? tempLoc.name : 'Assignee'}</span>`;
     document.getElementById("tempLocationTilesAdmin").style.display = "none";
     document.getElementById("tempLocationItemsGrid").style.display = "grid";
+    const actionsToolbar = document.getElementById("tempLocationItemActionsToolbar");
+    if (actionsToolbar) actionsToolbar.style.display = "flex";
     
     const items = await localDB.items.toArray();
     const assignedItems = items.filter(i => i.assigned_to === tempId);
@@ -914,15 +920,45 @@ function renderTempLocationTilesAdmin() {
 }
 
 function renderAssignedItems(items) {
-    const container = document.getElementById("tempLocationItemsGrid"); container.innerHTML = "";
-    if (!items || items.length === 0) { container.style.display = "block"; container.innerHTML = `<div style="padding: 40px; text-align: center; color: #999; font-style: italic;">No items currently checked out to this assignee.</div>`; return; }
+    const container = document.getElementById("tempLocationItemsGrid");
+    container.innerHTML = "";
+    if (!items || items.length === 0) {
+        container.style.display = "block";
+        container.innerHTML = `<div style="padding: 40px; text-align: center; color: #999; font-style: italic;">No items currently checked out to this assignee.</div>`;
+        return;
+    }
     container.style.display = "grid";
     items.forEach(item => {
-        const card = document.createElement("div"); card.className = "item-card"; if (item.id === lastMovedItemId) card.classList.add("moved-item-highlight");
-        let imgUrl = "../assets/images/no-image.jpg"; if (item.photos?.length) { const defaultPhoto = item.photos.find(p => p.is_primary) || item.photos[0]; imgUrl = window.db.storage.from("item-photos").getPublicUrl(defaultPhoto.file_path).data.publicUrl; }
-        let locPath = item.location_id ? buildLocationPath(item.location_id) : "Unallocated";
-        card.innerHTML = `<div class="item-card-photo-wrapper"><img src="${imgUrl}"></div><div class="item-card-qty-badge">Qty: ${item.quantity}</div><div onclick="executeReturnItem('${item.id}', true); event.stopPropagation();" style="position:absolute; top:8px; right:8px; background:#ef4444; color:white; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2); cursor:pointer;">📥 Return Item</div><div class="item-card-name" style="margin-top: 10px;">${item.name}</div><div style="font-size: 11px; color: #666; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 4px;"><span>📍</span> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%;">${locPath}</span></div>`;
-        card.onclick = () => openItemDetails(item); container.appendChild(card);
+        const card = document.createElement("div");
+        card.className = "item-card";
+        if (item.id === lastMovedItemId) card.classList.add("moved-item-highlight");
+
+        let imgUrl = "../assets/images/no-image.jpg";
+        if (item.photos?.length) {
+            const defaultPhoto = item.photos.find(p => p.is_primary) || item.photos[0];
+            imgUrl = window.db.storage.from("item-photos").getPublicUrl(defaultPhoto.file_path).data.publicUrl;
+        }
+
+        const locPath = item.location_id ? buildLocationPath(item.location_id) : "Unallocated";
+        const isEquipment = String(item.quantity).trim() === "-";
+        const maxQty = isEquipment ? 1 : Math.max(1, parseInt(item.quantity, 10) || 1);
+        const selectedQty = stockUsageDraft.get(item.id) || 0;
+        const qtyBadge = isEquipment ? "Tool" : `Qty: ${item.quantity}`;
+        const actionHtml = isStockUsageModeActive
+            ? `<div onclick="event.stopPropagation();" style="position:absolute; left:8px; right:8px; bottom:8px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+                    <div style="font-size:11px; font-weight:800; color:#c2410c; margin-bottom:6px;">Use quantity</div>
+                    <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+                        <button class="btn-outline" onclick="adjustStockUsageQuantity('${item.id}', -1); event.stopPropagation();" style="height:28px; min-width:28px; padding:0; font-weight:900;">-</button>
+                        <input type="number" min="0" max="${maxQty}" value="${selectedQty}" onchange="setStockUsageQuantity('${item.id}', this.value); event.stopPropagation();" onclick="event.stopPropagation();" style="width:56px; height:30px; margin:0; text-align:center; font-weight:800; border-radius:6px;">
+                        <button class="btn-outline" onclick="adjustStockUsageQuantity('${item.id}', 1); event.stopPropagation();" style="height:28px; min-width:28px; padding:0; font-weight:900;">+</button>
+                    </div>
+                    <button class="btn-primary" onclick="setStockUsageQuantity('${item.id}', ${maxQty}); event.stopPropagation();" style="width:100%; margin-top:6px; height:28px; background:#ef4444; border-color:#ef4444; font-size:11px;">Use all</button>
+                </div>`
+            : `<div onclick="executeReturnItem('${item.id}', true); event.stopPropagation();" style="position:absolute; top:8px; right:8px; background:#ef4444; color:white; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.2); cursor:pointer;">Return Item</div>`;
+
+        card.innerHTML = `<div class="item-card-photo-wrapper"><img src="${imgUrl}"></div><div class="item-card-qty-badge">${qtyBadge}</div>${actionHtml}<div class="item-card-name" style="margin-top: 10px;">${item.name}</div><div style="font-size: 11px; color: #666; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 4px;"><span>Location:</span> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%;">${locPath}</span></div>`;
+        card.onclick = () => openItemDetails(item);
+        container.appendChild(card);
     });
 }
 
@@ -3547,16 +3583,86 @@ function toggleStockUsageMode() {
     }
     if (confirmBtn) confirmBtn.style.display = isStockUsageModeActive ? "inline-flex" : "none";
     if (cancelBtn) cancelBtn.style.display = isStockUsageModeActive ? "inline-flex" : "none";
+
+    if (currentTempLocationId) loadTempLocationDetails(currentTempLocationId);
 }
 
 function cancelStockUsageChanges() {
     if (isStockUsageModeActive) toggleStockUsageMode();
 }
 
+function setStockUsageQuantity(itemId, qty) {
+    const inputQty = Math.max(0, parseInt(qty, 10) || 0);
+    localDB.items.get(itemId).then(item => {
+        if (!item) return;
+        const maxQty = String(item.quantity).trim() === "-" ? 1 : Math.max(1, parseInt(item.quantity, 10) || 1);
+        const finalQty = Math.min(inputQty, maxQty);
+        if (finalQty <= 0) stockUsageDraft.delete(itemId);
+        else stockUsageDraft.set(itemId, finalQty);
+        if (currentTempLocationId) loadTempLocationDetails(currentTempLocationId);
+    });
+}
+
+function adjustStockUsageQuantity(itemId, amount) {
+    const currentQty = stockUsageDraft.get(itemId) || 0;
+    setStockUsageQuantity(itemId, currentQty + amount);
+}
+
 async function confirmStockUsageChanges() {
     if (stockUsageDraft.size === 0) {
         await customAlert("No stock usage changes have been selected yet.", "Use Stock Mode");
         return;
+    }
+
+    if (window.isProcessingTransaction) return;
+    window.isProcessingTransaction = true;
+
+    try {
+        const assignee = tempLocationsAdmin.find(t => t.id === currentTempLocationId);
+        const assigneeName = assignee ? assignee.name : "Assignee";
+        let usedLineCount = 0;
+        let usedUnitCount = 0;
+
+        for (const [itemId, requestedQty] of stockUsageDraft.entries()) {
+            const item = await localDB.items.get(itemId);
+            if (!item || String(item.assigned_to) !== String(currentTempLocationId)) continue;
+
+            const isEquipment = String(item.quantity).trim() === "-";
+            const currentQty = isEquipment ? 1 : Math.max(1, parseInt(item.quantity, 10) || 1);
+            const qtyToUse = isEquipment ? 1 : Math.min(currentQty, Math.max(1, parseInt(requestedQty, 10) || 1));
+            const remainingQty = currentQty - qtyToUse;
+
+            if (isEquipment || remainingQty <= 0) {
+                await window.offlineSafeWrite("DELETE", "items", null, item.id);
+            } else {
+                await window.offlineSafeWrite("UPDATE", "items", { quantity: remainingQty }, item.id);
+            }
+
+            usedLineCount++;
+            usedUnitCount += qtyToUse;
+            logAction("USE", "Item", item.name, `Used ${isEquipment ? "tool" : qtyToUse + " unit(s)"} from ${assigneeName}`);
+        }
+
+        stockUsageDraft.clear();
+        isStockUsageModeActive = false;
+
+        const toggleBtn = document.getElementById("btnToggleStockUsageMode");
+        const confirmBtn = document.getElementById("btnConfirmStockUsage");
+        const cancelBtn = document.getElementById("btnCancelStockUsage");
+        if (toggleBtn) {
+            toggleBtn.textContent = "Use Stock Mode";
+            toggleBtn.style.background = "";
+        }
+        if (confirmBtn) confirmBtn.style.display = "none";
+        if (cancelBtn) cancelBtn.style.display = "none";
+
+        await refreshAllDataFromLocal();
+        if (currentTempLocationId) await loadTempLocationDetails(currentTempLocationId);
+        if (window.processSyncQueue) window.processSyncQueue();
+
+        await customAlert(`Recorded <b>${usedUnitCount}</b> used unit(s) across <b>${usedLineCount}</b> item line(s). Any remaining quantity is still assigned to ${assigneeName}.`, "Stock Usage Recorded");
+    } finally {
+        window.isProcessingTransaction = false;
     }
 }
 
