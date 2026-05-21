@@ -139,7 +139,24 @@ button { font-family: 'Inter', sans-serif; letter-spacing: 0.3px; }
 .btn-primary { background: #004a99; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
 .btn-danger { background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
 .btn-outline { background: white; border: 1px solid #ddd; color: #333; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
-.status-indicator { position: fixed; bottom: 20px; right: 20px; padding: 6px 15px; border-radius: 20px; color: white; font-size: 11px; font-weight: 700; z-index: 12000; }
+.status-indicator { position: fixed; bottom: 20px; right: 10px; padding: 6px 15px; border-radius: 20px; color: white; font-size: 11px; font-weight: 700; z-index: 12000; cursor: pointer; }
+.sync-status-modal-content { max-width: 620px; padding: 22px; }
+.sync-status-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.sync-status-header h3 { margin: 0; color: #004a99; }
+.sync-status-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.sync-status-tab { border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; border-radius: 8px; padding: 10px; font-weight: 800; cursor: pointer; }
+.sync-status-tab.active { background: #004a99; border-color: #004a99; color: #fff; }
+.sync-status-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; color: #334155; }
+.sync-status-pill-preview { display: inline-flex; background: #22c55e; color: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 800; margin-bottom: 8px; }
+.sync-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.sync-status-grid div { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #fff; }
+.sync-status-grid b { display: block; color: #0f172a; font-size: 13px; margin-bottom: 4px; }
+.sync-status-grid span { display: block; color: #64748b; font-size: 12px; line-height: 1.35; }
+.sync-status-table-wrap { max-height: 320px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+.sync-status-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sync-status-table th, .sync-status-table td { padding: 9px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+.sync-status-table th { background: #f8fafc; color: #334155; position: sticky; top: 0; }
+.sync-status-empty { text-align: center; color: #64748b; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 24px; }
 .w-100 { width: 100%; } .mb-2 { margin-bottom: 10px; } .mt-3 { margin-top: 20px; }
 
 /* BREADCRUMB NAVIGATION STYLING */
@@ -454,9 +471,7 @@ body:has(.modal[style*="display:block"]) {
         pointer-events: auto;
     }
 
-    .status-indicator {
-        bottom: 86px;
-    }
+    
 
     /* --- TABLE LAYOUT FIX 1: BROWSER TABLES (Items & Locations Lists) --- */
     #itemsTableWrapper, #locationsTableWrapper {
@@ -569,10 +584,10 @@ body:has(.modal[style*="display:block"]) {
     position: fixed;
     top: 0;
     left: 0;
-    width: 70vw; 
+    width: 100vw; 
     height: 100vh;
-    background: rgba(0, 0, 0, 0.5); /* Slightly darker backdrop */
-    backdrop-filter: blur(2px); /* Optional: Adds a premium blur effect */
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.5) 0 70vw, transparent 70vw 100vw);
+    backdrop-filter: none;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;

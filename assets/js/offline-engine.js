@@ -41,11 +41,24 @@ function initOfflineEngine() {
     if (!document.querySelector('.status-indicator')) {
         const box = document.createElement("div");
         box.className = "status-indicator";
+        box.title = "Click for sync details";
+        box.setAttribute("role", "button");
+        box.setAttribute("tabindex", "0");
+        box.addEventListener("click", () => window.openSyncStatusModal());
+        box.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                window.openSyncStatusModal();
+            }
+        });
         document.body.appendChild(box);
     }
 
     // Set initial state
     updateNetworkUI(navigator.onLine);
+    if (navigator.onLine) {
+        setTimeout(() => window.processSyncQueue(), 500);
+    }
 
     // Listen for connection drops
     window.addEventListener('offline', () => {
@@ -70,9 +83,11 @@ function updateNetworkUI(isOnline) {
     if (isOnline) {
         statusBox.style.background = "#22c55e"; // Green
         statusBox.textContent = "Online - Synced";
+        statusBox.dataset.statusMode = "online";
     } else {
         statusBox.style.background = "#ef4444"; // Red
-        statusBox.textContent = "Offline - Saving Locally";
+        statusBox.textContent = "Offline - Local Mode";
+        statusBox.dataset.statusMode = "offline";
     }
 }
 
@@ -92,13 +107,147 @@ window.setStatus = function(mode, msg) {
     else statusBox.style.background = "#22c55e"; // Green
 
     statusBox.textContent = msg;
+    statusBox.dataset.statusMode = mode;
 }
+
+function ensureSyncStatusModal() {
+    let modal = document.getElementById("syncStatusModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = "syncStatusModal";
+    modal.className = "modal";
+    modal.style.zIndex = "10060";
+    modal.innerHTML = `
+        <div class="modal-content sync-status-modal-content">
+            <div class="sync-status-header">
+                <h3>Sync Status</h3>
+                <button class="btn-outline" type="button" onclick="closeModal('syncStatusModal')">Close</button>
+            </div>
+            <div class="sync-status-tabs" role="tablist">
+                <button type="button" class="sync-status-tab active" id="syncStatusMeaningTab" onclick="switchSyncStatusTab('meaning')">What This Means</button>
+                <button type="button" class="sync-status-tab" id="syncStatusQueueTab" onclick="switchSyncStatusTab('queue')">Waiting To Sync</button>
+            </div>
+            <div id="syncStatusMeaningPanel" class="sync-status-panel"></div>
+            <div id="syncStatusQueuePanel" class="sync-status-panel" style="display:none;"></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+}
+
+function formatSyncPayload(payload) {
+    if (!payload) return "No payload";
+    const clean = sanitizeSyncPayload("", payload);
+    const keys = Object.keys(clean).filter(key => clean[key] !== null && clean[key] !== undefined);
+    if (keys.length === 0) return "No payload";
+    return keys.slice(0, 5).map(key => `${key}: ${String(clean[key]).slice(0, 40)}`).join(", ");
+}
+
+function escapeSyncStatusHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    }[char]));
+}
+
+async function getSyncQueueRows() {
+    const dataTasks = await localDB.sync_queue.where("status").equals("pending").toArray();
+    const photoTasks = await localDB.sync_photos_queue.where("status").equals("pending").toArray();
+    const dataRows = dataTasks.map(task => ({
+        created_at: task.created_at,
+        type: "Data",
+        action: task.action,
+        target: task.table,
+        detail: formatSyncPayload(task.payload)
+    }));
+    const photoRows = photoTasks.map(task => ({
+        created_at: task.created_at,
+        type: "Photo",
+        action: "UPLOAD",
+        target: task.record_type || task.bucket,
+        detail: task.file_name || task.record_id || "Pending photo"
+    }));
+    return [...dataRows, ...photoRows].sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+}
+
+function renderSyncMeaningPanel() {
+    const statusBox = document.querySelector(".status-indicator");
+    const mode = statusBox?.dataset.statusMode || (navigator.onLine ? "online" : "offline");
+    const label = statusBox?.textContent || "Unknown";
+    const descriptions = {
+        online: "Your device can reach the internet and the local inventory copy is expected to match the cloud after pending work is processed.",
+        connected: "Your device is online. Recent local changes should be pushed to the cloud automatically.",
+        syncing: "The app is actively sending local changes or downloading fresh data. Keep this tab open until it settles.",
+        error: "The app could not fully sync. Your changes are kept locally and will retry when the connection or server allows it.",
+        offline: "The app is working from the local database. Changes you make are saved on this device and queued for later sync."
+    };
+    const panel = document.getElementById("syncStatusMeaningPanel");
+    panel.innerHTML = `
+        <div class="sync-status-card">
+            <div class="sync-status-pill-preview">${label}</div>
+            <p>${descriptions[mode] || descriptions.online}</p>
+        </div>
+        <div class="sync-status-grid">
+            <div><b>Online - Synced</b><span>Connected and no known pending work.</span></div>
+            <div><b>Syncing</b><span>Local changes are being pushed or data is downloading.</span></div>
+            <div><b>Offline - Local Mode</b><span>You can keep working; changes wait on this device.</span></div>
+            <div><b>Sync Failed</b><span>Queued work remains local and will retry.</span></div>
+        </div>
+    `;
+}
+
+async function renderSyncQueuePanel() {
+    const panel = document.getElementById("syncStatusQueuePanel");
+    panel.innerHTML = `<p style="color:#64748b;">Loading sync queue...</p>`;
+    const rows = await getSyncQueueRows();
+    if (rows.length === 0) {
+        panel.innerHTML = `<div class="sync-status-empty">Nothing is waiting to sync.</div>`;
+        return;
+    }
+    panel.innerHTML = `
+        <div class="sync-status-table-wrap">
+            <table class="sync-status-table">
+                <thead><tr><th>Time</th><th>Type</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+                <tbody>${rows.map(row => `
+                    <tr>
+                        <td>${escapeSyncStatusHtml(row.created_at ? new Date(row.created_at).toLocaleString() : "-")}</td>
+                        <td>${escapeSyncStatusHtml(row.type)}</td>
+                        <td>${escapeSyncStatusHtml(row.action)}</td>
+                        <td>${escapeSyncStatusHtml(row.target)}</td>
+                        <td>${escapeSyncStatusHtml(row.detail)}</td>
+                    </tr>
+                `).join("")}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+window.switchSyncStatusTab = async function(tabName) {
+    document.getElementById("syncStatusMeaningTab").classList.toggle("active", tabName === "meaning");
+    document.getElementById("syncStatusQueueTab").classList.toggle("active", tabName === "queue");
+    document.getElementById("syncStatusMeaningPanel").style.display = tabName === "meaning" ? "block" : "none";
+    document.getElementById("syncStatusQueuePanel").style.display = tabName === "queue" ? "block" : "none";
+    if (tabName === "meaning") renderSyncMeaningPanel();
+    else await renderSyncQueuePanel();
+};
+
+window.openSyncStatusModal = async function() {
+    ensureSyncStatusModal();
+    document.getElementById("syncStatusModal").style.display = "flex";
+    renderSyncMeaningPanel();
+    await renderSyncQueuePanel();
+    window.switchSyncStatusTab("meaning");
+};
 
 // 5. Global Data Down-Sync (Downloads Supabase -> Saves to Dexie)
 window.syncDatabaseToLocal = async function() {
     if (!window.isAppOnline) return; // Abort if offline
 
-    window.setStatus("syncing", "Downloading database...");
+    window.setStatus("syncing", "Downloading...");
     
     try {
         console.log("🔄 Starting Down-Sync...");
@@ -173,9 +322,20 @@ document.addEventListener('DOMContentLoaded', initOfflineEngine);
 ========================================================= */
 
 // 6. Universal Offline Writer (Upgraded with Client-Side UUIDs)
+function sanitizeSyncPayload(table, payload) {
+    if (!payload || typeof payload !== "object") return payload;
+    const clean = { ...payload };
+    Object.keys(clean).forEach(key => {
+        if (key.startsWith("_")) delete clean[key];
+    });
+    if (table === "items") delete clean.photos;
+    return clean;
+}
+
 window.offlineSafeWrite = async function(action, table, payload, recordId = null) {
     try {
         let finalId = recordId;
+        if (payload) payload = sanitizeSyncPayload(table, payload);
         
         // 1. Save to Local Dexie DB first (Optimistic UI)
         if (action === 'CREATE') {
@@ -216,10 +376,11 @@ window.processSyncQueue = async function() {
                 // FIND THIS in offline-engine.js
 if (task.action === 'CREATE') {
     // CHANGE THIS LINE:
-    const { error: err } = await window.db.from(task.table).upsert([task.payload]);
+    const payload = sanitizeSyncPayload(task.table, task.payload);
+    const { error: err } = await window.db.from(task.table).upsert([payload]);
     error = err;
 }
-                else if (task.action === 'UPDATE') { const { error: err } = await window.db.from(task.table).update(task.payload).eq('id', task.record_id); error = err; } 
+                else if (task.action === 'UPDATE') { const payload = sanitizeSyncPayload(task.table, task.payload); const { error: err } = await window.db.from(task.table).update(payload).eq('id', task.record_id); error = err; } 
                 else if (task.action === 'DELETE') { const { error: err } = await window.db.from(task.table).delete().eq('id', task.record_id); error = err; }
 
                 if (!error) await localDB.sync_queue.update(task.id, { status: 'completed' });

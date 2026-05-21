@@ -786,7 +786,7 @@
                 <button onclick="switchScannerCamera('main')" style="position: absolute; top: 12px; right: 12px; z-index: 100; background: rgba(15, 23, 42, 0.75); color: white; border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); backdrop-filter: blur(4px);">🔄</button>
             </div>
             <div class="modal-buttons" style="justify-content: center; margin-top: 20px;">
-                <button class="btn-outline w-100" onclick="closeBarcodeScannerModal()">Close scanner</button>
+                <button class="btn-outline w-100" id="barcodeScannerCancelBtn" onclick="cancelBarcodeScannerModal()">Close scanner</button>
             </div>
         </div>
     </div>
@@ -828,8 +828,7 @@
             <p id="qaInstruction" style="margin-bottom: 15px; color: #475569; font-size: 15px;">Scan Item Barcode or Tap NFC</p>
 
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 15px; background: #f1f5f9; padding: 8px; border-radius: 8px;">
-                <input type="checkbox" id="qaBatchToggle" onchange="toggleQaBatchMode(this.checked)" style="width: 18px; height: 18px; margin: 0; cursor: pointer;">
-                <label for="qaBatchToggle" style="font-weight: 600; font-size: 14px; color: #334155; margin: 0; cursor: pointer; user-select: none;">📦 Scan Multiple Items (Batch)</label>
+                <button type="button" id="qaBatchToggle" onclick="toggleQaBatchMode(this.getAttribute('aria-pressed') !== 'true')" aria-pressed="false" style="width: 100%; border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; padding: 10px 12px; border-radius: 999px; font-weight: 700; cursor: pointer;">Scan Multiple Items</button>
             </div>
 
             <div id="qaMainContent" style="position: relative;">
@@ -846,7 +845,7 @@
                         <input type="number" id="qaInlineQtyInput" style="width: 80px; text-align: center; font-size: 22px; font-weight: bold; margin: 0; height: 46px; border-radius:8px;" value="1" min="1">
                         <button class="btn-primary" onclick="adjustInlineQty('qa', 1)" style="width: 42px; height: 42px; border-radius: 50%; font-size: 22px; padding:0; display:flex; align-items:center; justify-content:center; background:#004a99; font-weight:bold;">+</button>
                     </div>
-                    <button class="btn-primary" style="width: 100%; height: 38px; font-weight: bold;">Confirm Quantity</button>
+                    <button class="btn-primary" onclick="confirmQuickItemQuantity('qa')" style="width: 100%; height: 38px; font-weight: bold;">Confirm Quantity</button>
                 </div>
 
                 <div style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
@@ -889,8 +888,7 @@
             <p id="qmInstruction" style="margin-bottom: 15px; color: #475569; font-size: 15px;">Scan Item Barcode or Tap NFC</p>
 
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 15px; background: #f1f5f9; padding: 8px; border-radius: 8px;">
-                <input type="checkbox" id="qmBatchToggle" onchange="toggleQmBatchMode(this.checked)" style="width: 18px; height: 18px; margin: 0; cursor: pointer;">
-                <label for="qmBatchToggle" style="font-weight: 600; font-size: 14px; color: #334155; margin: 0; cursor: pointer; user-select: none;">📦 Scan Multiple Items (Batch)</label>
+                <button type="button" id="qmBatchToggle" onclick="toggleQmBatchMode(this.getAttribute('aria-pressed') !== 'true')" aria-pressed="false" style="width: 100%; border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; padding: 10px 12px; border-radius: 999px; font-weight: 700; cursor: pointer;">Scan Multiple Items</button>
             </div>
 
             <div id="qmMainContent" style="position: relative;">
@@ -907,7 +905,7 @@
                         <input type="number" id="qmInlineQtyInput" style="width: 80px; text-align: center; font-size: 22px; font-weight: bold; margin: 0; height: 46px; border-radius:8px;" value="1" min="1">
                         <button class="btn-primary" onclick="adjustInlineQty('qm', 1)" style="width: 42px; height: 42px; border-radius: 50%; font-size: 22px; padding:0; display:flex; align-items:center; justify-content:center; background:#004a99; font-weight:bold;">+</button>
                     </div>
-                    <button class="btn-primary" style="width: 100%; height: 38px; font-weight: bold;">Confirm Quantity</button>
+                    <button class="btn-primary" onclick="confirmQuickItemQuantity('qm')" style="width: 100%; height: 38px; font-weight: bold;">Confirm Quantity</button>
                 </div>
 
                <div style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
@@ -945,8 +943,7 @@
             <p id="qrInstruction" style="margin-bottom: 15px; color: #475569; font-size: 15px;">Scan Checked-Out Item Barcode or Tap NFC</p>
 
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 15px; background: #f1f5f9; padding: 8px; border-radius: 8px;">
-                <input type="checkbox" id="qrBatchToggle" onchange="toggleQrBatchMode(this.checked)" style="width: 18px; height: 18px; margin: 0; cursor: pointer;">
-                <label for="qrBatchToggle" style="font-weight: 600; font-size: 14px; color: #334155; margin: 0; cursor: pointer; user-select: none;">📦 Scan Multiple Items (Batch)</label>
+                <button type="button" id="qrBatchToggle" onclick="toggleQrBatchMode(this.getAttribute('aria-pressed') !== 'true')" aria-pressed="false" style="width: 100%; border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; padding: 10px 12px; border-radius: 999px; font-weight: 700; cursor: pointer;">Scan Multiple Items</button>
             </div>
 
             <div id="qrMainContent" style="position: relative;">
@@ -969,7 +966,7 @@
                         <input type="number" id="qrInlineQtyInput" style="width: 80px; text-align: center; font-size: 22px; font-weight: bold; margin: 0; height: 46px; border-radius:8px;" value="1" min="1">
                         <button class="btn-primary" onclick="adjustInlineQty('qr', 1)" style="width: 42px; height: 42px; border-radius: 50%; font-size: 22px; padding:0; display:flex; align-items:center; justify-content:center; background:#004a99; font-weight:bold;">+</button>
                     </div>
-                    <button class="btn-primary" style="width: 100%; height: 38px; font-weight: bold;">Confirm Quantity</button>
+                    <button class="btn-primary" onclick="confirmQuickItemQuantity('qr')" style="width: 100%; height: 38px; font-weight: bold;">Confirm Quantity</button>
                 </div>
 
                <div style="position: relative; width: 100%; max-width: 400px; margin: 0 auto;">
@@ -1058,7 +1055,7 @@
 </div>
 
     <div class="fab-container left-side" id="mobileFabContainer">
-        <div class="fab-half-screen-overlay" id="fabOverlay" onclick="toggleFab()"></div>
+        <div class="fab-half-screen-overlay" id="fabOverlay" onclick="closeFab()"></div>
 
         <div style="position: relative; display: flex; flex-direction: column; align-items: flex-start;">
             <div id="quickActionsStack" class="fab-stack">
@@ -1103,10 +1100,24 @@
 </div>
 
     <script>
-        function toggleFab() {
-            document.getElementById('quickActionsStack').classList.toggle('open');
-            document.getElementById('fabOverlay').classList.toggle('open');
-        }
+        window.closeFab = function() {
+            document.getElementById('quickActionsStack')?.classList.remove('open');
+            document.getElementById('fabOverlay')?.classList.remove('open');
+        };
+
+        window.toggleFab = function() {
+            const stack = document.getElementById('quickActionsStack');
+            const overlay = document.getElementById('fabOverlay');
+            const modalIds = ['quickAssignModal', 'quickMoveModal', 'quickReturnModal', 'quantityAdjusterModal'];
+            const modalIsOpen = modalIds.some(id => document.getElementById(id)?.style.display === 'flex');
+
+            if (modalIsOpen || stack.classList.contains('open')) {
+                window.closeFab();
+            } else {
+                stack.classList.add('open');
+                overlay.classList.add('open');
+            }
+        };
     </script>
 
     <script src="../assets/js/inventory.js"></script>
@@ -1153,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fabContainer.style.opacity = "1";
                 fabContainer.style.pointerEvents = "auto";
                 if (lastActivePageId !== pageId) {
-                    if (quickStack) quickStack.classList.remove('open');
+                    window.closeFab();
                     lastActivePageId = pageId;
                 }
                 if (pageId === "pageItems") {
