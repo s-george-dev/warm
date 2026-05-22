@@ -411,7 +411,15 @@
                 <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemCameraInput').click()">📷 Camera</button>
             </div>
             <label>Item Name</label><input id="itemName" placeholder="Name">
-            <label>Quantity</label><input id="itemQuantity" placeholder="Quantity" type="number">
+            <label>Quantity</label>
+            <div id="addItemQtyWrapper" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; transition: opacity 0.2s ease;">
+                <input id="itemQuantity" placeholder="Quantity" type="text" value="1" style="height: 42px; width: 70px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 0; padding: 4px; border-radius: 8px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <button class="btn-secondary" onclick="adjustAddItemQty(1)" style="width: 28px; height: 20px; font-size: 11px; padding: 0; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; background: white;">▲</button>
+                    <button class="btn-secondary" onclick="adjustAddItemQty(-1)" style="width: 28px; height: 20px; font-size: 11px; padding: 0; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; background: white;">▼</button>
+                </div>
+                <button type="button" id="addItemEquipmentToggle" class="btn-outline" onclick="toggleAddItemEquipment()" style="height: 42px; padding: 0 12px; border-color: #fed7aa; color: #c2410c; font-weight: 700;">Tool?</button>
+            </div>
             <label>Location Placement Folder</label><select id="itemLocationSelect"></select>
             
             
@@ -433,7 +441,7 @@
             <div style="display: flex; gap: 8px;"><select id="itemTagSelect" style="margin-bottom: 0;" onchange="handleTagSelection('add', this.value)"></select><button class="btn-outline" style="height: 42px; padding: 10px 14px;" onclick="openTagModal(true)">+</button></div>
             <div id="addItemTagsPillsRow" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; margin-bottom: 10px;"></div>
             <div class="modal-buttons" style="margin-top: 25px;">
-                <button class="btn-outline" onclick="closeModal('addItemModal')">Cancel</button>
+                <button class="btn-outline" onclick="confirmCancel('addItemModal')">Cancel</button>
                 <button class="btn-primary" onclick="addItem()">Add Item</button>
             </div>
         </div>

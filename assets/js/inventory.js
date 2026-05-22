@@ -70,6 +70,138 @@ function clearSearch() {
     handleGlobalSearch('');
 }
 
+function normaliseToken(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function locationMatchesToken(location, token) {
+    const clean = normaliseToken(token);
+    if (!location || !clean) return false;
+    return normaliseToken(location.barcode) === clean
+        || normaliseToken(location.nfc_tag) === clean
+        || normaliseToken(location.nfc) === clean
+        || normaliseToken(location.name) === clean;
+}
+
+function itemMatchesHardwareToken(item, token) {
+    const clean = normaliseToken(token);
+    if (!item || !clean) return false;
+    return normaliseToken(item.barcode) === clean || normaliseToken(item.nfc_tag) === clean;
+}
+
+function findLocationByScanToken(token) {
+    return (locationsAdmin || []).find(location => locationMatchesToken(location, token));
+}
+
+function findItemByScanToken(items, token) {
+    return (items || []).find(item => itemMatchesHardwareToken(item, token));
+}
+
+function resetSearchControlsAfterScan() {
+    const typeFilter = document.getElementById("searchTypeFilter");
+    const searchInput = document.getElementById("globalSearchInput");
+    if (typeFilter) typeFilter.value = "all";
+    if (searchInput) searchInput.value = "";
+    activeSearchTags = [];
+    activeSearchCategory = null;
+    const pillsRow = document.getElementById("searchFilterPillsRow");
+    if (pillsRow) {
+        pillsRow.style.display = "none";
+        pillsRow.innerHTML = "";
+    }
+}
+
+async function routeGlobalHardwareScan(scannedToken) {
+    const cleanToken = String(scannedToken || "").trim();
+    if (!cleanToken) return;
+
+    const locationMatch = findLocationByScanToken(cleanToken);
+    if (locationMatch) {
+        resetSearchControlsAfterScan();
+        showPage("pageItems");
+        navigateToLocation(locationMatch.id);
+        return;
+    }
+
+    const items = await localDB.items.toArray();
+    const itemMatch = findItemByScanToken(items, cleanToken);
+    if (itemMatch) {
+        resetSearchControlsAfterScan();
+        showPage("pageItems");
+        currentLocationId = itemMatch.location_id || null;
+        if (currentLocationId) await loadLocation(currentLocationId);
+        else await loadRootLocations();
+        openItemDetails(itemMatch);
+        return;
+    }
+
+    resetSearchControlsAfterScan();
+    await customAlert("No item or location found matching that barcode/NFC tag.", "Scan Not Found");
+}
+
+function getNfcTextFromEvent(event) {
+    try {
+        const decoder = new TextDecoder();
+        for (const record of event.message?.records || []) {
+            if (record.data) {
+                const text = decoder.decode(record.data).replace(/^\w{2}/, "").trim();
+                if (text) return text;
+            }
+        }
+    } catch (e) {}
+    return event.serialNumber || "";
+}
+
+let modalDirtySnapshots = {};
+
+function getModalDirtySnapshot(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return "";
+    const values = {};
+    modal.querySelectorAll("input, textarea, select").forEach(el => {
+        if (!el.id) return;
+        if (el.type === "file") values[el.id] = Array.from(el.files || []).map(file => file.name);
+        else if (el.type === "checkbox" || el.type === "radio") values[el.id] = el.checked;
+        else values[el.id] = el.value;
+    });
+    if (modalId === "itemEditModal") {
+        values.__barcode = editModalActiveBarcodeString || "";
+        values.__nfc = editModalActiveNfcTagString || "";
+        values.__tags = [...activeSelectedEditTags].sort();
+        values.__newFiles = currentEditItemFiles.map(file => file.name);
+        values.__deletedPhotos = [...existingItemPhotosToDelete].sort();
+        values.__primaryPhoto = primaryPhotoIdentifier || "";
+    }
+    if (modalId === "addItemModal") {
+        values.__tags = [...activeSelectedAddTags].sort();
+        values.__newFiles = currentAddItemFiles.map(file => file.name);
+        values.__primaryPhoto = primaryPhotoIdentifier || "";
+    }
+    if (modalId === "locationActionsModal" || modalId === "addLocationModal") {
+        values.__photoChanged = !!currentEditLocationFile || !!window.locationPhotoDeleted || currentAddLocationFiles.length > 0;
+    }
+    return JSON.stringify(values);
+}
+
+function markModalClean(modalId) {
+    modalDirtySnapshots[modalId] = getModalDirtySnapshot(modalId);
+}
+
+function isModalDirty(modalId) {
+    return modalDirtySnapshots[modalId] !== undefined && modalDirtySnapshots[modalId] !== getModalDirtySnapshot(modalId);
+}
+
+function closeModalClean(modalId) {
+    delete modalDirtySnapshots[modalId];
+    closeModal(modalId);
+}
+
+async function closeModalWithDirtyCheck(modalId) {
+    if (!isModalDirty(modalId) || await customConfirm("Are you sure? Any unsaved changes will be lost.", "Discard Changes?", true)) {
+        closeModalClean(modalId);
+    }
+}
+
 /* =========================================================
    CUSTOM BRANDED DIALOG ENGINE & UTILS
 ========================================================= */
@@ -99,8 +231,8 @@ function customConfirm(message, title = "Confirm Action", isDanger = false) {
     });
 }
 
-function closeModal(id) { document.getElementById(id).style.display = "none"; }
-async function confirmCancel(modalId) { if (await customConfirm("Are you sure? Any unsaved changes will be lost.", "Discard Changes?", true)) { closeModal(modalId); } }
+function closeModal(id) { document.getElementById(id).style.display = "none"; delete modalDirtySnapshots[id]; }
+async function confirmCancel(modalId) { await closeModalWithDirtyCheck(modalId); }
 async function withStatus(fn, label) { window.setStatus("syncing", label); try { const r = await fn(); window.setStatus("connected", "Connected"); return r; } catch (e) { window.setStatus("error", "Error"); throw e; } }
 
 /* =========================================================
@@ -827,6 +959,7 @@ async function loadRootLocations() {
 }
 
 async function loadLocation(id) {
+    currentLocationId = id;
     const loc = await localDB.locations.get(id); if (loc) await buildBreadcrumb(loc);
     currentBrowserLocations = await localDB.locations.where('parent_id').equals(id).toArray();
     currentBrowserItems = await localDB.items.where('location_id').equals(id).toArray();
@@ -1134,8 +1267,10 @@ function renderItems(items) {
 
     const tbody = tableContainer.querySelector("tbody");
     if (combinedList.length === 0) {
+        const activeLocation = currentLocationId && currentLocationId !== "unallocated" ? locationsAdmin.find(l => String(l.id) === String(currentLocationId)) : null;
+        const emptyName = activeLocation ? activeLocation.name : (currentLocationId === "unallocated" ? "Unallocated Items" : "This location");
         tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #999; padding: 30px; font-style: italic;">Empty directory context</td></tr>`;
-        container.style.display = "block"; container.innerHTML = `<div style="padding: 40px; text-align: center; color: #64748b; font-size: 16px; font-weight: 600; font-style: italic; background: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1; margin-top: 10px;">📭 This location is completely empty!</div>`;
+        container.style.display = "block"; container.innerHTML = `<div style="padding: 40px; text-align: center; color: #64748b; font-size: 16px; font-weight: 600; font-style: italic; background: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1; margin-top: 10px;">${emptyName} is empty!</div>`;
     } else {
         container.style.display = "grid";
         combinedList.forEach(row => {
@@ -1306,6 +1441,7 @@ function ensureAddItemLayout() {
     const photoButtons = preview?.nextElementSibling;
     const name = document.getElementById("itemName");
     const qty = document.getElementById("itemQuantity");
+    const qtyWrapper = document.getElementById("addItemQtyWrapper");
     const location = document.getElementById("itemLocationSelect");
     const description = document.getElementById("itemDescription");
     const barcodeRow = document.getElementById("addItemBarcode")?.closest("div[style*='align-items: flex-end']");
@@ -1315,10 +1451,10 @@ function ensureAddItemLayout() {
     const tagPills = document.getElementById("addItemTagsPillsRow");
     const buttons = content.querySelector(".modal-buttons");
 
-    if (!title || !preview || !photoLabel || !photoButtons || !name || !qty || !location || !description || !category || !tagSelect || !tagPills || !buttons) return;
+    if (!title || !preview || !photoLabel || !photoButtons || !name || !qty || !qtyWrapper || !location || !description || !category || !tagSelect || !tagPills || !buttons) return;
 
     const nameLabel = name.previousElementSibling;
-    const qtyLabel = qty.previousElementSibling;
+    const qtyLabel = qtyWrapper.previousElementSibling;
     const locationLabel = location.previousElementSibling;
     const descriptionLabel = description.previousElementSibling;
     const categoryRow = category.parentElement;
@@ -1337,7 +1473,7 @@ function ensureAddItemLayout() {
 
     const fieldStack = document.createElement("div");
     fieldStack.className = "item-form-fields-stack";
-    fieldStack.append(wrapItemFormField(qtyLabel, qty), wrapItemFormField(categoryLabel, categoryRow));
+    fieldStack.append(wrapItemFormField(qtyLabel, qtyWrapper), wrapItemFormField(categoryLabel, categoryRow));
 
     const actionStack = document.createElement("div");
     actionStack.className = "item-form-action-stack";
@@ -1369,14 +1505,49 @@ function ensureAddItemLayout() {
 
 function openAddItemModal() { 
     ensureAddItemLayout();
-    document.getElementById("itemName").value = ""; document.getElementById("itemQuantity").value = ""; document.getElementById("itemDescription").value = ""; document.getElementById("addItemBarcode").value = ""; document.getElementById("addItemNFC").value = ""; document.getElementById("addItemPhotoInput").value = ""; document.getElementById("addItemCameraInput").value = "";
+    document.getElementById("itemName").value = ""; document.getElementById("itemQuantity").value = "1"; document.getElementById("itemDescription").value = ""; document.getElementById("addItemBarcode").value = ""; document.getElementById("addItemNFC").value = ""; document.getElementById("addItemPhotoInput").value = ""; document.getElementById("addItemCameraInput").value = "";
+    setAddItemEquipmentState(false);
     currentAddItemFiles = []; primaryPhotoIdentifier = null; renderMultipleFilesPreviews('addItemPreviewsRow', currentAddItemFiles, 'add-item');
     activeSelectedAddTags = []; renderActiveTagPills('add');
     const selectEl = document.getElementById("itemLocationSelect"); if (selectEl) selectEl.value = (currentLocationId && currentLocationId !== "unallocated") ? currentLocationId : "";
     document.getElementById("addItemModal").style.display = "flex"; 
+    markModalClean("addItemModal");
 }
 
-function closeAddItemModal() { document.getElementById("addItemModal").style.display = "none"; }
+function closeAddItemModal() { closeModalClean("addItemModal"); }
+
+function setAddItemEquipmentState(isEquipment) {
+    const wrapper = document.getElementById("addItemQtyWrapper");
+    const input = document.getElementById("itemQuantity");
+    const toggle = document.getElementById("addItemEquipmentToggle");
+    if (!input) return;
+    input.value = isEquipment ? "-" : (parseInt(input.value, 10) || 1);
+    input.disabled = isEquipment;
+    input.style.background = isEquipment ? "#e2e8f0" : "#ffffff";
+    if (wrapper) {
+        wrapper.style.opacity = isEquipment ? "0.55" : "1";
+        wrapper.style.filter = isEquipment ? "grayscale(75%)" : "none";
+    }
+    if (toggle) {
+        toggle.dataset.active = isEquipment ? "true" : "false";
+        toggle.style.background = isEquipment ? "#c2410c" : "";
+        toggle.style.color = isEquipment ? "#ffffff" : "#c2410c";
+    }
+}
+
+function toggleAddItemEquipment() {
+    const toggle = document.getElementById("addItemEquipmentToggle");
+    setAddItemEquipmentState(toggle?.dataset.active !== "true");
+}
+
+function adjustAddItemQty(amount) {
+    const input = document.getElementById("itemQuantity");
+    const toggle = document.getElementById("addItemEquipmentToggle");
+    if (!input || toggle?.dataset.active === "true") return;
+    let value = (parseInt(input.value, 10) || 0) + amount;
+    if (value < 0) value = 0;
+    input.value = value;
+}
 
 async function addItem() {
     if (window.isProcessingTransaction) return;
@@ -1384,7 +1555,8 @@ async function addItem() {
 
     try {
         const name = document.getElementById("itemName").value;
-        const quantity = parseInt(document.getElementById("itemQuantity").value) || 0;
+        const isEquipment = document.getElementById("addItemEquipmentToggle")?.dataset.active === "true";
+        const quantity = isEquipment ? "-" : (parseInt(document.getElementById("itemQuantity").value) || 0);
         const location_id = document.getElementById("itemLocationSelect").value || null;
         const description = document.getElementById("itemDescription").value;
         const category = document.getElementById("itemCategorySelect").value || 'tools';
@@ -1465,6 +1637,7 @@ async function switchToItemEdit() {
         
         renderMultipleFilesPreviews('editItemPreviewsRow', currentEditItemFiles, 'edit-item', photos);
         document.getElementById("itemEditModal").style.display = "flex";
+        markModalClean("itemEditModal");
         
     } catch (error) {
         console.error("Critical Error opening edit modal:", error);
@@ -1516,6 +1689,7 @@ async function executeMoveItem() {
 
 async function saveItemEdits() {
     if (!window.isAppOnline) return await customAlert("You must be connected to the internet to save edits.", "Offline Mode");
+    if (!isModalDirty("itemEditModal")) return await customAlert("No item changes to save.", "No Changes");
     if (window.isProcessingTransaction) return;
     window.isProcessingTransaction = true;
 
@@ -1604,6 +1778,7 @@ function openAddLocationModal() {
     const cat = document.getElementById("addLocationCategory"); if (cat) cat.value = "storage";
     document.getElementById("addLocationPhotoInput").value = ""; document.getElementById("addLocationCameraInput").value = ""; document.getElementById("addLocationPreview").src = "../assets/images/folder-icon.jpg";
     currentAddLocationFiles = []; document.getElementById("addLocationModal").style.display = "flex";
+    markModalClean("addLocationModal");
 }
 
 async function addLocation() {
@@ -1647,10 +1822,12 @@ function openLocationActions(id) {
     currentEditLocationFile = null; window.locationPhotoDeleted = false;
     const previewImg = document.getElementById("editLocationPreview"); if (loc.photo) previewImg.src = window.db.storage.from("location-photos").getPublicUrl(loc.photo).data.publicUrl; else previewImg.src = "../assets/images/folder-icon.jpg";
     document.getElementById("locationActionsModal").style.display = "flex";
+    markModalClean("locationActionsModal");
 }
 
 async function saveLocationEdits() {
     if (!window.isAppOnline) return await customAlert("You must be connected to the internet to save edits.", "Offline Mode");
+    if (!isModalDirty("locationActionsModal")) return await customAlert("No location changes to save.", "No Changes");
     if (!editingLocationId) return;
     const barcode = document.getElementById("editLocationBarcode").value; const nfc_tag = document.getElementById("editLocationNFC").value; const name = document.getElementById("editLocationName").value;
     if (barcode && !(await isHardwareTagUnique(barcode, editingLocationId))) return await customAlert("Barcode ID is already registered!", "Duplicate Code");
@@ -1791,6 +1968,7 @@ async function switchToItemEdit() {
         
         renderMultipleFilesPreviews('editItemPreviewsRow', currentEditItemFiles, 'edit-item', photos);
         document.getElementById("itemEditModal").style.display = "flex";
+        markModalClean("itemEditModal");
         
     } catch (error) {
         console.error("Critical Error opening edit modal:", error);
@@ -1901,6 +2079,7 @@ async function attemptDeleteItem() {
 
 async function saveItemEdits() {
     if (!window.isAppOnline) return await customAlert("You must be connected to the internet to save edits.", "Offline Mode");
+    if (!isModalDirty("itemEditModal")) return await customAlert("No item changes to save.", "No Changes");
     if (window.isProcessingTransaction) return;
     window.isProcessingTransaction = true;
 
@@ -2043,6 +2222,7 @@ function openAddLocationModal() {
     const cat = document.getElementById("addLocationCategory"); if (cat) cat.value = "storage";
     document.getElementById("addLocationPhotoInput").value = ""; document.getElementById("addLocationCameraInput").value = ""; document.getElementById("addLocationPreview").src = "../assets/images/folder-icon.jpg";
     currentAddLocationFiles = []; document.getElementById("addLocationModal").style.display = "flex";
+    markModalClean("addLocationModal");
 }
 
 async function addLocation() {
@@ -2084,10 +2264,12 @@ function openLocationActions(id) {
     currentEditLocationFile = null; window.locationPhotoDeleted = false;
     const previewImg = document.getElementById("editLocationPreview"); if (loc.photo) previewImg.src = window.db.storage.from("location-photos").getPublicUrl(loc.photo).data.publicUrl; else previewImg.src = "../assets/images/folder-icon.jpg";
     document.getElementById("locationActionsModal").style.display = "flex";
+    markModalClean("locationActionsModal");
 }
 
 async function saveLocationEdits() {
     if (!window.isAppOnline) return await customAlert("You must be connected to the internet to save edits.", "Offline Mode");
+    if (!isModalDirty("locationActionsModal")) return await customAlert("No location changes to save.", "No Changes");
     if (!editingLocationId) return;
     const barcode = document.getElementById("editLocationBarcode").value; const nfc_tag = document.getElementById("editLocationNFC").value; const name = document.getElementById("editLocationName").value;
     if (barcode && !(await isHardwareTagUnique(barcode, editingLocationId))) return await customAlert("Barcode ID is already registered!", "Duplicate Code");
@@ -2540,8 +2722,7 @@ function renderSectionedSearchResults(sections, filterType) {
 
 function handleLocationBarcodeLookup(scannedText) {
     if (!scannedText || !locationsAdmin) return;
-    const cleanToken = scannedText.trim().toLowerCase();
-    const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === cleanToken) || (l.nfc && l.nfc.trim().toLowerCase() === cleanToken));
+    const match = findLocationByScanToken(scannedText);
     if (match) { document.getElementById("moveItemLocationSelect").value = match.id; executeMoveItem(); }
 }
 
@@ -2836,7 +3017,7 @@ window.openBarcodeScannerModal = async function(targetInputId = null) {
             ndef.onreading = (event) => {
                 if (isProcessingUnifiedScan) return; 
                 isProcessingUnifiedScan = true;
-                executeUnifiedScannerRouting(event.serialNumber, targetInputId);
+                executeUnifiedScannerRouting(getNfcTextFromEvent(event), targetInputId);
             };
         } catch (err) {
             nfcStatusDiv.innerHTML = "⚠️ NFC Error: Please check device settings.";
@@ -2897,7 +3078,7 @@ window.applyDynamicZoom = function(val) {
 };
 
 // --- THE MASTER ROUTER (Handles both Barcode & NFC perfectly) ---
-window.executeUnifiedScannerRouting = function(scannedToken, targetInputId) {
+window.executeUnifiedScannerRouting = async function(scannedToken, targetInputId) {
     const cleanToken = scannedToken.trim();
     const lowerToken = cleanToken.toLowerCase();
     closeBarcodeScannerModal();
@@ -2925,7 +3106,7 @@ window.executeUnifiedScannerRouting = function(scannedToken, targetInputId) {
         else { customAlert("No assignee profile found matching that tag.", "Not Found"); }
 
     } else if (targetInputId === 'itemLocationSelect' || targetInputId === 'addItemLocationTunnel') {
-        const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
+        const match = findLocationByScanToken(cleanToken);
         if (match) { 
             window.updateLocationDropdownUI("itemLocationSelect", match); 
         } else { 
@@ -2933,7 +3114,7 @@ window.executeUnifiedScannerRouting = function(scannedToken, targetInputId) {
         }
 
     } else if (targetInputId === 'editItemLocationSelect') {
-        const match = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerToken) || (l.nfc && l.nfc.trim().toLowerCase() === lowerToken));
+        const match = findLocationByScanToken(cleanToken);
         if (match) { window.updateLocationDropdownUI("editItemLocationSelect", match); } 
         else { customAlert("No location folder found matching that tag.", "Not Found"); }
 
@@ -2946,10 +3127,7 @@ window.executeUnifiedScannerRouting = function(scannedToken, targetInputId) {
         if (targetInputId === 'assignItemBarcode') handleAssignBarcodeLookup(cleanToken);
 
     } else { 
-        document.getElementById("globalSearchInput").value = cleanToken; 
-        const typeFilter = document.getElementById("searchTypeFilter"); 
-        if (typeFilter) typeFilter.value = "barcode"; 
-        handleGlobalSearch(cleanToken); 
+        await routeGlobalHardwareScan(cleanToken);
     }
 };
 
@@ -3425,7 +3603,10 @@ async function startQuickNFC(prefix, callback) {
         if (prefix === "qr") qrNfcAbort = controller;
         const ndef = new NDEFReader();
         await ndef.scan({ signal: controller.signal });
-        ndef.onreading = ev => { if (ev.serialNumber) callback(ev.serialNumber); };
+        ndef.onreading = ev => {
+            const token = getNfcTextFromEvent(ev);
+            if (token) callback(token);
+        };
     } catch (e) {}
 }
 function stopQuickNFC(prefix) {
@@ -3501,7 +3682,7 @@ window.handleQuickMoveScan = async function(text) {
             else { await window.triggerQmSplash("Item Captured!"); qmQueue = []; setQuickQtyControls("qm", match); qmIsProcessing = false; }
         } else if (qmCurrentStep === 2) {
             const locations = await localDB.locations.toArray();
-            const match = locations.find(l => (l.barcode && l.barcode.trim().toLowerCase() === token) || (l.nfc_tag && l.nfc_tag.trim().toLowerCase() === token) || (l.nfc && l.nfc.trim().toLowerCase() === token));
+            const match = locations.find(l => locationMatchesToken(l, token));
             if (!match) { await customAlert("No destination location folder found matching that code.", "Not Found"); qmIsProcessing = false; return; }
             await window.triggerQmSplash("Location Verified!", 700); window.executeQuickMoveAssignment(match.id, match.name);
         }
@@ -3948,9 +4129,9 @@ if (typeof handleGlobalSearch === "function" && !window.searchInterceptApplied) 
         const lowerTerm = term.toLowerCase().trim();
         
         if (lowerTerm && filterType !== "tag" && filterType !== "category") {
-            const locMatch = locationsAdmin.find(l => (l.barcode && l.barcode.trim().toLowerCase() === lowerTerm) || (l.nfc && l.nfc.trim().toLowerCase() === lowerTerm));
+            const locMatch = findLocationByScanToken(term);
             if (locMatch) {
-                document.getElementById('globalSearchInput').value = '';
+                resetSearchControlsAfterScan();
                 navigateToLocation(locMatch.id); 
                 return; 
             }
