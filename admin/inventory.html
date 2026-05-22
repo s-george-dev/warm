@@ -408,7 +408,7 @@
                 <input type="file" id="addItemPhotoInput" accept="image/*" multiple style="display: none;" onchange="handleMultipleFilesSelection(this, 'addItemPreviewsRow', 'add-item')">
                 <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemPhotoInput').click()">📁 Upload</button>
                 <input type="file" id="addItemCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleMultipleFilesSelection(this, 'addItemPreviewsRow', 'add-item')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addItemCameraInput').click()">📷 Camera</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="openPhotoCaptureModal('add-item')">📷 Camera</button>
             </div>
             <label>Item Name</label><input id="itemName" placeholder="Name">
             <label>Quantity</label>
@@ -461,7 +461,7 @@
                 <button class="btn-outline" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; border-color: #cbd5e1;" onclick="document.getElementById('editItemPhotoInput').click()">📁 Upload</button>
                 
                 <input type="file" id="editItemCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleMultipleFilesSelection(this, 'editItemPreviewsRow', 'edit-item')">
-                <button class="btn-outline" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; border-color: #cbd5e1;" onclick="document.getElementById('editItemCameraInput').click()">📷 Camera</button>
+                <button class="btn-outline" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; border-color: #cbd5e1;" onclick="openPhotoCaptureModal('edit-item')">📷 Camera</button>
             </div>
 
             <div style="margin-bottom: 12px;">
@@ -549,7 +549,7 @@
                 <input type="file" id="addLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview', 'add')">
                 <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationPhotoInput').click()">📁 Upload</button>
                 <input type="file" id="addLocationCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewLocationImage(this, 'addLocationPreview', 'add')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addLocationCameraInput').click()">📷 Camera</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="openPhotoCaptureModal('add-location')">📷 Camera</button>
             </div>
             <label>Location Name</label><input id="addLocationName" type="text">
             <label>Description</label><textarea id="addLocationDescription" rows="3"></textarea>
@@ -582,7 +582,7 @@
                 <input type="file" id="addTempLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewTempLocationImage(this, 'addTempLocationPreview', 'add')">
                 <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addTempLocationPhotoInput').click()">📁 Upload Photo</button>
                 <input type="file" id="addTempLocationCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewTempLocationImage(this, 'addTempLocationPreview', 'add')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('addTempLocationCameraInput').click()">📷 Take Photo</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="openPhotoCaptureModal('add-temp-location')">📷 Take Photo</button>
             </div>
             <label>Assignee / Van Name</label><input id="addTempLocationName" type="text">
             <label>Description (Optional)</label><textarea id="addTempLocationDescription" rows="2"></textarea>
@@ -610,7 +610,7 @@
                 <input type="file" id="editTempLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewTempLocationImage(this, 'editTempLocationPreview', 'edit')">
                 <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editTempLocationPhotoInput').click()">📁 Change Photo</button>
                 <input type="file" id="editTempLocationCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewTempLocationImage(this, 'editTempLocationPreview', 'edit')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editTempLocationCameraInput').click()">📷 Take Photo</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="openPhotoCaptureModal('edit-temp-location')">📷 Take Photo</button>
                 <button class="btn-danger" style="font-size: 13px; padding: 5px 12px;" onclick="deleteTempLocationPhoto()">Remove</button>
             </div>
             <label>Name</label><input id="editTempLocationName" type="text">
@@ -639,7 +639,7 @@
                 <input type="file" id="editLocationPhotoInput" accept="image/*" style="display: none;" onchange="previewLocationImage(this, 'editLocationPreview', 'edit')">
                 <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editLocationPhotoInput').click()">📁 Change</button>
                 <input type="file" id="editLocationCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="previewLocationImage(this, 'editLocationPreview', 'edit')">
-                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="document.getElementById('editLocationCameraInput').click()">📷 Photo</button>
+                <button class="btn-outline" style="font-size: 13px; flex: 1;" onclick="openPhotoCaptureModal('edit-location')">📷 Photo</button>
                 <button class="btn-danger" style="font-size: 13px; padding: 5px 12px;" onclick="deleteLocationPhoto()">Remove</button>
             </div>
             <label>Location Name</label><input id="editLocationName" type="text">

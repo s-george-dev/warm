@@ -1420,6 +1420,126 @@ function previewTempLocationImage(input, previewId, mode) {
     }
 }
 
+let photoCaptureStream = null;
+let photoCaptureMode = null;
+
+function ensurePhotoCaptureModal() {
+    let modal = document.getElementById("photoCaptureModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = "photoCaptureModal";
+    modal.className = "modal";
+    modal.style.zIndex = "10020";
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 460px; text-align: center;">
+            <h3 style="margin-top:0; color:#004a99;">Camera Photo</h3>
+            <video id="photoCaptureVideo" autoplay playsinline muted style="width:100%; max-height:360px; background:#111; border-radius:12px; object-fit:cover;"></video>
+            <canvas id="photoCaptureCanvas" style="display:none;"></canvas>
+            <div class="modal-buttons" style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+                <button class="btn-outline" onclick="closePhotoCaptureModal()">Cancel</button>
+                <button class="btn-primary" onclick="capturePhotoFromDevice()">Use Photo</button>
+            </div>
+            <button class="btn-outline" onclick="fallbackPhotoFilePicker()" style="width:100%; margin-top:10px;">Choose file instead</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+}
+
+function stopPhotoCaptureStream() {
+    if (photoCaptureStream) {
+        photoCaptureStream.getTracks().forEach(track => track.stop());
+        photoCaptureStream = null;
+    }
+}
+
+async function openPhotoCaptureModal(mode) {
+    photoCaptureMode = mode;
+    const modal = ensurePhotoCaptureModal();
+    const video = document.getElementById("photoCaptureVideo");
+    modal.style.display = "flex";
+
+    try {
+        stopPhotoCaptureStream();
+        photoCaptureStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false
+        });
+        video.srcObject = photoCaptureStream;
+        await video.play();
+    } catch (error) {
+        console.warn("Device camera unavailable, falling back to file picker:", error);
+        closePhotoCaptureModal();
+        fallbackPhotoFilePicker(mode);
+    }
+}
+
+function closePhotoCaptureModal() {
+    stopPhotoCaptureStream();
+    const modal = document.getElementById("photoCaptureModal");
+    if (modal) modal.style.display = "none";
+}
+
+function fallbackPhotoFilePicker(mode = photoCaptureMode) {
+    const inputMap = {
+        "add-item": "addItemCameraInput",
+        "edit-item": "editItemCameraInput",
+        "add-location": "addLocationCameraInput",
+        "edit-location": "editLocationCameraInput",
+        "add-temp-location": "addTempLocationCameraInput",
+        "edit-temp-location": "editTempLocationCameraInput"
+    };
+    const input = document.getElementById(inputMap[mode]);
+    if (input) input.click();
+}
+
+function addCapturedPhotoToTarget(file, mode) {
+    if (mode === "add-item") {
+        currentAddItemFiles.push(file);
+        renderMultipleFilesPreviews("addItemPreviewsRow", currentAddItemFiles, "add-item");
+        return;
+    }
+    if (mode === "edit-item") {
+        currentEditItemFiles.push(file);
+        renderMultipleFilesPreviews("editItemPreviewsRow", currentEditItemFiles, "edit-item", currentItemForActions?.photos || []);
+        return;
+    }
+
+    const previewMap = {
+        "add-location": "addLocationPreview",
+        "edit-location": "editLocationPreview",
+        "add-temp-location": "addTempLocationPreview",
+        "edit-temp-location": "editTempLocationPreview"
+    };
+    if (mode === "add-location" || mode === "add-temp-location") currentAddLocationFiles = [file];
+    if (mode === "edit-location" || mode === "edit-temp-location") {
+        currentEditLocationFile = file;
+        window.locationPhotoDeleted = false;
+    }
+
+    const preview = document.getElementById(previewMap[mode]);
+    if (preview) preview.src = URL.createObjectURL(file);
+}
+
+async function capturePhotoFromDevice() {
+    const video = document.getElementById("photoCaptureVideo");
+    const canvas = document.getElementById("photoCaptureCanvas");
+    if (!video || !canvas || !photoCaptureMode) return;
+
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(video, 0, 0, width, height);
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if (!blob) return;
+    const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+    addCapturedPhotoToTarget(file, photoCaptureMode);
+    closePhotoCaptureModal();
+}
+
 /* =========================================================
    ITEM ACTIONS (CRUD)
 ========================================================= */
